@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Warriors and Cavalry</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+      #game {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        image-rendering: pixelated;
+      }
+      #hud {
+        position: absolute;
+        top: 0;
+        left: 0;
+        padding: 4px 8px;
+        font-family: monospace;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.5);
+      }
+      #error {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: #fff;
+      }
+      #error[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="hud"></div>
+    <div id="error" hidden></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
