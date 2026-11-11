@@ -4,6 +4,8 @@ import { generateMap, MAPGEN_CONFIG } from './sim/mapgen';
 import { createPixelRenderer, type PixelRenderer } from './render/pixelRenderer';
 import { buildTerrainMesh } from './render/terrainMesh';
 import { buildWater } from './render/water';
+import { CameraRig } from './render/cameraRig';
+import { createKeyState } from './render/keyState';
 
 declare global {
   interface Window {
@@ -41,24 +43,35 @@ function start(): void {
   scene.add(buildTerrainMesh(map));
   scene.add(buildWater(map, MAPGEN_CONFIG.seaLevel));
 
-  // Temporary fixed camera; replaced by a proper camera controller later.
-  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 1000);
-  camera.position.set(64, 70, 150);
-  camera.lookAt(64, 0, 64);
+  const rig = new CameraRig(map.width, map.height);
+  const keys = createKeyState(window);
+
+  canvas.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      rig.zoom(e.deltaY);
+    },
+    { passive: false },
+  );
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   function onResize(): void {
     const size = resize();
     if (!size) return;
-    camera.aspect = size.width / size.height;
-    camera.updateProjectionMatrix();
+    rig.setAspect(size.width / size.height);
   }
   window.addEventListener('resize', onResize);
   onResize();
 
   if (import.meta.env.DEV) window.__debug = { renderer };
 
-  function frame(): void {
-    renderer.render(scene, camera);
+  let lastTime: number | null = null;
+  function frame(time: number): void {
+    const dt = lastTime === null ? 0 : (time - lastTime) / 1000;
+    lastTime = time;
+    rig.update(dt, keys);
+    renderer.render(scene, rig.camera);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
