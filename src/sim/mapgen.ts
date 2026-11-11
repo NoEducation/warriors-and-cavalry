@@ -3,8 +3,8 @@ import { GameMap } from './map';
 import { fbm2 } from './noise';
 import { TileType } from './tiles';
 
-/** Generation tuning. Mutable so values can be tweaked for experiments. */
-export const MAPGEN_CONFIG = {
+/** Generation tuning. Frozen so maps stay reproducible; tune by editing these values here. */
+export const MAPGEN_CONFIG = Object.freeze({
   seaLevel: 0,
   maxHeight: 12,
   noiseScale: 1 / 32,
@@ -13,7 +13,7 @@ export const MAPGEN_CONFIG = {
   sandBand: 0.5,
   rockSlope: 0.45,
   rockAltitude: 3,
-};
+});
 
 export interface MapParams {
   seed: number;

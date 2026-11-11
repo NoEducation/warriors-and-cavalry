@@ -22,7 +22,11 @@ export function createHud(root: HTMLElement, onNewMap: () => void): Hud {
   const button = root.appendChild(document.createElement('button'));
   button.type = 'button';
   button.textContent = 'New map';
-  button.addEventListener('click', onNewMap);
+  button.addEventListener('click', () => {
+    // Drop focus so Space/Enter while moving the camera does not press the button again.
+    button.blur();
+    onNewMap();
+  });
 
   tileLine.textContent = 'Tile: —';
   fpsLine.textContent = 'FPS: —';

@@ -58,7 +58,9 @@ function start(): void {
   scene.add(highlight.object);
   const hud = createHud(hudRoot, () => {
     const seed = randomSeed();
-    history.replaceState(null, '', `?seed=${seed}`);
+    const url = new URL(location.href);
+    url.searchParams.set('seed', String(seed));
+    history.replaceState(null, '', url);
     loadMap(seed);
   });
 

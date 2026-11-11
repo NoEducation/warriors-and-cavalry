@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateMap, mapChecksum } from '../src/sim/mapgen';
+import { generateMap, MAPGEN_CONFIG, mapChecksum } from '../src/sim/mapgen';
 import { TileType } from '../src/sim/tiles';
 
 describe('generateMap', () => {
@@ -50,5 +50,11 @@ describe('generateMap', () => {
   it('normalises the seed to an unsigned 32-bit integer', () => {
     const map = generateMap({ seed: -1, width: 16, height: 16 });
     expect(map.seed).toBe(4294967295);
+  });
+});
+
+describe('MAPGEN_CONFIG', () => {
+  it('is frozen', () => {
+    expect(Object.isFrozen(MAPGEN_CONFIG)).toBe(true);
   });
 });
