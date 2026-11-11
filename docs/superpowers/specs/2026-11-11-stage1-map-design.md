@@ -1,7 +1,7 @@
 # Stage 1 — Generated 3D Map Running in the Browser
 
 Date: 2026-11-11
-Status: draft, waiting for review
+Status: approved 2026-11-11
 
 ## Goal
 
@@ -20,10 +20,11 @@ networking, mobile/touch input, map editor.
 
 ## Tech stack
 
-- TypeScript 5, `strict: true`
-- Vite 6 (Vite 7 needs Node ≥ 20.19; this machine has 20.14)
-- Three.js (rendering library; no game engine)
-- Vitest 3 for unit tests
+- Node 26 (installed: 26.13.1)
+- TypeScript 7, `strict: true`
+- Vite 8 (newest release)
+- Three.js 0.187 (rendering library; no game engine)
+- Vitest 5 for unit tests
 - No other runtime dependencies. No image, model or audio asset files.
 
 ## Architecture
