@@ -7,7 +7,8 @@ const FNV_PRIME = 0x01000193;
 
 /**
  * 32-bit FNV-1a over the bytes of the map's `heights` and `tiles`, then (as little-endian int32) the tick count,
- * each resource's amount and capacity in `RESOURCE_KINDS` order, and each object's id, kind, tx and ty in id order. Use to compare worlds cheaply, e.g. between peers.
+ * each resource's amount and capacity in `RESOURCE_KINDS` order, each object's id, kind, tx and ty in id order,
+ * and each producing building's cycle progress in id order. Use to compare worlds cheaply, e.g. between peers.
  */
 export function worldChecksum(world: World): number {
   const { heights, tiles } = world.map;
@@ -23,6 +24,10 @@ export function worldChecksum(world: World): number {
     hash = feedInt32(hash, object.kind);
     hash = feedInt32(hash, object.tx);
     hash = feedInt32(hash, object.ty);
+  }
+  for (const object of world.objects()) {
+    const production = world.productionState(object.id);
+    if (production) hash = feedInt32(hash, production.progress);
   }
   return hash >>> 0;
 }

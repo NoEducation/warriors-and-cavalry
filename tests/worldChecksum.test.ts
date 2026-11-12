@@ -66,4 +66,23 @@ describe('worldChecksum', () => {
     expect(b.economy.amount(ResourceKind.Wood)).toBe(92);
     expect(worldChecksum(a)).not.toBe(worldChecksum(b));
   });
+
+  it('covers production progress', () => {
+    // Same objects, amounts and tick count; only the hut's progress differs (50 ticks against 0).
+    const hutWorld = (): World => {
+      const world = new World(flatMap());
+      world.spawn(ObjectKind.Tree, 6, 6);
+      return world;
+    };
+    const hut = { type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 1, ty: 1 } as const;
+    const early = hutWorld();
+    early.apply(hut);
+    for (let i = 0; i < 50; i++) early.tick();
+    const late = hutWorld();
+    for (let i = 0; i < 50; i++) late.tick();
+    late.apply(hut);
+    expect(early.productionState(2)?.progress).toBe(50);
+    expect(late.productionState(2)?.progress).toBe(0);
+    expect(worldChecksum(early)).not.toBe(worldChecksum(late));
+  });
 });

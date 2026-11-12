@@ -25,7 +25,7 @@ export interface EconomyView {
 
 /**
  * Whole-number amounts and capacities per resource; an amount is always between 0 and its capacity.
- * Only `World` calls the mutators (`spend`, `add`, `addCapacity`, `removeCapacity`).
+ * Only `World` calls the mutators (`spend`, `add`, `refund`, `addCapacity`, `removeCapacity`).
  */
 export class Economy implements EconomyView {
   private readonly amounts: number[] = [];
@@ -74,6 +74,11 @@ export class Economy implements EconomyView {
     const stored = Math.max(0, Math.min(amount, this.capacities[kind] - this.amounts[kind]));
     this.amounts[kind] += stored;
     return stored;
+  }
+
+  /** Adds back `floor(cost / refundDivisor)` of each resource, limited by capacity. Call when a building is demolished. */
+  public refund(cost: ResourceAmounts): void {
+    for (const kind of RESOURCE_KINDS) this.add(kind, Math.floor(cost[kind] / ECONOMY_CONFIG.refundDivisor));
   }
 
   /** Adds a storage building's `storage` to the capacities. Call when the building is added. */

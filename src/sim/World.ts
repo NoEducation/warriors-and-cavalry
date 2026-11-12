@@ -1,29 +1,27 @@
 // The simulation state: a map, the objects standing on it and the camp's economy, changed only through commands.
-import { ECONOMY_CONFIG, Economy, type EconomyView } from './Economy';
+import { Economy, type EconomyView } from './Economy';
 import { Footprint } from './Footprint';
 import type { GameMap } from './GameMap';
 import type { MapObject } from './MapObject';
-import { OBJECT_KINDS, type ObjectKind } from './ObjectKind';
+import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import { checkPlacement } from './placementRules';
-import { RESOURCE_KINDS } from './ResourceKind';
+import { Production, type ProductionState } from './Production';
 import type { CommandResult, PlacementCheck, WorldChange, WorldCommand } from './WorldCommand';
 
 export class World {
-  public readonly map: GameMap;
   /** Object id per tile (index ty*width+tx); 0 means free. */
   private readonly occupancy: Int32Array;
   /** Ids only increase and are never reused, so insertion order is ascending id order. */
   private readonly byId = new Map<number, MapObject>();
   private readonly listeners = new Set<(change: WorldChange) => void>();
-  private readonly stock: Economy;
+  private readonly production: Production;
   private nextId = 1;
   private ticks = 0;
 
-  /** Creates a world with no objects on `map`, holding `economy` (by default the usual start amounts). */
-  public constructor(map: GameMap, economy: Economy = new Economy()) {
-    this.map = map;
+  /** Creates a world with no objects on `map`, holding `stock` (by default the usual start amounts). */
+  public constructor(public readonly map: GameMap, private readonly stock: Economy = new Economy()) {
     this.occupancy = new Int32Array(map.width * map.height);
-    this.stock = economy;
+    this.production = new Production(map, stock, (tx, ty) => this.objectAt(tx, ty)?.kind === ObjectKind.Tree);
   }
 
   /** Resource amounts and capacities. Read-only: they change only through `apply` and `tick`. */
@@ -39,6 +37,12 @@ export class World {
   /** Advances the world by one simulation tick. Called by the game loop as many times as the runner says. */
   public tick(): void {
     this.ticks++;
+    this.production.tick();
+  }
+
+  /** What the production building `objectId` is doing; null for objects that do not produce or do not exist. */
+  public productionState(objectId: number): ProductionState | null {
+    return this.production.state(objectId);
   }
 
   /** Number of objects currently in the world. */
@@ -111,19 +115,19 @@ export class World {
     this.fill(Footprint.of(object.kind, object.tx, object.ty), 0);
     this.byId.delete(objectId);
     this.stock.removeCapacity(info.storage);
-    for (const kind of RESOURCE_KINDS) {
-      this.stock.add(kind, Math.floor(info.cost[kind] / ECONOMY_CONFIG.refundDivisor));
-    }
+    this.stock.refund(info.cost);
+    this.production.removed(object);
     this.notify({ type: 'removed', object });
     return { ok: true, object };
   }
 
-  /** Adds the object and its storage capacity, then tells the listeners. */
+  /** Adds the object, its storage capacity and its production, then tells the listeners. */
   private add(kind: ObjectKind, tx: number, ty: number): MapObject {
     const object: MapObject = Object.freeze({ id: this.nextId++, kind, tx, ty });
     this.byId.set(object.id, object);
     this.fill(Footprint.of(kind, tx, ty), object.id);
     this.stock.addCapacity(OBJECT_KINDS[kind].storage);
+    this.production.added(object);
     this.notify({ type: 'added', object });
     return object;
   }
