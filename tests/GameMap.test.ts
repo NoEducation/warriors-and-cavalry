@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GameMap } from '../src/sim/map';
+import { GameMap } from '../src/sim/GameMap';
 import { TILE_NAMES, TileType } from '../src/sim/tiles';
 
 // 2x2 tiles -> 3x3 corners with heights 0..8, row-major.

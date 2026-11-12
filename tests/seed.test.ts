@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SEED, parseSeed, randomSeed } from '../src/seed';
+import { DEFAULT_SEED, parseSeed, randomSeed } from '../src/game/seed';
 
 describe('parseSeed', () => {
   it('defaults to seed 1', () => {

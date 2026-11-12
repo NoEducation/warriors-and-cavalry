@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { CAMERA_CONFIG, clamp, clampDt, orbitOffset, panDelta, zoomDistance } from './cameraMath';
 
+/** Anything that can tell whether a key (by `KeyboardEvent.code`) is held. */
 export interface HeldKeys {
   isDown(code: string): boolean;
 }
@@ -9,12 +10,13 @@ export interface HeldKeys {
 const DEG = Math.PI / 180;
 
 export class CameraRig {
-  readonly camera: THREE.PerspectiveCamera;
+  public readonly camera: THREE.PerspectiveCamera;
   private readonly focus: THREE.Vector3;
   private yaw = 0;
   private distance: number = CAMERA_CONFIG.startDistance;
 
-  constructor(
+  /** Starts looking at the centre of a map of the given size; panning stays within it. */
+  public constructor(
     private readonly mapWidth: number,
     private readonly mapHeight: number,
   ) {
@@ -23,7 +25,8 @@ export class CameraRig {
     this.place();
   }
 
-  update(dtSeconds: number, keys: HeldKeys): void {
+  /** Pans (WASD/arrows) and rotates (Q/E) from the held keys. Call once per frame. */
+  public update(dtSeconds: number, keys: HeldKeys): void {
     const dt = clampDt(dtSeconds);
     const held = (a: string, b: string): number => (keys.isDown(a) || keys.isDown(b) ? 1 : 0);
 
@@ -41,12 +44,14 @@ export class CameraRig {
     this.place();
   }
 
-  zoom(wheelDeltaY: number): void {
+  /** Zooms out for a positive wheel delta and in for a negative one. Call from the wheel handler. */
+  public zoom(wheelDeltaY: number): void {
     this.distance = zoomDistance(this.distance, wheelDeltaY);
     this.place();
   }
 
-  setAspect(aspect: number): void {
+  /** Sets the camera's width/height ratio. Call whenever the render size changes. */
+  public setAspect(aspect: number): void {
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
   }

@@ -1,11 +1,13 @@
 // Internal (low-resolution) render size for a canvas, and the device-pixel block each low-res pixel covers.
 
+/** Drawing-buffer size in pixels. */
+export interface RenderSize {
+  readonly width: number;
+  readonly height: number;
+}
+
 /** Drawing-buffer size for a CSS size divided by `pixelScale`; null when the CSS size is unusable. */
-export function renderSize(
-  cssWidth: number,
-  cssHeight: number,
-  pixelScale: number,
-): { width: number; height: number } | null {
+export function renderSize(cssWidth: number, cssHeight: number, pixelScale: number): RenderSize | null {
   if (!Number.isFinite(cssWidth) || !Number.isFinite(cssHeight) || cssWidth <= 0 || cssHeight <= 0) {
     return null;
   }

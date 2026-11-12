@@ -1,25 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { generateMap, MAPGEN_CONFIG, mapChecksum } from '../src/sim/mapgen';
+import { MapGenerator, MAPGEN_CONFIG, mapChecksum } from '../src/sim/MapGenerator';
 import { TileType } from '../src/sim/tiles';
 
-describe('generateMap', () => {
+const generator = new MapGenerator();
+
+describe('MapGenerator', () => {
   it('is deterministic for the same params', () => {
-    const a = generateMap({ seed: 42, width: 64, height: 64 });
-    const b = generateMap({ seed: 42, width: 64, height: 64 });
+    const a = generator.generate({ seed: 42, width: 64, height: 64 });
+    const b = generator.generate({ seed: 42, width: 64, height: 64 });
     expect(Array.from(a.heights)).toEqual(Array.from(b.heights));
     expect(Array.from(a.tiles)).toEqual(Array.from(b.tiles));
     expect(mapChecksum(a)).toBe(mapChecksum(b));
   });
 
   it('gives different maps for different seeds', () => {
-    const a = generateMap({ seed: 1, width: 128, height: 128 });
-    const b = generateMap({ seed: 2, width: 128, height: 128 });
+    const a = generator.generate({ seed: 1, width: 128, height: 128 });
+    const b = generator.generate({ seed: 2, width: 128, height: 128 });
     expect(mapChecksum(a)).not.toBe(mapChecksum(b));
   });
 
   for (const seed of [1, 2, 3, 4, 5]) {
     it(`seed ${seed}: water border, enough grass and water, valid tile values`, () => {
-      const map = generateMap({ seed, width: 128, height: 128 });
+      const map = generator.generate({ seed, width: 128, height: 128 });
       let grass = 0;
       let water = 0;
       for (let ty = 0; ty < map.height; ty++) {
@@ -40,7 +42,7 @@ describe('generateMap', () => {
   }
 
   it('supports non-square maps', () => {
-    const map = generateMap({ seed: 7, width: 64, height: 32 });
+    const map = generator.generate({ seed: 7, width: 64, height: 32 });
     expect(map.width).toBe(64);
     expect(map.height).toBe(32);
     expect(map.tiles.length).toBe(64 * 32);
@@ -48,7 +50,7 @@ describe('generateMap', () => {
   });
 
   it('normalises the seed to an unsigned 32-bit integer', () => {
-    const map = generateMap({ seed: -1, width: 16, height: 16 });
+    const map = generator.generate({ seed: -1, width: 16, height: 16 });
     expect(map.seed).toBe(4294967295);
   });
 });
