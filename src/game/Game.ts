@@ -19,6 +19,8 @@ import { TileHover } from './TileHover';
 export interface DebugHandles {
   readonly renderer: THREE.WebGLRenderer;
   readonly game: Game;
+  /** The world currently shown; changes when a new map is loaded. */
+  readonly world: World;
 }
 
 declare global {
@@ -63,7 +65,16 @@ export class Game {
   public start(): void {
     window.addEventListener('resize', this.onResize);
     this.onResize();
-    if (import.meta.env.DEV) window.__debug = { renderer: this.pixelRenderer.webgl, game: this };
+    if (import.meta.env.DEV) {
+      const game = this;
+      window.__debug = {
+        renderer: this.pixelRenderer.webgl,
+        game,
+        get world(): World {
+          return game.world;
+        },
+      };
+    }
     requestAnimationFrame(this.onFrame);
   }
 
