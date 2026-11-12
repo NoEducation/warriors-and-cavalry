@@ -9,4 +9,6 @@ export const GAME_CONFIG = Object.freeze({
   fpsSamples: 60,
   /** Milliseconds between FPS display updates. */
   fpsUpdateMs: 500,
+  /** Seconds a HUD message (e.g. a rejected placement) stays visible. */
+  messageSeconds: 2,
 });

@@ -2,14 +2,18 @@
 import type * as THREE from 'three';
 import { Keyboard } from '../input/Keyboard';
 import { Pointer } from '../input/Pointer';
+import { BuildingMeshFactory } from '../render/BuildingMeshFactory';
 import { CameraRig } from '../render/CameraRig';
 import { PixelRenderer } from '../render/PixelRenderer';
+import { PlacementGhost } from '../render/PlacementGhost';
 import { TileHighlight } from '../render/TileHighlight';
 import { TilePicker } from '../render/TilePicker';
 import { WorldView } from '../render/WorldView';
 import { MapGenerator } from '../sim/MapGenerator';
 import type { World } from '../sim/World';
 import { Hud } from '../ui/Hud';
+import { BuildController } from './BuildController';
+import { BuildInput } from './BuildInput';
 import { FpsCounter } from './FpsCounter';
 import { GAME_CONFIG } from './GameConfig';
 import { parseSeed, randomSeed } from './seed';
@@ -38,27 +42,34 @@ export class Game {
   private readonly rig: CameraRig;
   private readonly keyboard: Keyboard;
   private readonly tileHover: TileHover;
+  private readonly builder: BuildController;
   private readonly fpsCounter = new FpsCounter(GAME_CONFIG.fpsSamples);
   /** Set by `loadMap`, which the constructor calls. */
   private world!: World;
   private lastFrameTime: number | null = null;
   private lastFpsUpdate = 0;
 
-  /** Builds the scene, HUD and input for the map in the URL's `seed`. Throws if WebGL is unavailable. */
-  public constructor(canvas: HTMLCanvasElement, hudRoot: HTMLElement) {
+  /** Builds the scene, HUD, build bar and input for the map in the URL's `seed`. Throws if WebGL is unavailable. */
+  public constructor(canvas: HTMLCanvasElement, hudRoot: HTMLElement, buildBarRoot: HTMLElement) {
     this.pixelRenderer = new PixelRenderer(canvas, GAME_CONFIG.pixelScale);
     this.worldView = new WorldView();
     this.highlight = new TileHighlight();
-    this.worldView.scene.add(this.highlight.object);
+    const ghost = new PlacementGhost(new BuildingMeshFactory());
+    this.worldView.scene.add(this.highlight.object, ghost.object);
     this.hud = new Hud(hudRoot, () => this.onNewMap());
 
     this.loadMap(parseSeed(location.search));
+    this.builder = new BuildController(this.world, (text) => this.hud.showMessage(text, GAME_CONFIG.messageSeconds));
 
     this.rig = new CameraRig(GAME_CONFIG.mapSize, GAME_CONFIG.mapSize);
     this.keyboard = new Keyboard(window);
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    this.tileHover = new TileHover(new Pointer(canvas), new TilePicker(), this.highlight, this.hud);
+    const pointer = new Pointer(canvas);
+    this.tileHover = new TileHover(pointer, new TilePicker(), this.highlight, ghost, this.hud, this.builder);
+    new BuildInput(this.builder, buildBarRoot, window, pointer, () =>
+      this.tileHover.tileUnderCursor(this.rig.camera, this.world.map),
+    );
   }
 
   /** Sizes the renderer, follows window resizes and starts the frame loop. Call once after construction. */
@@ -88,7 +99,7 @@ export class Game {
 
   private update(dtSeconds: number): void {
     this.rig.update(dtSeconds, this.keyboard);
-    this.tileHover.update(this.rig.camera, this.world.map);
+    this.tileHover.update(this.rig.camera, this.world);
     this.fpsCounter.addFrame(dtSeconds);
   }
 
@@ -110,6 +121,7 @@ export class Game {
     url.searchParams.set('seed', String(seed));
     history.replaceState(null, '', url);
     this.loadMap(seed);
+    this.builder.setWorld(this.world);
   }
 
   private readonly onFrame = (time: number): void => {
