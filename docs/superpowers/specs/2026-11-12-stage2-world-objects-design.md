@@ -1,7 +1,7 @@
 # Stage 2 — Class Refactor, Larger Map, Trees and Buildings
 
 Date: 2026-11-12
-Status: draft, waiting for review
+Status: approved 2026-11-12
 Builds on: `2026-11-11-stage1-map-design.md` (all of its rules still apply
 unless this document changes them).
 
