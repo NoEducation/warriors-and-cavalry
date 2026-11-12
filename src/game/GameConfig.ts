@@ -4,7 +4,7 @@ export const GAME_CONFIG = Object.freeze({
   /** Map width and height in tiles. */
   mapSize: 512,
   /** CSS pixels per rendered pixel (rounded to whole device pixels at runtime). */
-  pixelScale: 3,
+  pixelScale: 2,
   /** Frames averaged for the FPS reading. */
   fpsSamples: 60,
   /** Milliseconds between FPS display updates. */
