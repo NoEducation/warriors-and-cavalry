@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampDt, orbitOffset, panDelta, zoomDistance } from '../src/render/cameraMath';
+import { clampDt, clampPitch, dragRotation, orbitOffset, panDelta, zoomDistance } from '../src/render/cameraMath';
 
 const DEG = Math.PI / 180;
 
@@ -77,5 +77,64 @@ describe('orbitOffset', () => {
   it('keeps the requested distance at any yaw', () => {
     const o = orbitOffset(1.3, 55 * DEG, 60);
     expect(Math.hypot(o.x, o.y, o.z)).toBeCloseTo(60);
+  });
+});
+
+describe('clampPitch', () => {
+  it('keeps pitches at and between the limits', () => {
+    expect(clampPitch(25 * DEG)).toBeCloseTo(25 * DEG);
+    expect(clampPitch(55 * DEG)).toBeCloseTo(55 * DEG);
+    expect(clampPitch(80 * DEG)).toBeCloseTo(80 * DEG);
+  });
+
+  it('raises pitches below 25 degrees to 25', () => {
+    expect(clampPitch(24 * DEG)).toBeCloseTo(25 * DEG);
+    expect(clampPitch(-1)).toBeCloseTo(25 * DEG);
+  });
+
+  it('lowers pitches above 80 degrees to 80', () => {
+    expect(clampPitch(81 * DEG)).toBeCloseTo(80 * DEG);
+    expect(clampPitch(10)).toBeCloseTo(80 * DEG);
+  });
+
+  it('turns NaN into the starting pitch', () => {
+    expect(clampPitch(NaN)).toBeCloseTo(55 * DEG);
+  });
+});
+
+describe('dragRotation', () => {
+  it('gives zero deltas for no movement', () => {
+    const r = dragRotation(0, 0);
+    expect(r.yawDelta).toBeCloseTo(0);
+    expect(r.pitchDelta).toBeCloseTo(0);
+  });
+
+  it('turns 0.5 rad of yaw for 100 px sideways and does not tilt', () => {
+    const r = dragRotation(100, 0);
+    expect(Math.abs(r.yawDelta)).toBeCloseTo(0.5);
+    expect(r.pitchDelta).toBe(0);
+  });
+
+  it('increases yaw when dragging right, so the scene turns clockwise seen from above', () => {
+    expect(dragRotation(100, 0).yawDelta).toBeGreaterThan(0);
+  });
+
+  it('raises the pitch by 0.5 rad for 100 px downwards', () => {
+    const r = dragRotation(0, 100);
+    expect(r.pitchDelta).toBeCloseTo(0.5);
+    expect(r.yawDelta).toBeCloseTo(0);
+  });
+
+  it('gives zero deltas for non-finite input', () => {
+    const inputs: [number, number][] = [
+      [NaN, 5],
+      [5, Infinity],
+      [-Infinity, NaN],
+    ];
+    for (const [dx, dy] of inputs) {
+      const r = dragRotation(dx, dy);
+      expect(r.yawDelta).toBe(0);
+      expect(r.pitchDelta).toBe(0);
+    }
   });
 });

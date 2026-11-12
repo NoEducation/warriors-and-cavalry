@@ -1,6 +1,6 @@
-// RTS camera: orbits a focus point on the ground; keys pan and rotate, the wheel zooms.
+// RTS camera: orbits a focus point on the ground; keys pan and rotate, the wheel zooms, mouse drags rotate and tilt.
 import * as THREE from 'three';
-import { CAMERA_CONFIG, clamp, clampDt, orbitOffset, panDelta, zoomDistance } from './cameraMath';
+import { CAMERA_CONFIG, clamp, clampDt, clampPitch, orbitOffset, panDelta, zoomDistance } from './cameraMath';
 
 /** Anything that can tell whether a key (by `KeyboardEvent.code`) is held. */
 export interface HeldKeys {
@@ -13,6 +13,7 @@ export class CameraRig {
   public readonly camera: THREE.PerspectiveCamera;
   private readonly focus: THREE.Vector3;
   private yaw = 0;
+  private pitch: number = CAMERA_CONFIG.pitchDeg * DEG;
   private distance: number = CAMERA_CONFIG.startDistance;
 
   /** Starts looking at the centre of a map of the given size; panning stays within it. */
@@ -44,6 +45,26 @@ export class CameraRig {
     this.place();
   }
 
+  /**
+   * Turns the camera around the focus by `yawDeltaRad` (positive turns the view counter-clockwise seen from above, like Q).
+   * Takes effect immediately; call from mouse-drag input. Non-finite deltas are ignored.
+   */
+  public rotateBy(yawDeltaRad: number): void {
+    if (!Number.isFinite(yawDeltaRad)) return;
+    this.yaw += yawDeltaRad;
+    this.place();
+  }
+
+  /**
+   * Tilts the camera by `pitchDeltaRad` (positive towards top-down), clamped to the pitch limits.
+   * Takes effect immediately; call from mouse-drag input. Non-finite deltas are ignored.
+   */
+  public tiltBy(pitchDeltaRad: number): void {
+    if (!Number.isFinite(pitchDeltaRad)) return;
+    this.pitch = clampPitch(this.pitch + pitchDeltaRad);
+    this.place();
+  }
+
   /** Zooms out for a positive wheel delta and in for a negative one. Call from the wheel handler. */
   public zoom(wheelDeltaY: number): void {
     this.distance = zoomDistance(this.distance, wheelDeltaY);
@@ -57,7 +78,7 @@ export class CameraRig {
   }
 
   private place(): void {
-    const o = orbitOffset(this.yaw, CAMERA_CONFIG.pitchDeg * DEG, this.distance);
+    const o = orbitOffset(this.yaw, this.pitch, this.distance);
     this.camera.position.set(this.focus.x + o.x, this.focus.y + o.y, this.focus.z + o.z);
     this.camera.lookAt(this.focus);
   }

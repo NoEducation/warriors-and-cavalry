@@ -3,6 +3,9 @@
 export const CAMERA_CONFIG = {
   fovDeg: 30,
   pitchDeg: 55,
+  minPitchDeg: 25,
+  maxPitchDeg: 80,
+  dragRadPerPixel: 0.005,
   minDistance: 20,
   maxDistance: 160,
   startDistance: 60,
@@ -50,6 +53,36 @@ export function zoomDistance(distance: number, wheelDeltaY: number): number {
   if (wheelDeltaY > 0) distance *= zoomStep;
   else if (wheelDeltaY < 0) distance /= zoomStep;
   return clamp(distance, minDistance, maxDistance);
+}
+
+const DEG = Math.PI / 180;
+
+/** Camera pitch in radians limited to [minPitchDeg, maxPitchDeg]; NaN becomes the starting pitch. */
+export function clampPitch(pitchRad: number): number {
+  const { pitchDeg, minPitchDeg, maxPitchDeg } = CAMERA_CONFIG;
+  if (Number.isNaN(pitchRad)) return pitchDeg * DEG;
+  return clamp(pitchRad, minPitchDeg * DEG, maxPitchDeg * DEG);
+}
+
+/** Camera yaw and pitch change, in radians, caused by a mouse drag. */
+export interface DragRotation {
+  readonly yawDelta: number;
+  readonly pitchDelta: number;
+}
+
+/**
+ * Yaw and pitch change for a drag of (dx, dy) CSS pixels; non-finite input gives no change.
+ *
+ * Yaw sign: `orbitOffset` puts the camera at (sin yaw, cos yaw) around the focus, so a larger yaw moves the camera
+ * from +z towards +x, which turns its heading from -z towards -x: a left (counter-clockwise from above) turn, the same
+ * as holding Q. When the camera turns left, what was ahead of it slides to the right of the screen, i.e. the scene
+ * turns clockwise seen from above. Dragging right should turn the scene clockwise, so yawDelta = +dx (not -dx).
+ * Pitch: dragging down (positive dy) raises the camera towards top-down.
+ */
+export function dragRotation(dxPixels: number, dyPixels: number): DragRotation {
+  if (!Number.isFinite(dxPixels) || !Number.isFinite(dyPixels)) return { yawDelta: 0, pitchDelta: 0 };
+  const k = CAMERA_CONFIG.dragRadPerPixel;
+  return { yawDelta: dxPixels * k, pitchDelta: dyPixels * k };
 }
 
 /** Camera position relative to the focus point; at yaw 0 it sits above the +z side. */

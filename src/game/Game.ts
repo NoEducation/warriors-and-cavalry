@@ -14,6 +14,7 @@ import type { World } from '../sim/World';
 import { Hud } from '../ui/Hud';
 import { BuildController } from './BuildController';
 import { BuildInput, type MapClickTarget } from './BuildInput';
+import { CameraDragInput } from './CameraDragInput';
 import { FpsDisplay } from './FpsDisplay';
 import { GAME_CONFIG } from './GameConfig';
 import { parseSeed, randomSeed } from './seed';
@@ -48,6 +49,7 @@ export class Game {
   private readonly builder: BuildController;
   private readonly tileHover: TileHover;
   private readonly buildInput: BuildInput;
+  private readonly cameraDragInput: CameraDragInput;
   /** The world currently shown. Game is its only owner and passes it to whoever needs it; `loadMap` replaces it. */
   private world: World;
   private lastFrameTime: number | null = null;
@@ -63,6 +65,7 @@ export class Game {
     this.builder = new BuildController((text) => this.hud.showMessage(text, GAME_CONFIG.messageSeconds));
     this.tileHover = new TileHover(this.pointer, this.picker, this.highlight, this.ghost, this.hud, this.builder);
     this.buildInput = new BuildInput(this.builder, buildBarRoot, window, this.pointer, () => this.mapClickTarget());
+    this.cameraDragInput = new CameraDragInput(this.pointer, this.rig);
     this.addOverlaysToScene();
     this.listenToCanvas(canvas);
     this.showWorld();
