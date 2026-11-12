@@ -230,3 +230,14 @@ describe('World.spawn and listeners', () => {
     expect(changes.length).toBe(1);
   });
 });
+
+describe('World.tick', () => {
+  it('counts ticks from zero', () => {
+    const world = new World(flatMap());
+    expect(world.tickCount).toBe(0);
+    world.tick();
+    world.tick();
+    world.tick();
+    expect(world.tickCount).toBe(3);
+  });
+});

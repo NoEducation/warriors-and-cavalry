@@ -5,13 +5,14 @@ const FNV_OFFSET_BASIS = 0x811c9dc5;
 const FNV_PRIME = 0x01000193;
 
 /**
- * 32-bit FNV-1a over the bytes of the map's `heights` and `tiles`, then each object's id, kind, tx and ty
- * (as little-endian int32) in id order. Use to compare worlds cheaply, e.g. between peers.
+ * 32-bit FNV-1a over the bytes of the map's `heights` and `tiles`, then the tick count and each object's id,
+ * kind, tx and ty (as little-endian int32) in id order. Use to compare worlds cheaply, e.g. between peers.
  */
 export function worldChecksum(world: World): number {
   const { heights, tiles } = world.map;
   let hash = feedBytes(FNV_OFFSET_BASIS, new Uint8Array(heights.buffer, heights.byteOffset, heights.byteLength));
   hash = feedBytes(hash, tiles);
+  hash = feedInt32(hash, world.tickCount);
   for (const object of world.objects()) {
     hash = feedInt32(hash, object.id);
     hash = feedInt32(hash, object.kind);

@@ -19,11 +19,22 @@ export class World {
   private readonly byId = new Map<number, MapObject>();
   private readonly listeners = new Set<(change: WorldChange) => void>();
   private nextId = 1;
+  private ticks = 0;
 
   /** Creates a world with no objects on `map`. */
   public constructor(map: GameMap) {
     this.map = map;
     this.occupancy = new Int32Array(map.width * map.height);
+  }
+
+  /** Number of simulation ticks run since the world was generated. */
+  public get tickCount(): number {
+    return this.ticks;
+  }
+
+  /** Advances the world by one simulation tick. Called by the game loop as many times as the runner says. */
+  public tick(): void {
+    this.ticks++;
   }
 
   /** Number of objects currently in the world. */

@@ -13,14 +13,22 @@ describe('worldChecksum', () => {
   });
 
   it('keeps the seed 1 world of 512 x 512 tiles unchanged', () => {
-    // Recorded before trees got species; tree looks are render-only, so the simulation must not change.
-    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(3842414936);
+    // Re-recorded when the checksum started covering the tick count (was 3842414936 before that).
+    // Tree looks are render-only, so changing them must not change this value.
+    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(541835208);
   });
 
   it('differs for different seeds', () => {
     const a = generator.generate({ seed: 1, width: 128, height: 128 });
     const b = generator.generate({ seed: 2, width: 128, height: 128 });
     expect(worldChecksum(a)).not.toBe(worldChecksum(b));
+  });
+
+  it('changes after a tick', () => {
+    const world = generator.generate({ seed: 3, width: 64, height: 64 });
+    const before = worldChecksum(world);
+    world.tick();
+    expect(worldChecksum(world)).not.toBe(before);
   });
 
   it('changes after a building is placed', () => {

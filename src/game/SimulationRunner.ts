@@ -1,0 +1,62 @@
+// Turns real frame time into a whole number of simulation ticks, with pause and speed steps.
+
+/** Speed multipliers the player can step through, slowest first. */
+export const SIMULATION_SPEEDS = [1, 2, 4] as const;
+/** Most ticks run in one frame; time beyond that (a long stall, a hidden tab) is dropped. */
+export const MAX_TICKS_PER_FRAME = 10;
+
+export class SimulationRunner {
+  /** Elapsed simulation time not yet turned into ticks, in ticks (always below 1 between frames). */
+  private pending = 0;
+  private speedIndex = 0;
+  private isPaused = false;
+
+  /** Runs `ticksPerSecond` ticks per second of real time at 1×. Create once per game. */
+  public constructor(private readonly ticksPerSecond: number) {}
+
+  /** True while the simulation is paused. */
+  public get paused(): boolean {
+    return this.isPaused;
+  }
+
+  /** The current speed multiplier, one of SIMULATION_SPEEDS. */
+  public get speed(): number {
+    return SIMULATION_SPEEDS[this.speedIndex];
+  }
+
+  /** Pauses a running simulation or resumes a paused one. Call on the player's pause key. */
+  public togglePause(): void {
+    this.isPaused = !this.isPaused;
+  }
+
+  /** Steps to the next faster speed; stays at the fastest. */
+  public faster(): void {
+    this.speedIndex = Math.min(this.speedIndex + 1, SIMULATION_SPEEDS.length - 1);
+  }
+
+  /** Steps to the next slower speed; stays at the slowest. */
+  public slower(): void {
+    this.speedIndex = Math.max(this.speedIndex - 1, 0);
+  }
+
+  /** Drops time accumulated towards the next tick, keeping pause and speed. Call when a new world is loaded. */
+  public reset(): void {
+    this.pending = 0;
+  }
+
+  /**
+   * How many ticks to run for a frame that lasted `dtSeconds` of real time. Call once per frame.
+   * Leftover time carries over to the next frame; paused, negative or NaN time gives 0.
+   */
+  public ticksFor(dtSeconds: number): number {
+    if (this.isPaused || !(dtSeconds > 0)) return 0;
+    this.pending += dtSeconds * this.ticksPerSecond * this.speed;
+    const ticks = Math.floor(this.pending);
+    if (ticks > MAX_TICKS_PER_FRAME) {
+      this.pending = 0;
+      return MAX_TICKS_PER_FRAME;
+    }
+    this.pending -= ticks;
+    return ticks;
+  }
+}
