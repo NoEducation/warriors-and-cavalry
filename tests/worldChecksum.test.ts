@@ -12,6 +12,11 @@ describe('worldChecksum', () => {
     expect(worldChecksum(a)).toBe(worldChecksum(b));
   });
 
+  it('keeps the seed 1 world of 512 x 512 tiles unchanged', () => {
+    // Recorded before trees got species; tree looks are render-only, so the simulation must not change.
+    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(3842414936);
+  });
+
   it('differs for different seeds', () => {
     const a = generator.generate({ seed: 1, width: 128, height: 128 });
     const b = generator.generate({ seed: 2, width: 128, height: 128 });
