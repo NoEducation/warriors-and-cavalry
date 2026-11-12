@@ -8,10 +8,11 @@ import { PlacementGhost } from '../render/PlacementGhost';
 import { TileHighlight } from '../render/TileHighlight';
 import { TilePicker } from '../render/TilePicker';
 import { WorldView } from '../render/WorldView';
-import { gameTimeAt, TICKS_PER_SECOND } from '../sim/gameTime';
+import { TICKS_PER_SECOND } from '../sim/gameTime';
 import { MapGenerator } from '../sim/MapGenerator';
 import type { World } from '../sim/World';
 import { Hud } from '../ui/Hud';
+import { ResourceBar } from '../ui/ResourceBar';
 import { BuildController } from './BuildController';
 import { BuildInput, type MapClickTarget } from './BuildInput';
 import { CameraDragInput } from './CameraDragInput';
@@ -19,6 +20,7 @@ import { FpsDisplay } from './FpsDisplay';
 import { GAME_CONFIG } from './GameConfig';
 import { parseSeed, randomSeed } from './seed';
 import { SimulationRunner } from './SimulationRunner';
+import { StatusDisplay } from './StatusDisplay';
 import { TileHover } from './TileHover';
 import { TimeInput } from './TimeInput';
 
@@ -40,12 +42,18 @@ export class Game {
   private readonly buildInput: BuildInput;
   private readonly cameraDragInput: CameraDragInput;
   private readonly timeInput: TimeInput;
+  private readonly status: StatusDisplay;
   /** The world currently shown. Game is its only owner and passes it to whoever needs it; `loadMap` replaces it. */
   private world: World;
   private lastFrameTime: number | null = null;
 
-  /** Builds the scene, HUD, build bar and input for the map in the URL's `seed`. Throws if WebGL is unavailable. */
-  public constructor(canvas: HTMLCanvasElement, hudRoot: HTMLElement, buildBarRoot: HTMLElement) {
+  /** Builds the scene, HUD, resource bar, build bar and input for the URL's `seed`. Throws without WebGL. */
+  public constructor(
+    canvas: HTMLCanvasElement,
+    hudRoot: HTMLElement,
+    resourceRoot: HTMLElement,
+    buildBarRoot: HTMLElement,
+  ) {
     this.pixelRenderer = new PixelRenderer(canvas, GAME_CONFIG.pixelScale);
     this.world = this.generateWorld(parseSeed(location.search));
     this.keyboard = new Keyboard(window);
@@ -57,6 +65,7 @@ export class Game {
     this.buildInput = new BuildInput(this.builder, buildBarRoot, window, this.pointer, () => this.mapClickTarget());
     this.cameraDragInput = new CameraDragInput(this.pointer, this.rig);
     this.timeInput = new TimeInput(window, this.runner);
+    this.status = new StatusDisplay(this.hud, new ResourceBar(resourceRoot), this.buildInput, this.runner);
     // The hover outline and placement ghost stay in the scene across maps.
     this.worldView.scene.add(this.highlight.object, this.ghost.object);
     this.listenToCanvas(canvas);
@@ -123,7 +132,7 @@ export class Game {
     const dt = this.lastFrameTime === null ? 0 : (time - this.lastFrameTime) / 1000;
     this.lastFrameTime = time;
     for (let ticks = this.runner.ticksFor(dt); ticks > 0; ticks--) this.world.tick();
-    this.hud.setClock(gameTimeAt(this.world.tickCount), this.runner.paused, this.runner.speed);
+    this.status.update(this.world);
     this.rig.update(dt, this.keyboard);
     this.tileHover.update(this.rig.camera, this.world);
     this.fpsDisplay.addFrame(dt, time);

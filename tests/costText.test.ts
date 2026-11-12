@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NO_RESOURCES, resources } from '../src/sim/ResourceKind';
-import { costText } from '../src/ui/costText';
+import { costText, shortCostText } from '../src/ui/costText';
 
 describe('costText', () => {
   it('lists every non-zero amount in resource order', () => {
@@ -14,5 +14,13 @@ describe('costText', () => {
 
   it('says free when nothing is charged', () => {
     expect(costText(NO_RESOURCES)).toBe('free');
+  });
+});
+
+describe('shortCostText', () => {
+  it('abbreviates each non-zero amount to its first letter, or says free', () => {
+    expect(shortCostText(resources(50, 40, 0))).toBe('50w 40s');
+    expect(shortCostText(resources(0, 0, 3))).toBe('3f');
+    expect(shortCostText(NO_RESOURCES)).toBe('free');
   });
 });

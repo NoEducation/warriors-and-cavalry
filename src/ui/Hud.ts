@@ -8,6 +8,8 @@ export interface HudTileInfo extends TileCoord {
   readonly height: number;
   /** Name of the object standing on the tile, if any. */
   readonly objectName?: string;
+  /** What that object is doing, e.g. `working` for a production building; shown after its name. */
+  readonly objectState?: string;
 }
 
 export class Hud {
@@ -65,6 +67,7 @@ export class Hud {
     if (info) {
       text = `Tile: ${info.tx}, ${info.ty} ${info.name} h=${info.height.toFixed(1)}`;
       if (info.objectName) text += ` — ${info.objectName}`;
+      if (info.objectName && info.objectState) text += ` — ${info.objectState}`;
     }
     if (this.tileLine.textContent !== text) this.tileLine.textContent = text;
   }

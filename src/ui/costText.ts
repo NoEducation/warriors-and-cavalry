@@ -6,3 +6,11 @@ export function costText(cost: ResourceAmounts): string {
   const parts = RESOURCE_KINDS.filter((kind) => cost[kind] > 0).map((kind) => `${cost[kind]} ${RESOURCE_NAMES[kind]}`);
   return parts.length > 0 ? parts.join(', ') : 'free';
 }
+
+/** `50w 40s`: like `costText` with each resource shortened to its first letter, for the compact build bar buttons. */
+export function shortCostText(cost: ResourceAmounts): string {
+  const parts = RESOURCE_KINDS.filter((kind) => cost[kind] > 0).map(
+    (kind) => `${cost[kind]}${RESOURCE_NAMES[kind][0]}`,
+  );
+  return parts.length > 0 ? parts.join(' ') : 'free';
+}

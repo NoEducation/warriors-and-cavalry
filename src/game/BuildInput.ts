@@ -1,5 +1,6 @@
 // Player input for building: digit keys, Escape, the build bar and clicks on the map drive a BuildController.
 import type { Pointer } from '../input/Pointer';
+import type { EconomyView } from '../sim/Economy';
 import type { TileCoord } from '../sim/TileCoord';
 import type { World } from '../sim/World';
 import { BuildBar } from '../ui/BuildBar';
@@ -32,6 +33,11 @@ export class BuildInput {
     this.bar = new BuildBar(barRoot, (tool) => this.select(tool));
     keyTarget.addEventListener('keydown', this.onKeyDown);
     pointer.onClick(this.onClick);
+  }
+
+  /** Dims the build bar buttons whose cost `economy` cannot pay. Cheap; call every frame. */
+  public showAffordable(economy: EconomyView): void {
+    this.bar.setAffordable(economy);
   }
 
   /** Selects `tool` (null deselects) in the controller and shows it as active on the bar. */

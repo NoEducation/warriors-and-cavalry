@@ -11,14 +11,17 @@ function showError(message: string): void {
 function main(): void {
   const canvas = document.getElementById('game');
   const hudRoot = document.getElementById('hud');
+  const resourceRoot = document.getElementById('resources');
   const buildBarRoot = document.getElementById('buildbar');
-  if (!(canvas instanceof HTMLCanvasElement) || !hudRoot || !buildBarRoot) {
-    throw new Error('index.html must contain <canvas id="game">, <div id="hud"> and <div id="buildbar">');
+  if (!(canvas instanceof HTMLCanvasElement) || !hudRoot || !resourceRoot || !buildBarRoot) {
+    throw new Error(
+      'index.html must contain <canvas id="game">, <div id="hud">, <div id="resources"> and <div id="buildbar">',
+    );
   }
 
   let game: Game;
   try {
-    game = new Game(canvas, hudRoot, buildBarRoot);
+    game = new Game(canvas, hudRoot, resourceRoot, buildBarRoot);
   } catch (err) {
     console.error(err);
     showError('WebGL is not available in this browser.');
