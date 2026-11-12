@@ -1,90 +1,95 @@
-// Every tree of a world, drawn as two instanced meshes (trunks and foliage).
+// Every tree of a world: one instanced mesh per species and square region, so three.js can skip regions out of view.
 import * as THREE from 'three';
-import type { MapObject } from '../sim/MapObject';
 import { ObjectKind } from '../sim/ObjectKind';
-import { hash2 } from '../sim/rng';
 import type { World } from '../sim/World';
+import { treeAppearance, type TreeAppearance } from './treeAppearance';
+import { TreeGeometryFactory } from './TreeGeometryFactory';
+import { ALL_TREE_SPECIES, type TreeSpecies } from './TreeSpecies';
 
-/** Tree shape in world units at scale 1; total height is trunkHeight - foliageOverlap + foliageHeight. */
-const TREE_SHAPE = {
-  trunkRadius: 0.13,
-  trunkHeight: 0.6,
-  foliageRadius: 0.6,
-  foliageHeight: 1.15,
-  /** How far the foliage cone reaches down over the trunk. */
-  foliageOverlap: 0.15,
-  radialSegments: 6,
-  /** Trees are sunk into the ground so trunks do not float on slopes. */
-  sink: 0.05,
-  /** Scale varies by up to this fraction either way. */
-  scaleVariation: 0.2,
-} as const;
+/** Tiles per region side. Each region gets its own meshes and bounding spheres for frustum culling. */
+export const TREE_REGION_SIZE = 64;
+/** Trees are sunk into the ground so trunks do not float on slopes. */
+const TREE_SINK = 0.05;
 
-const TRUNK_COLOR = 0x6b4a2b;
-const FOLIAGE_COLOR = 0x2f6b2f;
-/** Mixed into the map seed for the rotation hash so rotation and scale vary independently. */
-const ROTATION_SEED_SALT = 0x5bd1e995;
+/** The trees of one species in one region, as instance matrices and tints. */
+interface TreeBatch {
+  readonly species: TreeSpecies;
+  readonly matrices: THREE.Matrix4[];
+  readonly tints: number[];
+}
 
 export class TreeLayer {
-  /** Add this to the scene; contains the trunk and foliage meshes. */
+  /** Add this to the scene; contains one instanced mesh per species and region that has trees. */
   public readonly object = new THREE.Group();
-  private readonly trunks: THREE.InstancedMesh;
-  private readonly foliage: THREE.InstancedMesh;
+  private readonly geometries = new Map<TreeSpecies, THREE.BufferGeometry>();
+  // Vertex colours carry trunk and crown colours; three.js multiplies them by the per-instance tint (setColorAt).
+  private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  private readonly meshes: THREE.InstancedMesh[] = [];
 
-  /** Builds one instance per tree currently in `world`. Reads the world only; call again for a new world. */
+  /** Builds the meshes for every tree currently in `world`. Reads the world only; call again for a new world. */
   public constructor(world: World) {
-    const trees: MapObject[] = [];
-    for (const object of world.objects()) if (object.kind === ObjectKind.Tree) trees.push(object);
-
-    const s = TREE_SHAPE;
-    // Open-ended: the caps are never visible (underground or inside the foliage), so they would only cost triangles.
-    const trunkTop = s.trunkRadius * 0.7;
-    const trunkGeometry = new THREE.CylinderGeometry(trunkTop, s.trunkRadius, s.trunkHeight, s.radialSegments, 1, true);
-    trunkGeometry.translate(0, s.trunkHeight / 2, 0);
-    const foliageGeometry = new THREE.ConeGeometry(s.foliageRadius, s.foliageHeight, s.radialSegments, 1, true);
-    foliageGeometry.translate(0, s.trunkHeight - s.foliageOverlap + s.foliageHeight / 2, 0);
-
-    this.trunks = this.createMesh(trunkGeometry, TRUNK_COLOR, trees.length);
-    this.foliage = this.createMesh(foliageGeometry, FOLIAGE_COLOR, trees.length);
-    this.placeInstances(world, trees);
-    this.object.add(this.trunks, this.foliage);
+    const batches = this.collectBatches(world);
+    if (batches.length === 0) return;
+    const factory = new TreeGeometryFactory();
+    for (const species of ALL_TREE_SPECIES) {
+      if (batches.some((b) => b.species === species)) this.geometries.set(species, factory.create(species));
+    }
+    for (const batch of batches) this.meshes.push(this.createMesh(batch));
+    this.object.add(...this.meshes);
   }
 
-  /** Frees the geometries, materials and instance buffers. Call after removing `object` from the scene. */
+  /** Removes the meshes and frees the shared geometries, the material and the instance buffers. Call once. */
   public dispose(): void {
-    for (const mesh of [this.trunks, this.foliage]) {
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
-      mesh.dispose();
-    }
+    this.object.clear();
+    for (const mesh of this.meshes) mesh.dispose();
+    for (const geometry of this.geometries.values()) geometry.dispose();
+    this.material.dispose();
+    this.meshes.length = 0;
+    this.geometries.clear();
   }
 
-  private createMesh(geometry: THREE.BufferGeometry, color: number, count: number): THREE.InstancedMesh {
-    const material = new THREE.MeshLambertMaterial({ color, flatShading: true });
-    return new THREE.InstancedMesh(geometry, material, count);
-  }
-
-  private placeInstances(world: World, trees: readonly MapObject[]): void {
+  /** Groups the trees by region and species, in row-major region order. */
+  private collectBatches(world: World): TreeBatch[] {
     const { map } = world;
-    const matrix = new THREE.Matrix4();
-    const position = new THREE.Vector3();
-    const rotation = new THREE.Quaternion();
-    const scale = new THREE.Vector3();
-    const up = new THREE.Vector3(0, 1, 0);
-    trees.forEach((tree, i) => {
-      const scaleHash = hash2(map.seed, tree.tx, tree.ty);
-      const rotationHash = hash2(map.seed ^ ROTATION_SEED_SALT, tree.tx, tree.ty);
-      position.set(tree.tx + 0.5, map.tileHeight(tree.tx, tree.ty) - TREE_SHAPE.sink, tree.ty + 0.5);
-      rotation.setFromAxisAngle(up, rotationHash * Math.PI * 2);
-      scale.setScalar(1 + TREE_SHAPE.scaleVariation * (2 * scaleHash - 1));
-      matrix.compose(position, rotation, scale);
-      this.trunks.setMatrixAt(i, matrix);
-      this.foliage.setMatrixAt(i, matrix);
-    });
-    for (const mesh of [this.trunks, this.foliage]) {
-      mesh.instanceMatrix.needsUpdate = true;
-      // Frustum culling uses the bounding sphere of all instances; it must be computed after the matrices are set.
-      mesh.computeBoundingSphere();
+    const regionsPerRow = Math.ceil(map.width / TREE_REGION_SIZE);
+    const batches = new Map<number, TreeBatch>();
+    for (const object of world.objects()) {
+      if (object.kind !== ObjectKind.Tree) continue;
+      const look = treeAppearance(map, object.tx, object.ty);
+      const region =
+        Math.floor(object.ty / TREE_REGION_SIZE) * regionsPerRow + Math.floor(object.tx / TREE_REGION_SIZE);
+      const key = region * ALL_TREE_SPECIES.length + look.species;
+      let batch = batches.get(key);
+      if (!batch) {
+        batch = { species: look.species, matrices: [], tints: [] };
+        batches.set(key, batch);
+      }
+      const ground = map.tileHeight(object.tx, object.ty) - TREE_SINK;
+      batch.matrices.push(this.treeMatrix(look, object.tx + 0.5, ground, object.ty + 0.5));
+      batch.tints.push(look.tint);
     }
+    return [...batches.entries()].sort((a, b) => a[0] - b[0]).map(([, batch]) => batch);
+  }
+
+  /** Places a tree's base at (x, y, z): scaled, turned about its own axis, then leant. */
+  private treeMatrix(look: TreeAppearance, x: number, y: number, z: number): THREE.Matrix4 {
+    const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), look.rotation);
+    const lean = new THREE.Quaternion().setFromEuler(new THREE.Euler(look.leanX, 0, look.leanZ));
+    const scale = new THREE.Vector3(look.widthScale, look.heightScale, look.widthScale);
+    return new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), lean.multiply(turn), scale);
+  }
+
+  private createMesh(batch: TreeBatch): THREE.InstancedMesh {
+    const mesh = new THREE.InstancedMesh(this.geometries.get(batch.species)!, this.material, batch.matrices.length);
+    const tint = new THREE.Color();
+    batch.matrices.forEach((matrix, i) => {
+      mesh.setMatrixAt(i, matrix);
+      mesh.setColorAt(i, tint.setScalar(batch.tints[i]));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    // Culling uses the sphere around this mesh's instances only; it must be computed after the matrices are set.
+    mesh.computeBoundingSphere();
+    return mesh;
   }
 }
