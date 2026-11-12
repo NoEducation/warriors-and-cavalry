@@ -1,7 +1,7 @@
 # Economy Stage — Game Time, Resources, Stockpile, Production
 
 Date: 2026-11-12
-Status: draft, waiting for review
+Status: approved 2026-11-12
 Builds on: `2026-11-12-stage2-world-objects-design.md` and `AGENTS.md` (all of
 their rules still apply unless this document changes them).
 
@@ -140,8 +140,9 @@ yield to the economy and starts the next cycle.
   that redraws stacks when amounts change, and the crop growth on farms.
 - `src/ui/` gains `ResourceBar.ts`; `Hud` gains the clock line; `BuildBar`
   shows costs.
-- `World` notifies listeners of economy changes and production progress the
-  render and UI layers need, so they do not poll every object every frame.
+- Render and UI read the small amount of economy and production state they
+  show (three amounts, a few buildings' progress) once per frame and touch
+  the DOM or rebuild meshes only when a displayed value changed.
 
 ## Testing
 
