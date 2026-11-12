@@ -3,7 +3,7 @@ import { GameMap } from '../src/sim/GameMap';
 import { ObjectKind, OBJECT_KINDS } from '../src/sim/ObjectKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
-import type { WorldChange } from '../src/sim/WorldCommand';
+import type { CommandResult, WorldChange, WorldCommand } from '../src/sim/WorldCommand';
 
 const SIZE = 16;
 
@@ -50,6 +50,11 @@ describe('World.canPlace', () => {
 
   it('rejects non-buildable kinds', () => {
     expect(new World(flatMap()).canPlace(ObjectKind.Tree, 3, 3)).toEqual({ ok: false, reason: 'NotBuildable' });
+  });
+
+  it('rejects an unknown kind without throwing', () => {
+    const world = new World(flatMap());
+    expect(world.canPlace(99 as ObjectKind, 1, 1)).toEqual({ ok: false, reason: 'NotBuildable' });
   });
 
   it('rejects footprints outside the map', () => {
@@ -125,6 +130,29 @@ describe('World.apply', () => {
     expect(world.objectCount).toBe(0);
     expect(changes).toEqual([]);
     expect(world.objectAt(SIZE - 3, 0)).toBeUndefined();
+  });
+
+  it('rejects a placement of an unknown kind without throwing or changing anything', () => {
+    const world = new World(flatMap());
+    const changes = recordChanges(world);
+    const command = { type: 'placeBuilding', kind: 99 as ObjectKind, tx: 1, ty: 1 } as WorldCommand;
+    let result: CommandResult | undefined;
+    expect(() => (result = world.apply(command))).not.toThrow();
+    expect(result).toEqual({ ok: false, reason: 'NotBuildable' });
+    expect(world.objectCount).toBe(0);
+    expect(world.objectAt(1, 1)).toBeUndefined();
+    expect(changes).toEqual([]);
+  });
+
+  it('rejects an unknown command type without throwing or changing anything', () => {
+    const world = new World(flatMap());
+    world.spawn(ObjectKind.Tree, 2, 2);
+    const changes = recordChanges(world);
+    let result: CommandResult | undefined;
+    expect(() => (result = world.apply({ type: 'nonsense' } as unknown as WorldCommand))).not.toThrow();
+    expect(result).toEqual({ ok: false, reason: 'UnknownCommand' });
+    expect(world.objectCount).toBe(1);
+    expect(changes).toEqual([]);
   });
 
   it('demolishes a building, freeing its tiles, and never reuses its id', () => {

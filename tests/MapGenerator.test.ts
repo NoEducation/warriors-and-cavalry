@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MapGenerator, MAPGEN_CONFIG, worldChecksum } from '../src/sim/MapGenerator';
-import { ObjectKind } from '../src/sim/ObjectKind';
+import { MapGenerator, MAPGEN_CONFIG } from '../src/sim/MapGenerator';
 import { TileType } from '../src/sim/tiles';
 
 const generator = new MapGenerator();
@@ -13,14 +12,29 @@ describe('MapGenerator', () => {
     expect(Array.from(a.map.tiles)).toEqual(Array.from(b.map.tiles));
     expect(a.objectCount).toBeGreaterThan(0);
     expect(Array.from(a.objects())).toEqual(Array.from(b.objects()));
-    expect(worldChecksum(a)).toBe(worldChecksum(b));
   });
 
   it('gives different worlds for different seeds', () => {
     const a = generator.generate({ seed: 1, width: 128, height: 128 });
     const b = generator.generate({ seed: 2, width: 128, height: 128 });
-    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
+    expect(Array.from(a.map.heights)).not.toEqual(Array.from(b.map.heights));
   });
+
+  for (const seed of [1, 2, 3, 4, 5]) {
+    it(`seed ${seed} at 512 x 512: seabed no deeper than 6 below sea level, no wall at the border`, () => {
+      const { map } = generator.generate({ seed, width: 512, height: 512 });
+      let min = Infinity;
+      for (const h of map.heights) min = Math.min(min, h);
+      expect(min).toBeGreaterThanOrEqual(-6.001);
+      // The forced water border must match its neighbours instead of standing up as a one-tile wall.
+      let step = 0;
+      for (let i = 2; i < map.width - 1; i++) {
+        step = Math.max(step, Math.abs(map.heightAt(i, 1) - map.heightAt(i, 2)));
+        step = Math.max(step, Math.abs(map.heightAt(1, i) - map.heightAt(2, i)));
+      }
+      expect(step).toBeLessThanOrEqual(0.5);
+    });
+  }
 
   for (const seed of [1, 2, 3, 4, 5]) {
     it(`seed ${seed} at 512 x 512: water border, 40-55 % land, at most 15 % rock`, () => {
@@ -62,21 +76,6 @@ describe('MapGenerator', () => {
   it('normalises the seed to an unsigned 32-bit integer', () => {
     const { map } = generator.generate({ seed: -1, width: 16, height: 16 });
     expect(map.seed).toBe(4294967295);
-  });
-});
-
-describe('worldChecksum', () => {
-  it('changes after a building is placed', () => {
-    const world = generator.generate({ seed: 3, width: 64, height: 64 });
-    const before = worldChecksum(world);
-    let placed = false;
-    for (let ty = 0; ty < world.map.height && !placed; ty++) {
-      for (let tx = 0; tx < world.map.width && !placed; tx++) {
-        placed = world.apply({ type: 'placeBuilding', kind: ObjectKind.Hovel, tx, ty }).ok;
-      }
-    }
-    expect(placed, 'found a buildable spot').toBe(true);
-    expect(worldChecksum(world)).not.toBe(before);
   });
 });
 

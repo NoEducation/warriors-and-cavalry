@@ -1,7 +1,8 @@
 // Translucent preview of the building about to be placed, tinted by whether it fits.
 import * as THREE from 'three';
-import type { PlacementPreview } from '../game/BuildTool';
-import { OBJECT_KINDS, type ObjectKind } from '../sim/ObjectKind';
+import { Footprint } from '../sim/Footprint';
+import type { ObjectKind } from '../sim/ObjectKind';
+import type { PlacementPreview } from '../sim/PlacementPreview';
 import type { World } from '../sim/World';
 import type { BuildingMeshFactory } from './BuildingMeshFactory';
 import { disposeObject } from './disposeObject';
@@ -68,18 +69,8 @@ export class PlacementGhost {
     this.tintedOk = null;
   }
 
-  /** Highest corner height under the footprint, ignoring corners outside the map. */
+  /** Highest corner height under the footprint, ignoring corners outside the map (0 when none is inside). */
   private floorHeight(world: World, preview: PlacementPreview): number {
-    const { map } = world;
-    const info = OBJECT_KINDS[preview.kind];
-    const x0 = Math.max(0, preview.tx);
-    const y0 = Math.max(0, preview.ty);
-    const x1 = Math.min(map.width, preview.tx + info.width);
-    const y1 = Math.min(map.height, preview.ty + info.height);
-    let max = -Infinity;
-    for (let cy = y0; cy <= y1; cy++) {
-      for (let cx = x0; cx <= x1; cx++) max = Math.max(max, map.heightAt(cx, cy));
-    }
-    return max;
+    return Footprint.of(preview.kind, preview.tx, preview.ty).cornerHeightRange(world.map)?.max ?? 0;
   }
 }

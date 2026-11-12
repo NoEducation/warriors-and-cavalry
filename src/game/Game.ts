@@ -1,4 +1,4 @@
-// Owns every game object and runs the frame loop.
+// Owns every game object and the current world, and runs the frame loop.
 import type * as THREE from 'three';
 import { Keyboard } from '../input/Keyboard';
 import { Pointer } from '../input/Pointer';
@@ -13,8 +13,8 @@ import { MapGenerator } from '../sim/MapGenerator';
 import type { World } from '../sim/World';
 import { Hud } from '../ui/Hud';
 import { BuildController } from './BuildController';
-import { BuildInput } from './BuildInput';
-import { FpsCounter } from './FpsCounter';
+import { BuildInput, type MapClickTarget } from './BuildInput';
+import { FpsDisplay } from './FpsDisplay';
 import { GAME_CONFIG } from './GameConfig';
 import { parseSeed, randomSeed } from './seed';
 import { TileHover } from './TileHover';
@@ -34,85 +34,89 @@ declare global {
 }
 
 export class Game {
-  private readonly pixelRenderer: PixelRenderer;
-  private readonly worldView: WorldView;
-  private readonly highlight: TileHighlight;
-  private readonly hud: Hud;
   private readonly mapGenerator = new MapGenerator();
-  private readonly rig: CameraRig;
+  private readonly worldView = new WorldView();
+  private readonly highlight = new TileHighlight();
+  private readonly ghost = new PlacementGhost(new BuildingMeshFactory());
+  private readonly picker = new TilePicker();
+  private readonly rig = new CameraRig(GAME_CONFIG.mapSize, GAME_CONFIG.mapSize);
+  private readonly pixelRenderer: PixelRenderer;
   private readonly keyboard: Keyboard;
-  private readonly tileHover: TileHover;
+  private readonly pointer: Pointer;
+  private readonly hud: Hud;
+  private readonly fpsDisplay: FpsDisplay;
   private readonly builder: BuildController;
-  private readonly fpsCounter = new FpsCounter(GAME_CONFIG.fpsSamples);
-  /** Set by `loadMap`, which the constructor calls. */
-  private world!: World;
+  private readonly tileHover: TileHover;
+  private readonly buildInput: BuildInput;
+  /** The world currently shown. Game is its only owner and passes it to whoever needs it; `loadMap` replaces it. */
+  private world: World;
   private lastFrameTime: number | null = null;
-  private lastFpsUpdate = 0;
 
   /** Builds the scene, HUD, build bar and input for the map in the URL's `seed`. Throws if WebGL is unavailable. */
   public constructor(canvas: HTMLCanvasElement, hudRoot: HTMLElement, buildBarRoot: HTMLElement) {
     this.pixelRenderer = new PixelRenderer(canvas, GAME_CONFIG.pixelScale);
-    this.worldView = new WorldView();
-    this.highlight = new TileHighlight();
-    const ghost = new PlacementGhost(new BuildingMeshFactory());
-    this.worldView.scene.add(this.highlight.object, ghost.object);
-    this.hud = new Hud(hudRoot, () => this.onNewMap());
-
-    this.loadMap(parseSeed(location.search));
-    this.builder = new BuildController(this.world, (text) => this.hud.showMessage(text, GAME_CONFIG.messageSeconds));
-
-    this.rig = new CameraRig(GAME_CONFIG.mapSize, GAME_CONFIG.mapSize);
+    this.world = this.generateWorld(parseSeed(location.search));
     this.keyboard = new Keyboard(window);
-    canvas.addEventListener('wheel', this.onWheel, { passive: false });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    const pointer = new Pointer(canvas);
-    this.tileHover = new TileHover(pointer, new TilePicker(), this.highlight, ghost, this.hud, this.builder);
-    new BuildInput(this.builder, buildBarRoot, window, pointer, () =>
-      this.tileHover.tileUnderCursor(this.rig.camera, this.world.map),
-    );
+    this.pointer = new Pointer(canvas);
+    this.hud = new Hud(hudRoot, () => this.onNewMap());
+    this.fpsDisplay = new FpsDisplay(this.hud, GAME_CONFIG.fpsSamples, GAME_CONFIG.fpsUpdateMs);
+    this.builder = new BuildController((text) => this.hud.showMessage(text, GAME_CONFIG.messageSeconds));
+    this.tileHover = new TileHover(this.pointer, this.picker, this.highlight, this.ghost, this.hud, this.builder);
+    this.buildInput = new BuildInput(this.builder, buildBarRoot, window, this.pointer, () => this.mapClickTarget());
+    this.addOverlaysToScene();
+    this.listenToCanvas(canvas);
+    this.showWorld();
   }
 
   /** Sizes the renderer, follows window resizes and starts the frame loop. Call once after construction. */
   public start(): void {
     window.addEventListener('resize', this.onResize);
     this.onResize();
-    if (import.meta.env.DEV) {
-      const game = this;
-      window.__debug = {
-        renderer: this.pixelRenderer.webgl,
-        game,
-        get world(): World {
-          return game.world;
-        },
-      };
-    }
+    if (import.meta.env.DEV) this.exposeDebugHandles();
     requestAnimationFrame(this.onFrame);
   }
 
-  /** Generates the world for `seed` and shows it, replacing the current one. */
+  /** Generates the world for `seed` and shows it, replacing the current one. The selected build tool is kept. */
   public loadMap(seed: number): void {
-    this.world = this.mapGenerator.generate({ seed, width: GAME_CONFIG.mapSize, height: GAME_CONFIG.mapSize });
+    this.world = this.generateWorld(seed);
+    this.showWorld();
+  }
+
+  private generateWorld(seed: number): World {
+    return this.mapGenerator.generate({ seed, width: GAME_CONFIG.mapSize, height: GAME_CONFIG.mapSize });
+  }
+
+  /** Shows `this.world` in the scene and its seed on the HUD. */
+  private showWorld(): void {
     this.worldView.showWorld(this.world);
     this.highlight.hide();
-    this.hud.setSeed(seed);
+    this.hud.setSeed(this.world.map.seed);
   }
 
-  private update(dtSeconds: number): void {
-    this.rig.update(dtSeconds, this.keyboard);
-    this.tileHover.update(this.rig.camera, this.world);
-    this.fpsCounter.addFrame(dtSeconds);
+  /** Adds the hover outline and placement ghost, which stay in the scene across maps. */
+  private addOverlaysToScene(): void {
+    this.worldView.scene.add(this.highlight.object, this.ghost.object);
   }
 
-  private render(): void {
-    this.pixelRenderer.render(this.worldView.scene, this.rig.camera);
+  /** Mouse wheel zooms; the browser's context menu is suppressed so right-click can deselect the build tool. */
+  private listenToCanvas(canvas: HTMLCanvasElement): void {
+    canvas.addEventListener('wheel', this.onWheel, { passive: false });
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
-  /** Shows the FPS reading at most every `fpsUpdateMs`. */
-  private updateFpsDisplay(time: number): void {
-    const fps = this.fpsCounter.fps;
-    if (time - this.lastFpsUpdate < GAME_CONFIG.fpsUpdateMs || fps === null) return;
-    this.lastFpsUpdate = time;
-    this.hud.setFps(fps);
+  private mapClickTarget(): MapClickTarget {
+    return { world: this.world, tile: this.tileHover.tileUnderCursor(this.rig.camera, this.world.map) };
+  }
+
+  private exposeDebugHandles(): void {
+    const game = this;
+    window.__debug = {
+      renderer: this.pixelRenderer.webgl,
+      game,
+      get world(): World {
+        return game.world;
+      },
+    };
   }
 
   private onNewMap(): void {
@@ -121,15 +125,15 @@ export class Game {
     url.searchParams.set('seed', String(seed));
     history.replaceState(null, '', url);
     this.loadMap(seed);
-    this.builder.setWorld(this.world);
   }
 
   private readonly onFrame = (time: number): void => {
     const dt = this.lastFrameTime === null ? 0 : (time - this.lastFrameTime) / 1000;
     this.lastFrameTime = time;
-    this.update(dt);
-    this.updateFpsDisplay(time);
-    this.render();
+    this.rig.update(dt, this.keyboard);
+    this.tileHover.update(this.rig.camera, this.world);
+    this.fpsDisplay.addFrame(dt, time);
+    this.pixelRenderer.render(this.worldView.scene, this.rig.camera);
     requestAnimationFrame(this.onFrame);
   };
 

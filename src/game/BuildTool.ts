@@ -11,14 +11,6 @@ export interface BuildToolEntry {
   readonly tool: Exclude<BuildTool, null>;
 }
 
-/** Where a building would go and whether it may be placed there. */
-export interface PlacementPreview {
-  readonly kind: ObjectKind;
-  readonly tx: number;
-  readonly ty: number;
-  readonly ok: boolean;
-}
-
 export const BUILD_TOOLS: readonly BuildToolEntry[] = Object.freeze([
   { label: 'Keep', key: 'Digit1', tool: { type: 'build', kind: ObjectKind.Keep } },
   { label: 'Hovel', key: 'Digit2', tool: { type: 'build', kind: ObjectKind.Hovel } },

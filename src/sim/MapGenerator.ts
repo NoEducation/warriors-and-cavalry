@@ -26,6 +26,8 @@ export const MAPGEN_CONFIG = Object.freeze({
   coastWarp: 0.9,
   /** Along the map border, a zone 1/borderSteepness half-maps wide pushes the island shape down towards the sea. */
   borderSteepness: 8,
+  /** Deepest the seabed goes below sea level; the forced water border sits at this depth too. */
+  seabedDepth: 6,
 });
 
 /** Seed offset for the coastline noise, so it differs from the terrain noise (which uses seed + octave). */
@@ -97,8 +99,9 @@ export class MapGenerator {
   private cornerHeight(shape: IslandShape, cx: number, cy: number): number {
     const c = MAPGEN_CONFIG;
     const { seed, width, height } = shape;
-    // Corners of the outermost tiles stay under water, whatever the noise says.
-    if (cx <= 1 || cy <= 1 || cx >= width - 1 || cy >= height - 1) return c.seaLevel - c.shoreDrop;
+    const seabed = c.seaLevel - c.seabedDepth;
+    // Corners of the outermost tiles stay under water, whatever the noise says, level with the seabed around them.
+    if (cx <= 1 || cy <= 1 || cx >= width - 1 || cy >= height - 1) return seabed;
     const u = cx / width;
     const v = cy / height;
     const dx = Math.abs(u * 2 - 1);
@@ -111,7 +114,8 @@ export class MapGenerator {
     const d = radial + border;
     const n = fbm2(seed, cx * c.noiseScale, cy * c.noiseScale, c.octaves);
     const s = 1 - d * d;
-    return (c.maxHeight * n + c.coastLift) * s - c.shoreDrop;
+    // Far from the island the shape keeps falling; the seabed stops it.
+    return Math.max(seabed, (c.maxHeight * n + c.coastLift) * s - c.shoreDrop);
   }
 
   private classifyTile(corners: [number, number, number, number]): TileType {
@@ -125,29 +129,3 @@ export class MapGenerator {
   }
 }
 
-/**
- * 32-bit FNV-1a over the bytes of the map's `heights` and `tiles`, then each object's id, kind, tx and ty
- * (as little-endian int32) in id order. Use to compare worlds cheaply, e.g. between peers.
- */
-export function worldChecksum(world: World): number {
-  let hash = 0x811c9dc5;
-  const feed = (bytes: Uint8Array): void => {
-    for (let i = 0; i < bytes.length; i++) {
-      hash ^= bytes[i];
-      hash = Math.imul(hash, 0x01000193);
-    }
-  };
-  const { heights, tiles } = world.map;
-  feed(new Uint8Array(heights.buffer, heights.byteOffset, heights.byteLength));
-  feed(tiles);
-  const fields = new DataView(new ArrayBuffer(16 * world.objectCount));
-  let offset = 0;
-  for (const object of world.objects()) {
-    for (const value of [object.id, object.kind, object.tx, object.ty]) {
-      fields.setInt32(offset, value, true);
-      offset += 4;
-    }
-  }
-  feed(new Uint8Array(fields.buffer));
-  return hash >>> 0;
-}

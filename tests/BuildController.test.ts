@@ -19,7 +19,7 @@ function flatWorld(): World {
 
 function setup(world: World = flatWorld()): { world: World; controller: BuildController; messages: string[] } {
   const messages: string[] = [];
-  const controller = new BuildController(world, (text) => messages.push(text));
+  const controller = new BuildController((text) => messages.push(text));
   return { world, controller, messages };
 }
 
@@ -40,8 +40,8 @@ describe('BuildController', () => {
   it('does nothing without a tool', () => {
     const { world, controller, messages } = setup();
     expect(controller.tool).toBeNull();
-    expect(controller.preview({ tx: 1, ty: 1 })).toBeNull();
-    expect(controller.click({ tx: 1, ty: 1 })).toBeNull();
+    expect(controller.preview(world, { tx: 1, ty: 1 })).toBeNull();
+    expect(controller.click(world, { tx: 1, ty: 1 })).toBeNull();
     expect(world.objectCount).toBe(0);
     expect(messages).toEqual([]);
   });
@@ -50,9 +50,9 @@ describe('BuildController', () => {
     const { world, controller, messages } = setup();
     world.spawn(ObjectKind.Tree, 8, 8);
     controller.selectTool(HOVEL);
-    expect(controller.preview({ tx: 2, ty: 2 })).toEqual({ kind: ObjectKind.Hovel, tx: 2, ty: 2, ok: true });
-    expect(controller.preview({ tx: 7, ty: 7 })).toEqual({ kind: ObjectKind.Hovel, tx: 7, ty: 7, ok: false });
-    const result = controller.click({ tx: 2, ty: 2 });
+    expect(controller.preview(world, { tx: 2, ty: 2 })).toEqual({ kind: ObjectKind.Hovel, tx: 2, ty: 2, ok: true });
+    expect(controller.preview(world, { tx: 7, ty: 7 })).toEqual({ kind: ObjectKind.Hovel, tx: 7, ty: 7, ok: false });
+    const result = controller.click(world, { tx: 2, ty: 2 });
     expect(result?.ok).toBe(true);
     expect(world.objectAt(2, 2)?.kind).toBe(ObjectKind.Hovel);
     expect(controller.tool).toEqual(HOVEL);
@@ -62,8 +62,8 @@ describe('BuildController', () => {
   it('ignores a click with no tile', () => {
     const { world, controller, messages } = setup();
     controller.selectTool(HOVEL);
-    expect(controller.click(null)).toBeNull();
-    expect(controller.preview(null)).toBeNull();
+    expect(controller.click(world, null)).toBeNull();
+    expect(controller.preview(world, null)).toBeNull();
     expect(world.objectCount).toBe(0);
     expect(messages).toEqual([]);
   });
@@ -71,8 +71,8 @@ describe('BuildController', () => {
   it('reports a rejected placement', () => {
     const { world, controller, messages } = setup();
     controller.selectTool(HOVEL);
-    controller.click({ tx: 2, ty: 2 });
-    const result = controller.click({ tx: 3, ty: 3 });
+    controller.click(world, { tx: 2, ty: 2 });
+    const result = controller.click(world, { tx: 3, ty: 3 });
     expect(result).toEqual({ ok: false, reason: 'Occupied' });
     expect(messages).toEqual(['Cannot build: occupied']);
     expect(world.objectCount).toBe(1);
@@ -81,8 +81,8 @@ describe('BuildController', () => {
   it('rejects a Keep over the map edge without throwing', () => {
     const { world, controller, messages } = setup();
     controller.selectTool(KEEP);
-    expect(controller.preview({ tx: SIZE - 2, ty: SIZE - 2 })?.ok).toBe(false);
-    expect(() => controller.click({ tx: SIZE - 2, ty: SIZE - 2 })).not.toThrow();
+    expect(controller.preview(world, { tx: SIZE - 2, ty: SIZE - 2 })?.ok).toBe(false);
+    expect(() => controller.click(world, { tx: SIZE - 2, ty: SIZE - 2 })).not.toThrow();
     expect(messages).toEqual(['Cannot build: out of bounds']);
     expect(world.objectCount).toBe(0);
   });
@@ -92,31 +92,31 @@ describe('BuildController', () => {
     world.spawn(ObjectKind.Tree, 8, 8);
     world.apply({ type: 'placeBuilding', kind: ObjectKind.Hovel, tx: 2, ty: 2 });
     controller.selectTool(DEMOLISH);
-    expect(controller.preview({ tx: 2, ty: 2 })).toBeNull();
-    expect(controller.click({ tx: 3, ty: 3 })?.ok).toBe(true);
+    expect(controller.preview(world, { tx: 2, ty: 2 })).toBeNull();
+    expect(controller.click(world, { tx: 3, ty: 3 })?.ok).toBe(true);
     expect(world.objectAt(2, 2)).toBeUndefined();
-    expect(controller.click({ tx: 8, ty: 8 })).toEqual({ ok: false, reason: 'NotDemolishable' });
-    expect(controller.click({ tx: 0, ty: 0 })).toEqual({ ok: false, reason: 'UnknownObject' });
+    expect(controller.click(world, { tx: 8, ty: 8 })).toEqual({ ok: false, reason: 'NotDemolishable' });
+    expect(controller.click(world, { tx: 0, ty: 0 })).toEqual({ ok: false, reason: 'UnknownObject' });
     expect(messages).toEqual(['Cannot demolish: trees cannot be removed', 'Cannot demolish: nothing here']);
     expect(world.objectCount).toBe(1);
   });
 
-  it('cancel clears the tool', () => {
-    const { controller } = setup();
+  it('selecting null deselects the tool', () => {
+    const { world, controller } = setup();
     controller.selectTool(HOVEL);
-    controller.cancel();
+    controller.selectTool(null);
     expect(controller.tool).toBeNull();
+    expect(controller.preview(world, { tx: 1, ty: 1 })).toBeNull();
   });
 
-  it('setWorld keeps the tool and places into the new world', () => {
-    const { world: oldWorld, controller } = setup();
+  it('places into the world passed with each click', () => {
+    const { world: worldA, controller } = setup();
     controller.selectTool(HOVEL);
-    controller.click({ tx: 1, ty: 1 });
-    const newWorld = flatWorld();
-    controller.setWorld(newWorld);
-    expect(controller.tool).toEqual(HOVEL);
-    expect(controller.click({ tx: 5, ty: 5 })?.ok).toBe(true);
-    expect(newWorld.objectAt(5, 5)?.kind).toBe(ObjectKind.Hovel);
-    expect(oldWorld.objectCount).toBe(1);
+    expect(controller.click(worldA, { tx: 1, ty: 1 })?.ok).toBe(true);
+    const worldB = flatWorld();
+    expect(controller.click(worldB, { tx: 5, ty: 5 })?.ok).toBe(true);
+    expect(worldB.objectAt(5, 5)?.kind).toBe(ObjectKind.Hovel);
+    expect(worldA.objectCount).toBe(1);
+    expect(worldA.objectAt(5, 5)).toBeUndefined();
   });
 });

@@ -11,10 +11,13 @@ export type WorldCommand =
   | { readonly type: 'placeBuilding'; readonly kind: ObjectKind; readonly tx: number; readonly ty: number }
   | { readonly type: 'demolish'; readonly objectId: number };
 
-/** On success, the object that was added or removed. */
+/** On success, the object that was added or removed. `UnknownCommand` means the command's `type` is not recognised. */
 export type CommandResult =
   | { readonly ok: true; readonly object: MapObject }
-  | { readonly ok: false; readonly reason: PlacementFailure | 'UnknownObject' | 'NotDemolishable' };
+  | {
+      readonly ok: false;
+      readonly reason: PlacementFailure | 'UnknownObject' | 'NotDemolishable' | 'UnknownCommand';
+    };
 
 /** Delivered to World listeners for every object added or removed. */
 export interface WorldChange {

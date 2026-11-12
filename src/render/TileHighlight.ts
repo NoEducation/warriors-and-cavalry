@@ -1,5 +1,6 @@
 // White outline drawn on top of everything around the hovered tile or footprint.
 import * as THREE from 'three';
+import type { Footprint } from '../sim/Footprint';
 import type { GameMap } from '../sim/GameMap';
 
 const LIFT = 0.05;
@@ -23,16 +24,12 @@ export class TileHighlight {
     this.object.visible = false;
   }
 
-  /** Outlines tile (tx, ty) along its four corner heights, lifted slightly, and makes it visible. */
-  public showTile(map: GameMap, tx: number, ty: number): void {
-    this.showFootprint(map, tx, ty, 1, 1);
-  }
-
   /**
-   * Outlines the `width` x `height` tile rectangle starting at (tx, ty), following the corner heights along its edge and
-   * skipping corners outside the map, and makes it visible. Call per frame for the hovered footprint.
+   * Outlines `footprint` (a single tile is a 1 x 1 footprint), following the corner heights along its edge, lifted
+   * slightly and skipping corners outside the map, and makes it visible. Call per frame for the hovered footprint.
    */
-  public showFootprint(map: GameMap, tx: number, ty: number, width: number, height: number): void {
+  public showFootprint(map: GameMap, footprint: Footprint): void {
+    const { tx, ty, width, height } = footprint;
     const perimeter: [number, number][] = [];
     for (let x = tx; x < tx + width; x++) perimeter.push([x, ty]);
     for (let y = ty; y < ty + height; y++) perimeter.push([tx + width, y]);

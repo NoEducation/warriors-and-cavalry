@@ -1,5 +1,6 @@
 // Meshes for every building in a world, kept in step with the world's changes.
 import * as THREE from 'three';
+import { Footprint } from '../sim/Footprint';
 import type { MapObject } from '../sim/MapObject';
 import { OBJECT_KINDS } from '../sim/ObjectKind';
 import type { World } from '../sim/World';
@@ -60,14 +61,8 @@ export class BuildingLayer {
     disposeObject(mesh);
   }
 
-  /** Highest corner height under the object's footprint. */
+  /** Highest corner height under the object's footprint (objects always stand inside the map). */
   private floorHeight(object: MapObject): number {
-    const { map } = this.world;
-    const info = OBJECT_KINDS[object.kind];
-    let max = -Infinity;
-    for (let cy = object.ty; cy <= object.ty + info.height; cy++) {
-      for (let cx = object.tx; cx <= object.tx + info.width; cx++) max = Math.max(max, map.heightAt(cx, cy));
-    }
-    return max;
+    return Footprint.of(object.kind, object.tx, object.ty).cornerHeightRange(this.world.map)?.max ?? 0;
   }
 }

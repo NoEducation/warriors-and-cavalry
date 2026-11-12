@@ -4,8 +4,10 @@ import type { Pointer } from '../input/Pointer';
 import type { PlacementGhost } from '../render/PlacementGhost';
 import type { TileHighlight } from '../render/TileHighlight';
 import type { TilePicker } from '../render/TilePicker';
+import { Footprint } from '../sim/Footprint';
 import type { GameMap } from '../sim/GameMap';
 import { OBJECT_KINDS } from '../sim/ObjectKind';
+import type { PlacementPreview } from '../sim/PlacementPreview';
 import type { TileCoord } from '../sim/TileCoord';
 import { TILE_NAMES } from '../sim/tiles';
 import type { World } from '../sim/World';
@@ -29,37 +31,48 @@ export class TileHover {
     return cursor ? this.picker.pick(cursor, camera, map) : null;
   }
 
-  /**
-   * Finds the hovered tile and updates the ghost, the highlight (placement footprint, hovered object's footprint or the
-   * single tile) and the HUD tile line. Call once per frame.
-   */
+  /** Finds the tile hovered in `world` and updates the ghost, the highlight and the HUD tile line. Call once per frame. */
   public update(camera: THREE.Camera, world: World): void {
-    const { map } = world;
-    const tile = this.tileUnderCursor(camera, map);
-    const preview = this.builder.preview(tile);
-    if (preview) {
-      const info = OBJECT_KINDS[preview.kind];
-      this.ghost.show(world, preview);
-      this.highlight.showFootprint(map, preview.tx, preview.ty, info.width, info.height);
-    } else {
-      this.ghost.hide();
-    }
+    const tile = this.tileUnderCursor(camera, world.map);
+    const preview = this.builder.preview(world, tile);
+    this.updateGhost(world, preview);
+    this.updateHighlight(world, tile, preview);
+    this.updateHudLine(world, tile);
+  }
+
+  /** Shows the building about to be placed, or hides the ghost when there is none. */
+  private updateGhost(world: World, preview: PlacementPreview | null): void {
+    if (preview) this.ghost.show(world, preview);
+    else this.ghost.hide();
+  }
+
+  /** Outlines the placement footprint, else the hovered object's footprint, else the hovered tile. */
+  private updateHighlight(world: World, tile: TileCoord | null, preview: PlacementPreview | null): void {
     if (!tile) {
       this.highlight.hide();
+      return;
+    }
+    this.highlight.showFootprint(world.map, this.highlightedFootprint(world, tile, preview));
+  }
+
+  private highlightedFootprint(world: World, tile: TileCoord, preview: PlacementPreview | null): Footprint {
+    if (preview) return Footprint.of(preview.kind, preview.tx, preview.ty);
+    const object = world.objectAt(tile.tx, tile.ty);
+    if (object) return Footprint.of(object.kind, object.tx, object.ty);
+    return new Footprint(tile.tx, tile.ty, 1, 1);
+  }
+
+  /** Shows the hovered tile's position, terrain, height and object on the HUD, or a dash without a tile. */
+  private updateHudLine(world: World, tile: TileCoord | null): void {
+    if (!tile) {
       this.hud.setTile(null);
       return;
     }
+    const { map } = world;
     const object = world.objectAt(tile.tx, tile.ty);
-    const objectInfo = object ? OBJECT_KINDS[object.kind] : undefined;
-    if (!preview) {
-      if (object && objectInfo) {
-        this.highlight.showFootprint(map, object.tx, object.ty, objectInfo.width, objectInfo.height);
-      } else {
-        this.highlight.showTile(map, tile.tx, tile.ty);
-      }
-    }
     const type = map.tileAt(tile.tx, tile.ty);
     const name = type === undefined ? '?' : TILE_NAMES[type];
-    this.hud.setTile({ ...tile, name, height: map.tileHeight(tile.tx, tile.ty), objectName: objectInfo?.name });
+    const objectName = object ? OBJECT_KINDS[object.kind].name : undefined;
+    this.hud.setTile({ ...tile, name, height: map.tileHeight(tile.tx, tile.ty), objectName });
   }
 }
