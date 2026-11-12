@@ -1,4 +1,4 @@
-// Deterministic island generator: fbm noise shaped by a square falloff.
+// Deterministic island generator: fbm hills on an island whose coastline wobbles with low-frequency noise.
 import { GameMap } from './GameMap';
 import { fbm2 } from './noise';
 import { TileType } from './tiles';
@@ -6,19 +6,40 @@ import { TileType } from './tiles';
 /** Generation tuning. Frozen so maps stay reproducible; tune by editing these values here. */
 export const MAPGEN_CONFIG = Object.freeze({
   seaLevel: 0,
-  maxHeight: 12,
+  /** Height range of the hill noise. */
+  maxHeight: 10,
+  /** Hill noise frequency per tile, and its octaves. */
   noiseScale: 1 / 32,
   octaves: 4,
-  shoreDrop: 3,
+  /** Base height added inland (scaled by the island shape), so hill noise rarely floods the interior. */
+  coastLift: 3.5,
+  /** Height subtracted everywhere; sets where the island shape meets the sea. */
+  shoreDrop: 3.1,
   sandBand: 0.5,
   rockSlope: 0.45,
-  rockAltitude: 3,
+  rockAltitude: 5.6,
+  /** Coastline wobble: noise cycles across the whole map, its octaves, and how far (in half-map units) it moves the coast. */
+  coastFrequency: 4,
+  coastOctaves: 3,
+  coastWarp: 0.9,
+  /** Along the map border, a zone 1/borderSteepness half-maps wide pushes the island shape down towards the sea. */
+  borderSteepness: 8,
 });
+
+/** Seed offset for the coastline noise, so it differs from the terrain noise (which uses seed + octave). */
+const COAST_SEED_OFFSET = 0x5eed;
+/** Samples per axis when averaging the coastline noise. */
+const WOBBLE_SAMPLES = 16;
 
 export interface MapParams {
   readonly seed: number;
   readonly width: number;
   readonly height: number;
+}
+
+/** Per-map values shared by every corner height computation. */
+interface IslandShape extends MapParams {
+  readonly wobbleMean: number;
 }
 
 export class MapGenerator {
@@ -28,9 +49,10 @@ export class MapGenerator {
     const seed = params.seed >>> 0;
     const stride = width + 1;
     const heights = new Float32Array(stride * (height + 1));
+    const shape: IslandShape = { seed, width, height, wobbleMean: this.coastWobbleMean(seed) };
     for (let cy = 0; cy <= height; cy++) {
       for (let cx = 0; cx <= width; cx++) {
-        heights[cy * stride + cx] = this.cornerHeight(seed, cx, cy, width, height);
+        heights[cy * stride + cx] = this.cornerHeight(shape, cx, cy);
       }
     }
     const tiles = new Uint8Array(width * height);
@@ -48,13 +70,38 @@ export class MapGenerator {
     return new GameMap(width, height, seed, heights, tiles);
   }
 
-  private cornerHeight(seed: number, cx: number, cy: number, width: number, height: number): number {
+  /** Mean of the coastline noise over the map, so the wobble moves the coast in and out without changing island size much. */
+  private coastWobbleMean(seed: number): number {
     const c = MAPGEN_CONFIG;
-    const dx = Math.abs((cx / width) * 2 - 1);
-    const dy = Math.abs((cy / height) * 2 - 1);
-    const d = Math.max(dx, dy); // 0 at centre, 1 on the border
+    let sum = 0;
+    for (let j = 0; j < WOBBLE_SAMPLES; j++) {
+      for (let i = 0; i < WOBBLE_SAMPLES; i++) {
+        const u = (i + 0.5) / WOBBLE_SAMPLES;
+        const v = (j + 0.5) / WOBBLE_SAMPLES;
+        sum += fbm2(seed + COAST_SEED_OFFSET, u * c.coastFrequency, v * c.coastFrequency, c.coastOctaves);
+      }
+    }
+    return sum / (WOBBLE_SAMPLES * WOBBLE_SAMPLES);
+  }
+
+  private cornerHeight(shape: IslandShape, cx: number, cy: number): number {
+    const c = MAPGEN_CONFIG;
+    const { seed, width, height } = shape;
+    // Corners of the outermost tiles stay under water, whatever the noise says.
+    if (cx <= 1 || cy <= 1 || cx >= width - 1 || cy >= height - 1) return c.seaLevel - c.shoreDrop;
+    const u = cx / width;
+    const v = cy / height;
+    const dx = Math.abs(u * 2 - 1);
+    const dy = Math.abs(v * 2 - 1);
+    // Round island whose radius wobbles with low-frequency noise (bays, peninsulas).
+    const wobble = fbm2(seed + COAST_SEED_OFFSET, u * c.coastFrequency, v * c.coastFrequency, c.coastOctaves);
+    const radial = Math.sqrt(dx * dx + dy * dy) + c.coastWarp * 2 * (wobble - shape.wobbleMean);
+    // Pushes the coast smoothly away from the map border instead of cutting it off in a straight line.
+    const border = Math.max(0, 1 - (1 - Math.max(dx, dy)) * c.borderSteepness);
+    const d = radial + border;
     const n = fbm2(seed, cx * c.noiseScale, cy * c.noiseScale, c.octaves);
-    return c.maxHeight * n * (1 - d * d) - c.shoreDrop;
+    const s = 1 - d * d;
+    return (c.maxHeight * n + c.coastLift) * s - c.shoreDrop;
   }
 
   private classifyTile(corners: [number, number, number, number]): TileType {

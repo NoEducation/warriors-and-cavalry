@@ -1,0 +1,62 @@
+import * as THREE from 'three';
+import { describe, expect, it } from 'vitest';
+import { TERRAIN_CHUNK_SIZE, TerrainMeshBuilder } from '../src/render/TerrainMeshBuilder';
+import { GameMap } from '../src/sim/GameMap';
+
+function flatMap(width: number, height: number): GameMap {
+  return new GameMap(width, height, 1, new Float32Array((width + 1) * (height + 1)), new Uint8Array(width * height));
+}
+
+function meshes(group: THREE.Group): THREE.Mesh[] {
+  return group.children.filter((c): c is THREE.Mesh => c instanceof THREE.Mesh);
+}
+
+function vertexCount(group: THREE.Group): number {
+  return meshes(group).reduce((sum, m) => sum + m.geometry.getAttribute('position').count, 0);
+}
+
+describe('TerrainMeshBuilder', () => {
+  const builder = new TerrainMeshBuilder();
+
+  it('uses 32-tile chunks', () => {
+    expect(TERRAIN_CHUNK_SIZE).toBe(32);
+  });
+
+  it('splits a 64 x 64 map into 4 chunks', () => {
+    const group = builder.build(flatMap(64, 64));
+    expect(meshes(group)).toHaveLength(4);
+    expect(group.children).toHaveLength(4);
+    expect(vertexCount(group)).toBe(64 * 64 * 6);
+  });
+
+  it('makes smaller edge chunks for a 40 x 40 map', () => {
+    const group = builder.build(flatMap(40, 40));
+    expect(meshes(group)).toHaveLength(4);
+    expect(vertexCount(group)).toBe(40 * 40 * 6);
+  });
+
+  it('covers non-square maps', () => {
+    const group = builder.build(flatMap(70, 10));
+    expect(meshes(group)).toHaveLength(3);
+    expect(vertexCount(group)).toBe(70 * 10 * 6);
+  });
+
+  it('shares one material between all chunks', () => {
+    const all = meshes(builder.build(flatMap(64, 64)));
+    for (const mesh of all) expect(mesh.material).toBe(all[0].material);
+  });
+
+  it('places chunk vertices at world tile positions', () => {
+    const all = meshes(builder.build(flatMap(40, 40)));
+    let maxX = 0;
+    let maxZ = 0;
+    for (const mesh of all) {
+      mesh.geometry.computeBoundingBox();
+      const box = mesh.geometry.boundingBox as THREE.Box3;
+      maxX = Math.max(maxX, box.max.x + mesh.position.x);
+      maxZ = Math.max(maxZ, box.max.z + mesh.position.z);
+    }
+    expect(maxX).toBe(40);
+    expect(maxZ).toBe(40);
+  });
+});

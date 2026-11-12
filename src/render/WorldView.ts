@@ -10,7 +10,7 @@ export class WorldView {
   public readonly scene = new THREE.Scene();
   private readonly terrainBuilder = new TerrainMeshBuilder();
   private readonly waterBuilder = new WaterMeshBuilder();
-  private terrainMesh: THREE.Mesh | null = null;
+  private terrainChunks: THREE.Group | null = null;
   private waterMesh: THREE.Mesh | null = null;
 
   /** Creates the scene with background and lights; no map is shown until `showMap`. */
@@ -25,9 +25,9 @@ export class WorldView {
   /** Replaces the shown map's terrain and water with meshes for `map`. Call on every map load. */
   public showMap(map: GameMap): void {
     this.clearMap();
-    this.terrainMesh = this.terrainBuilder.build(map);
+    this.terrainChunks = this.terrainBuilder.build(map);
     this.waterMesh = this.waterBuilder.build(map, MAPGEN_CONFIG.seaLevel);
-    this.scene.add(this.terrainMesh, this.waterMesh);
+    this.scene.add(this.terrainChunks, this.waterMesh);
   }
 
   /** Removes and frees the map meshes. Call when the view is no longer needed. */
@@ -36,12 +36,12 @@ export class WorldView {
   }
 
   private clearMap(): void {
-    for (const mesh of [this.terrainMesh, this.waterMesh]) {
-      if (!mesh) continue;
-      this.scene.remove(mesh);
-      disposeObject(mesh);
+    for (const object of [this.terrainChunks, this.waterMesh]) {
+      if (!object) continue;
+      this.scene.remove(object);
+      disposeObject(object);
     }
-    this.terrainMesh = null;
+    this.terrainChunks = null;
     this.waterMesh = null;
   }
 }

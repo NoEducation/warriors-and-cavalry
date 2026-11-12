@@ -33,7 +33,8 @@ const TIE_EPS = 1e-9;
 /**
  * First point where the ray from `origin` along `direction` hits the terrain of `map` within `maxDistance`,
  * or null. Tests the same two triangles per tile that `TerrainMeshBuilder` draws, walking only the tiles the
- * ray's ground projection crosses, nearest first. Returns null for a zero or non-finite direction.
+ * ray's ground projection crosses, nearest first. Only upper sides count (the renderer culls the undersides).
+ * Returns null for a zero or non-finite direction.
  */
 export function raycastHeightfield(
   map: GameMap,
@@ -110,14 +111,15 @@ function intersectTile(map: GameMap, tx: number, ty: number, ray: Ray): number {
 
 /**
  * Ray parameter (>= 0) where the ray meets the plane y = a + b*u + c*v (u = x - tx, v = z - ty) inside the
- * lower-left (`upper` false) or upper-right (`upper` true) half of the unit tile; Infinity when it does not.
+ * lower-left (`upper` false) or upper-right (`upper` true) half of the unit tile, from above; Infinity otherwise.
  */
 function planeHit(ray: Ray, tx: number, ty: number, a: number, b: number, c: number, upper: boolean): number {
   const { origin: o, dir: d } = ray;
   const ou = o.x - tx;
   const ov = o.z - ty;
+  // dot(d, normal) with the upward normal (-b, 1, -c); >= 0 means parallel or seen from below (culled when drawn).
   const denom = d.y - b * d.x - c * d.z;
-  if (denom === 0) return Infinity;
+  if (!(denom < 0)) return Infinity;
   const t = (a + b * ou + c * ov - o.y) / denom;
   if (!(t >= 0)) return Infinity;
   const u = ou + d.x * t;

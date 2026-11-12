@@ -4,7 +4,7 @@ export const CAMERA_CONFIG = {
   fovDeg: 30,
   pitchDeg: 55,
   minDistance: 20,
-  maxDistance: 120,
+  maxDistance: 160,
   startDistance: 60,
   panSpeedPerDistance: 0.8,
   rotateSpeedDeg: 90,

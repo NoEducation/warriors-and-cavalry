@@ -98,6 +98,11 @@ describe('raycastHeightfield', () => {
     expect(raycastHeightfield(flat, { x: NaN, y: 5, z: 4 }, { x: 0, y: -1, z: 0 }, MAX)).toBeNull();
   });
 
+  it('ignores triangles seen from below, as the renderer culls them', () => {
+    expect(raycastHeightfield(flat, { x: 4.5, y: -5, z: 4.5 }, { x: 0, y: 1, z: 0 }, MAX)).toBeNull();
+    expect(raycastHeightfield(flat, { x: -5, y: -1, z: 4.5 }, { x: 1, y: 0.1, z: 0 }, MAX)).toBeNull();
+  });
+
   it('agrees with brute force on a generated map', () => {
     const map = new MapGenerator().generate({ seed: 1, width: 32, height: 32 });
     const rand = mulberry32(12345);

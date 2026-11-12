@@ -20,26 +20,33 @@ describe('MapGenerator', () => {
   });
 
   for (const seed of [1, 2, 3, 4, 5]) {
-    it(`seed ${seed}: water border, enough grass and water, valid tile values`, () => {
-      const map = generator.generate({ seed, width: 128, height: 128 });
-      let grass = 0;
-      let water = 0;
+    it(`seed ${seed} at 512 x 512: water border, 40-55 % land, at most 15 % rock`, () => {
+      const map = generator.generate({ seed, width: 512, height: 512 });
+      const counts = [0, 0, 0, 0];
+      let borderLand = 0;
       for (let ty = 0; ty < map.height; ty++) {
         for (let tx = 0; tx < map.width; tx++) {
-          const t = map.tileAt(tx, ty);
-          expect(t).toBeGreaterThanOrEqual(0);
-          expect(t).toBeLessThanOrEqual(3);
-          if (tx === 0 || ty === 0 || tx === map.width - 1 || ty === map.height - 1) {
-            expect(t, `border tile (${tx}, ${ty})`).toBe(TileType.Water);
-          }
-          if (t === TileType.Grass) grass++;
-          if (t === TileType.Water) water++;
+          const t = map.tiles[ty * map.width + tx];
+          counts[t]++;
+          const border = tx === 0 || ty === 0 || tx === map.width - 1 || ty === map.height - 1;
+          if (border && t !== TileType.Water) borderLand++;
         }
       }
-      expect(grass).toBeGreaterThanOrEqual(500);
-      expect(water).toBeGreaterThanOrEqual(500);
+      const total = map.width * map.height;
+      expect(counts.reduce((a, b) => a + b, 0), 'only valid tile values').toBe(total);
+      expect(borderLand, 'non-water border tiles').toBe(0);
+      const land = (total - counts[TileType.Water]) / total;
+      expect(land).toBeGreaterThanOrEqual(0.4);
+      expect(land).toBeLessThanOrEqual(0.55);
+      expect(counts[TileType.Rock] / total).toBeLessThanOrEqual(0.15);
     });
   }
+
+  it('generates a 512 x 512 map quickly', () => {
+    const start = performance.now();
+    generator.generate({ seed: 9, width: 512, height: 512 });
+    expect(performance.now() - start).toBeLessThan(2000);
+  });
 
   it('supports non-square maps', () => {
     const map = generator.generate({ seed: 7, width: 64, height: 32 });

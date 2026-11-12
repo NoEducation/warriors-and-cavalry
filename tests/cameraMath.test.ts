@@ -57,7 +57,7 @@ describe('zoomDistance', () => {
   });
 
   it('clamps to the distance limits', () => {
-    expect(zoomDistance(119, 100)).toBe(120);
+    expect(zoomDistance(159, 100)).toBe(160);
     expect(zoomDistance(21, -100)).toBe(20);
   });
 
