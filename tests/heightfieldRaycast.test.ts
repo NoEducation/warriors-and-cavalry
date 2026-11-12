@@ -104,7 +104,7 @@ describe('raycastHeightfield', () => {
   });
 
   it('agrees with brute force on a generated map', () => {
-    const map = new MapGenerator().generate({ seed: 1, width: 32, height: 32 });
+    const { map } = new MapGenerator().generate({ seed: 1, width: 32, height: 32 });
     const rand = mulberry32(12345);
     let hits = 0;
     for (let i = 0; i < 300; i++) {

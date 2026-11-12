@@ -1,7 +1,7 @@
 // The 3D scene for a map: background, lights, terrain and water.
 import * as THREE from 'three';
-import type { GameMap } from '../sim/GameMap';
 import { MAPGEN_CONFIG } from '../sim/MapGenerator';
+import type { World } from '../sim/World';
 import { disposeObject } from './disposeObject';
 import { TerrainMeshBuilder } from './TerrainMeshBuilder';
 import { WaterMeshBuilder } from './WaterMeshBuilder';
@@ -13,7 +13,7 @@ export class WorldView {
   private terrainChunks: THREE.Group | null = null;
   private waterMesh: THREE.Mesh | null = null;
 
-  /** Creates the scene with background and lights; no map is shown until `showMap`. */
+  /** Creates the scene with background and lights; no world is shown until `showWorld`. */
   public constructor() {
     this.scene.background = new THREE.Color(0x1b2a38);
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.9));
@@ -22,8 +22,9 @@ export class WorldView {
     this.scene.add(sun);
   }
 
-  /** Replaces the shown map's terrain and water with meshes for `map`. Call on every map load. */
-  public showMap(map: GameMap): void {
+  /** Replaces the shown terrain and water with meshes for `world`'s map. Call on every world load. */
+  public showWorld(world: World): void {
+    const { map } = world;
     this.clearMap();
     this.terrainChunks = this.terrainBuilder.build(map);
     this.waterMesh = this.waterBuilder.build(map, MAPGEN_CONFIG.seaLevel);

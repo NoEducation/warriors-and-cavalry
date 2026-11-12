@@ -1,7 +1,9 @@
-// Deterministic island generator: fbm hills on an island whose coastline wobbles with low-frequency noise.
+// Deterministic world generator: fbm hills on an island whose coastline wobbles with low-frequency noise, then forests.
 import { GameMap } from './GameMap';
 import { fbm2 } from './noise';
 import { TileType } from './tiles';
+import { TreePlacer } from './TreePlacer';
+import { World } from './World';
 
 /** Generation tuning. Frozen so maps stay reproducible; tune by editing these values here. */
 export const MAPGEN_CONFIG = Object.freeze({
@@ -43,8 +45,16 @@ interface IslandShape extends MapParams {
 }
 
 export class MapGenerator {
-  /** Builds a new map for `params`; the same params always give the same map. The seed is taken as unsigned 32-bit. */
-  public generate(params: MapParams): GameMap {
+  private readonly treePlacer = new TreePlacer();
+
+  /** Builds a new world (terrain, then trees) for `params`; the same params always give the same world. The seed is taken as unsigned 32-bit. */
+  public generate(params: MapParams): World {
+    const world = new World(this.generateTerrain(params));
+    this.treePlacer.place(world, world.map.seed);
+    return world;
+  }
+
+  private generateTerrain(params: MapParams): GameMap {
     const { width, height } = params;
     const seed = params.seed >>> 0;
     const stride = width + 1;
@@ -115,8 +125,11 @@ export class MapGenerator {
   }
 }
 
-/** 32-bit FNV-1a over the bytes of `heights` followed by `tiles`. Use to compare maps cheaply. */
-export function mapChecksum(map: GameMap): number {
+/**
+ * 32-bit FNV-1a over the bytes of the map's `heights` and `tiles`, then each object's id, kind, tx and ty
+ * (as little-endian int32) in id order. Use to compare worlds cheaply, e.g. between peers.
+ */
+export function worldChecksum(world: World): number {
   let hash = 0x811c9dc5;
   const feed = (bytes: Uint8Array): void => {
     for (let i = 0; i < bytes.length; i++) {
@@ -124,8 +137,17 @@ export function mapChecksum(map: GameMap): number {
       hash = Math.imul(hash, 0x01000193);
     }
   };
-  const h = map.heights;
-  feed(new Uint8Array(h.buffer, h.byteOffset, h.byteLength));
-  feed(map.tiles);
+  const { heights, tiles } = world.map;
+  feed(new Uint8Array(heights.buffer, heights.byteOffset, heights.byteLength));
+  feed(tiles);
+  const fields = new DataView(new ArrayBuffer(16 * world.objectCount));
+  let offset = 0;
+  for (const object of world.objects()) {
+    for (const value of [object.id, object.kind, object.tx, object.ty]) {
+      fields.setInt32(offset, value, true);
+      offset += 4;
+    }
+  }
+  feed(new Uint8Array(fields.buffer));
   return hash >>> 0;
 }

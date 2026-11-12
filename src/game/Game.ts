@@ -7,8 +7,8 @@ import { PixelRenderer } from '../render/PixelRenderer';
 import { TileHighlight } from '../render/TileHighlight';
 import { TilePicker } from '../render/TilePicker';
 import { WorldView } from '../render/WorldView';
-import type { GameMap } from '../sim/GameMap';
 import { MapGenerator } from '../sim/MapGenerator';
+import type { World } from '../sim/World';
 import { Hud } from '../ui/Hud';
 import { FpsCounter } from './FpsCounter';
 import { GAME_CONFIG } from './GameConfig';
@@ -38,7 +38,7 @@ export class Game {
   private readonly tileHover: TileHover;
   private readonly fpsCounter = new FpsCounter(GAME_CONFIG.fpsSamples);
   /** Set by `loadMap`, which the constructor calls. */
-  private map!: GameMap;
+  private world!: World;
   private lastFrameTime: number | null = null;
   private lastFpsUpdate = 0;
 
@@ -67,17 +67,17 @@ export class Game {
     requestAnimationFrame(this.onFrame);
   }
 
-  /** Generates the map for `seed` and shows it, replacing the current one. */
+  /** Generates the world for `seed` and shows it, replacing the current one. */
   public loadMap(seed: number): void {
-    this.map = this.mapGenerator.generate({ seed, width: GAME_CONFIG.mapSize, height: GAME_CONFIG.mapSize });
-    this.worldView.showMap(this.map);
+    this.world = this.mapGenerator.generate({ seed, width: GAME_CONFIG.mapSize, height: GAME_CONFIG.mapSize });
+    this.worldView.showWorld(this.world);
     this.highlight.hide();
     this.hud.setSeed(seed);
   }
 
   private update(dtSeconds: number): void {
     this.rig.update(dtSeconds, this.keyboard);
-    this.tileHover.update(this.rig.camera, this.map);
+    this.tileHover.update(this.rig.camera, this.world.map);
     this.fpsCounter.addFrame(dtSeconds);
   }
 
