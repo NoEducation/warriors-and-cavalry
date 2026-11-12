@@ -1,4 +1,5 @@
-// HTML overlay: seed, hovered tile, FPS, a message line and a "New map" button.
+// HTML overlay: game clock, seed, hovered tile, FPS, a message line and a "New map" button.
+import { formatGameTime, type GameTime } from '../sim/gameTime';
 import type { TileCoord } from '../sim/TileCoord';
 
 /** What the HUD shows about the hovered tile. */
@@ -10,6 +11,7 @@ export interface HudTileInfo extends TileCoord {
 }
 
 export class Hud {
+  private readonly clockLine: HTMLDivElement;
   private readonly seedLine: HTMLDivElement;
   private readonly tileLine: HTMLDivElement;
   private readonly fpsLine: HTMLDivElement;
@@ -21,6 +23,7 @@ export class Hud {
     private readonly root: HTMLElement,
     onNewMap: () => void,
   ) {
+    this.clockLine = this.addLine();
     this.seedLine = this.addLine();
     this.tileLine = this.addLine();
     this.fpsLine = this.addLine();
@@ -37,6 +40,17 @@ export class Hud {
 
     this.tileLine.textContent = 'Tile: —';
     this.fpsLine.textContent = 'FPS: —';
+  }
+
+  /**
+   * Shows the game clock, e.g. `Day 1 · 06:00`, followed by ` · Paused` when paused or the speed (` · 2×`) when not
+   * at 1×. Cheap to call every frame: the DOM changes only when the text does.
+   */
+  public setClock(time: GameTime, paused: boolean, speed: number): void {
+    let text = formatGameTime(time);
+    if (paused) text += ' · Paused';
+    else if (speed !== 1) text += ` · ${speed}×`;
+    if (this.clockLine.textContent !== text) this.clockLine.textContent = text;
   }
 
   /** Shows the seed of the current map. Call after each map load. */

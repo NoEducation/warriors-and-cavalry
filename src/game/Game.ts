@@ -1,5 +1,4 @@
 // Owns every game object and the current world, and runs the frame loop.
-import type * as THREE from 'three';
 import { Keyboard } from '../input/Keyboard';
 import { Pointer } from '../input/Pointer';
 import { BuildingMeshFactory } from '../render/BuildingMeshFactory';
@@ -9,6 +8,7 @@ import { PlacementGhost } from '../render/PlacementGhost';
 import { TileHighlight } from '../render/TileHighlight';
 import { TilePicker } from '../render/TilePicker';
 import { WorldView } from '../render/WorldView';
+import { gameTimeAt, TICKS_PER_SECOND } from '../sim/gameTime';
 import { MapGenerator } from '../sim/MapGenerator';
 import type { World } from '../sim/World';
 import { Hud } from '../ui/Hud';
@@ -18,21 +18,9 @@ import { CameraDragInput } from './CameraDragInput';
 import { FpsDisplay } from './FpsDisplay';
 import { GAME_CONFIG } from './GameConfig';
 import { parseSeed, randomSeed } from './seed';
+import { SimulationRunner } from './SimulationRunner';
 import { TileHover } from './TileHover';
-
-/** Handles exposed on `window.__debug` in dev builds, for the browser console. */
-export interface DebugHandles {
-  readonly renderer: THREE.WebGLRenderer;
-  readonly game: Game;
-  /** The world currently shown; changes when a new map is loaded. */
-  readonly world: World;
-}
-
-declare global {
-  interface Window {
-    __debug?: DebugHandles;
-  }
-}
+import { TimeInput } from './TimeInput';
 
 export class Game {
   private readonly mapGenerator = new MapGenerator();
@@ -41,6 +29,7 @@ export class Game {
   private readonly ghost = new PlacementGhost(new BuildingMeshFactory());
   private readonly picker = new TilePicker();
   private readonly rig = new CameraRig(GAME_CONFIG.mapSize, GAME_CONFIG.mapSize);
+  private readonly runner = new SimulationRunner(TICKS_PER_SECOND);
   private readonly pixelRenderer: PixelRenderer;
   private readonly keyboard: Keyboard;
   private readonly pointer: Pointer;
@@ -50,6 +39,7 @@ export class Game {
   private readonly tileHover: TileHover;
   private readonly buildInput: BuildInput;
   private readonly cameraDragInput: CameraDragInput;
+  private readonly timeInput: TimeInput;
   /** The world currently shown. Game is its only owner and passes it to whoever needs it; `loadMap` replaces it. */
   private world: World;
   private lastFrameTime: number | null = null;
@@ -66,7 +56,9 @@ export class Game {
     this.tileHover = new TileHover(this.pointer, this.picker, this.highlight, this.ghost, this.hud, this.builder);
     this.buildInput = new BuildInput(this.builder, buildBarRoot, window, this.pointer, () => this.mapClickTarget());
     this.cameraDragInput = new CameraDragInput(this.pointer, this.rig);
-    this.addOverlaysToScene();
+    this.timeInput = new TimeInput(window, this.runner);
+    // The hover outline and placement ghost stay in the scene across maps.
+    this.worldView.scene.add(this.highlight.object, this.ghost.object);
     this.listenToCanvas(canvas);
     this.showWorld();
   }
@@ -79,9 +71,10 @@ export class Game {
     requestAnimationFrame(this.onFrame);
   }
 
-  /** Generates the world for `seed` and shows it, replacing the current one. The selected build tool is kept. */
+  /** Generates the world for `seed` and shows it, replacing the current one. Build tool, pause and speed are kept. */
   public loadMap(seed: number): void {
     this.world = this.generateWorld(seed);
+    this.runner.reset();
     this.showWorld();
   }
 
@@ -94,11 +87,6 @@ export class Game {
     this.worldView.showWorld(this.world);
     this.highlight.hide();
     this.hud.setSeed(this.world.map.seed);
-  }
-
-  /** Adds the hover outline and placement ghost, which stay in the scene across maps. */
-  private addOverlaysToScene(): void {
-    this.worldView.scene.add(this.highlight.object, this.ghost.object);
   }
 
   /** Mouse wheel zooms; the browser's context menu is suppressed so right-click can deselect the build tool. */
@@ -116,6 +104,7 @@ export class Game {
     window.__debug = {
       renderer: this.pixelRenderer.webgl,
       game,
+      runner: this.runner,
       get world(): World {
         return game.world;
       },
@@ -133,6 +122,8 @@ export class Game {
   private readonly onFrame = (time: number): void => {
     const dt = this.lastFrameTime === null ? 0 : (time - this.lastFrameTime) / 1000;
     this.lastFrameTime = time;
+    for (let ticks = this.runner.ticksFor(dt); ticks > 0; ticks--) this.world.tick();
+    this.hud.setClock(gameTimeAt(this.world.tickCount), this.runner.paused, this.runner.speed);
     this.rig.update(dt, this.keyboard);
     this.tileHover.update(this.rig.camera, this.world);
     this.fpsDisplay.addFrame(dt, time);
