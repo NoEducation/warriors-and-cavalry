@@ -18,9 +18,9 @@ export class TileHover {
   ) {}
 
   /** Finds the hovered tile, updates the highlight and HUD, and returns the tile (or null). Call once per frame. */
-  public update(camera: THREE.Camera, terrain: THREE.Object3D | null, map: GameMap): TileCoord | null {
+  public update(camera: THREE.Camera, map: GameMap): TileCoord | null {
     const cursor = this.pointer.ndc;
-    const tile = cursor && terrain ? this.picker.pick(cursor, camera, terrain, map) : null;
+    const tile = cursor ? this.picker.pick(cursor, camera, map) : null;
     if (!tile) {
       this.highlight.hide();
       this.hud.setTile(null);

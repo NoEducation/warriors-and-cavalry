@@ -77,7 +77,7 @@ export class Game {
 
   private update(dtSeconds: number): void {
     this.rig.update(dtSeconds, this.keyboard);
-    this.tileHover.update(this.rig.camera, this.worldView.terrain, this.map);
+    this.tileHover.update(this.rig.camera, this.map);
     this.fpsCounter.addFrame(dtSeconds);
   }
 

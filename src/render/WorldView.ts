@@ -22,11 +22,6 @@ export class WorldView {
     this.scene.add(sun);
   }
 
-  /** The terrain of the shown map (for picking), or null before the first `showMap`. */
-  public get terrain(): THREE.Object3D | null {
-    return this.terrainMesh;
-  }
-
   /** Replaces the shown map's terrain and water with meshes for `map`. Call on every map load. */
   public showMap(map: GameMap): void {
     this.clearMap();
