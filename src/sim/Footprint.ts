@@ -37,6 +37,21 @@ export class Footprint {
     }
   }
 
+  /**
+   * The tiles outside the footprint that share an edge with it (not the four diagonal corner tiles), row by row.
+   * May lie outside the map; check before indexing.
+   */
+  public *edgeNeighbours(): Iterable<TileCoord> {
+    const right = this.tx + this.width;
+    const bottom = this.ty + this.height;
+    for (let tx = this.tx; tx < right; tx++) yield { tx, ty: this.ty - 1 };
+    for (let ty = this.ty; ty < bottom; ty++) {
+      yield { tx: this.tx - 1, ty };
+      yield { tx: right, ty };
+    }
+    for (let tx = this.tx; tx < right; tx++) yield { tx, ty: bottom };
+  }
+
   /** Lowest and highest height among the footprint's corners inside `map`; null when no corner is inside. */
   public cornerHeightRange(map: GameMap): HeightRange | null {
     let min = Infinity;

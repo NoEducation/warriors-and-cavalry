@@ -47,6 +47,19 @@ describe('Footprint', () => {
     expect(Footprint.of(ObjectKind.Hovel, 0, 0).cornerHeightRange(map)).toEqual({ min: 0, max: 0 });
   });
 
+  it('lists the edge neighbours of a 2x2 footprint in row-major order, without diagonal corners', () => {
+    expect(Array.from(new Footprint(3, 4, 2, 2).edgeNeighbours())).toEqual([
+      { tx: 3, ty: 3 },
+      { tx: 4, ty: 3 },
+      { tx: 2, ty: 4 },
+      { tx: 5, ty: 4 },
+      { tx: 2, ty: 5 },
+      { tx: 5, ty: 5 },
+      { tx: 3, ty: 6 },
+      { tx: 4, ty: 6 },
+    ]);
+  });
+
   it('skips corners outside the map and returns null when none are inside', () => {
     const map = flatMap();
     map.heights[0] = 2; // corner (0, 0)

@@ -13,6 +13,8 @@ const REASON_TEXT: Record<FailureReason, string> = {
   BadTerrain: 'bad terrain',
   Occupied: 'occupied',
   TooSteep: 'too steep',
+  NeedsRock: 'needs rock nearby',
+  NotEnoughResources: 'not enough resources',
   UnknownObject: 'nothing here',
   NotDemolishable: 'trees cannot be removed',
   UnknownCommand: 'unknown command',

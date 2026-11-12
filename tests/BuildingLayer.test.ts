@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BuildingLayer } from '../src/render/BuildingLayer';
 import { BuildingMeshFactory } from '../src/render/BuildingMeshFactory';
 import { GameMap } from '../src/sim/GameMap';
-import { ObjectKind } from '../src/sim/ObjectKind';
+import { OBJECT_KINDS, ObjectKind } from '../src/sim/ObjectKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
 
@@ -26,9 +26,15 @@ function meshCount(group: THREE.Object3D): number {
 describe('BuildingMeshFactory', () => {
   const factory = new BuildingMeshFactory();
 
-  it('creates a non-empty group for every buildable kind', () => {
-    for (const kind of [ObjectKind.Keep, ObjectKind.Hovel, ObjectKind.WoodcutterHut]) {
-      expect(meshCount(factory.create(kind))).toBeGreaterThan(0);
+  it('creates a non-empty group within the footprint for every buildable kind', () => {
+    for (const kind of Object.values(ObjectKind)) {
+      const info = OBJECT_KINDS[kind];
+      if (!info.buildable) continue;
+      const group = factory.create(kind);
+      expect(meshCount(group), info.name).toBeGreaterThan(0);
+      const box = new THREE.Box3().setFromObject(group);
+      expect(box.max.x, info.name).toBeLessThanOrEqual(info.width);
+      expect(box.max.z, info.name).toBeLessThanOrEqual(info.height);
     }
   });
 

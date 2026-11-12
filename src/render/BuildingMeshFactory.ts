@@ -53,6 +53,11 @@ export class BuildingMeshFactory {
       case ObjectKind.WoodcutterHut:
         this.addWoodcutterHut(group, w, d);
         break;
+      default:
+        // Placeholder for kinds without a shape yet (Stockpile, Granary, Quarry, Wheat farm): a plain block over the
+        // footprint, so placing them does not fail. Replaced by real shapes in a later task.
+        group.add(this.box({ ...foundation, y0: 0, y1: 0.6 }, COLORS.foundation));
+        break;
     }
     return group;
   }

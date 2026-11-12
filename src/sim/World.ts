@@ -1,15 +1,12 @@
-// The simulation state: a map plus the objects standing on it, changed only through commands.
+// The simulation state: a map, the objects standing on it and the camp's economy, changed only through commands.
+import { ECONOMY_CONFIG, Economy, type EconomyView } from './Economy';
 import { Footprint } from './Footprint';
 import type { GameMap } from './GameMap';
 import type { MapObject } from './MapObject';
-import { OBJECT_KINDS, type ObjectKind, type ObjectKindInfo } from './ObjectKind';
-import { TileType } from './tiles';
+import { OBJECT_KINDS, type ObjectKind } from './ObjectKind';
+import { checkPlacement } from './placementRules';
+import { RESOURCE_KINDS } from './ResourceKind';
 import type { CommandResult, PlacementCheck, WorldChange, WorldCommand } from './WorldCommand';
-
-/** Largest allowed difference between the highest and lowest corner under a building's footprint. */
-export const MAX_FOOTPRINT_SLOPE = 0.6;
-/** Heights are stored as float32, so a range of exactly MAX_FOOTPRINT_SLOPE can read slightly above it. */
-const SLOPE_TOLERANCE = 1e-5;
 
 export class World {
   public readonly map: GameMap;
@@ -18,13 +15,20 @@ export class World {
   /** Ids only increase and are never reused, so insertion order is ascending id order. */
   private readonly byId = new Map<number, MapObject>();
   private readonly listeners = new Set<(change: WorldChange) => void>();
+  private readonly stock: Economy;
   private nextId = 1;
   private ticks = 0;
 
-  /** Creates a world with no objects on `map`. */
-  public constructor(map: GameMap) {
+  /** Creates a world with no objects on `map`, holding `economy` (by default the usual start amounts). */
+  public constructor(map: GameMap, economy: Economy = new Economy()) {
     this.map = map;
     this.occupancy = new Int32Array(map.width * map.height);
+    this.stock = economy;
+  }
+
+  /** Resource amounts and capacities. Read-only: they change only through `apply` and `tick`. */
+  public get economy(): EconomyView {
+    return this.stock;
   }
 
   /** Number of simulation ticks run since the world was generated. */
@@ -55,24 +59,11 @@ export class World {
   }
 
   /**
-   * Whether a building of `kind` may be placed with its footprint starting at (tx, ty); the first failing rule wins.
-   * An unknown `kind` is reported as NotBuildable.
+   * Whether a building of `kind` may be placed with its footprint starting at (tx, ty); the first failing rule wins
+   * (see `checkPlacement`). Does not look at resources. An unknown `kind` is reported as NotBuildable.
    */
   public canPlace(kind: ObjectKind, tx: number, ty: number): PlacementCheck {
-    const info: ObjectKindInfo | undefined = OBJECT_KINDS[kind];
-    if (!info?.buildable) return { ok: false, reason: 'NotBuildable' };
-    const footprint = Footprint.of(kind, tx, ty);
-    if (!footprint.inBounds(this.map)) return { ok: false, reason: 'OutOfBounds' };
-    for (const tile of footprint.tiles()) {
-      const type = this.map.tileAt(tile.tx, tile.ty);
-      if (type !== TileType.Grass && type !== TileType.Sand) return { ok: false, reason: 'BadTerrain' };
-    }
-    if (!this.isFree(footprint)) return { ok: false, reason: 'Occupied' };
-    const range = footprint.cornerHeightRange(this.map);
-    if (!range || range.max - range.min > MAX_FOOTPRINT_SLOPE + SLOPE_TOLERANCE) {
-      return { ok: false, reason: 'TooSteep' };
-    }
-    return { ok: true };
+    return checkPlacement(this.map, kind, tx, ty, (footprint) => this.isFree(footprint));
   }
 
   /** Executes a player command. On failure, including a malformed command, nothing changes and no listener is called. */
@@ -81,6 +72,7 @@ export class World {
       case 'placeBuilding': {
         const check = this.canPlace(command.kind, command.tx, command.ty);
         if (!check.ok) return check;
+        if (!this.stock.spend(OBJECT_KINDS[command.kind].cost)) return { ok: false, reason: 'NotEnoughResources' };
         return { ok: true, object: this.add(command.kind, command.tx, command.ty) };
       }
       case 'demolish':
@@ -91,7 +83,7 @@ export class World {
   }
 
   /**
-   * Adds an object without the building rules (buildable, terrain, slope). For the map generator only;
+   * Adds an object without the building rules (buildable, terrain, slope, cost). For the map generator only;
    * throws a RangeError when the kind is unknown or the footprint is outside the map or occupied.
    */
   public spawn(kind: ObjectKind, tx: number, ty: number): MapObject {
@@ -110,20 +102,28 @@ export class World {
     };
   }
 
+  /** Removes the object, then refunds part of its cost into the capacity that remains. */
   private demolish(objectId: number): CommandResult {
     const object = this.byId.get(objectId);
     if (!object) return { ok: false, reason: 'UnknownObject' };
-    if (!OBJECT_KINDS[object.kind].buildable) return { ok: false, reason: 'NotDemolishable' };
+    const info = OBJECT_KINDS[object.kind];
+    if (!info.buildable) return { ok: false, reason: 'NotDemolishable' };
     this.fill(Footprint.of(object.kind, object.tx, object.ty), 0);
     this.byId.delete(objectId);
+    this.stock.removeCapacity(info.storage);
+    for (const kind of RESOURCE_KINDS) {
+      this.stock.add(kind, Math.floor(info.cost[kind] / ECONOMY_CONFIG.refundDivisor));
+    }
     this.notify({ type: 'removed', object });
     return { ok: true, object };
   }
 
+  /** Adds the object and its storage capacity, then tells the listeners. */
   private add(kind: ObjectKind, tx: number, ty: number): MapObject {
     const object: MapObject = Object.freeze({ id: this.nextId++, kind, tx, ty });
     this.byId.set(object.id, object);
     this.fill(Footprint.of(kind, tx, ty), object.id);
+    this.stock.addCapacity(OBJECT_KINDS[kind].storage);
     this.notify({ type: 'added', object });
     return object;
   }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { GameMap } from '../src/sim/GameMap';
+import { Economy } from '../src/sim/Economy';
 import { ObjectKind, OBJECT_KINDS } from '../src/sim/ObjectKind';
+import { NO_RESOURCES, RESOURCE_KINDS, ResourceKind } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
 import type { CommandResult, WorldChange, WorldCommand } from '../src/sim/WorldCommand';
@@ -30,15 +32,38 @@ function recordChanges(world: World): WorldChange[] {
 
 describe('OBJECT_KINDS', () => {
   it('describes footprints and buildability', () => {
-    expect(OBJECT_KINDS[ObjectKind.Tree]).toEqual({ name: 'Tree', width: 1, height: 1, buildable: false });
-    expect(OBJECT_KINDS[ObjectKind.Keep]).toEqual({ name: 'Keep', width: 4, height: 4, buildable: true });
-    expect(OBJECT_KINDS[ObjectKind.Hovel]).toEqual({ name: 'Hovel', width: 2, height: 2, buildable: true });
-    expect(OBJECT_KINDS[ObjectKind.WoodcutterHut]).toEqual({
-      name: "Woodcutter's hut",
-      width: 2,
-      height: 2,
-      buildable: true,
+    const rows = Object.values(ObjectKind).map((kind) => {
+      const { name, width, height, buildable } = OBJECT_KINDS[kind];
+      return [name, width, height, buildable];
     });
+    expect(rows).toEqual([
+      ['Tree', 1, 1, false],
+      ['Keep', 4, 4, true],
+      ['Hovel', 2, 2, true],
+      ["Woodcutter's hut", 2, 2, true],
+      ['Stockpile', 3, 3, true],
+      ['Granary', 3, 3, true],
+      ['Quarry', 3, 3, true],
+      ['Wheat farm', 4, 4, true],
+    ]);
+  });
+
+  it('holds costs, storage, placement rules and production', () => {
+    const rows = Object.values(ObjectKind).map((kind) => {
+      const { cost, storage, grassOnly, needsRock, production } = OBJECT_KINDS[kind];
+      return [RESOURCE_KINDS.map((k) => cost[k]), RESOURCE_KINDS.map((k) => storage[k]), grassOnly, needsRock, production];
+    });
+    const wood = ResourceKind.Wood;
+    expect(rows).toEqual([
+      [[0, 0, 0], [0, 0, 0], false, false, null],
+      [[50, 40, 0], [0, 0, 0], false, false, null],
+      [[15, 0, 0], [0, 0, 0], false, false, null],
+      [[20, 0, 0], [0, 0, 0], false, false, { resource: wood, cycleTicks: 100, yield: 2, treeRadius: 8 }],
+      [[10, 0, 0], [150, 150, 0], false, false, null],
+      [[25, 0, 0], [0, 0, 200], false, false, null],
+      [[30, 0, 0], [0, 0, 0], false, true, { resource: ResourceKind.Stone, cycleTicks: 150, yield: 2, treeRadius: null }],
+      [[20, 0, 0], [0, 0, 0], true, false, { resource: ResourceKind.Food, cycleTicks: 200, yield: 3, treeRadius: null }],
+    ]);
   });
 });
 
@@ -82,13 +107,47 @@ describe('World.canPlace', () => {
     expect(world.canPlace(ObjectKind.Hovel, 5, 5)).toEqual({ ok: true });
   });
 
-  it('rejects a footprint whose corner heights differ by more than 0.6', () => {
-    const steep = flatMap();
-    setCorner(steep, 5, 5, 0.7);
-    expect(new World(steep).canPlace(ObjectKind.Hovel, 3, 3)).toEqual({ ok: false, reason: 'TooSteep' });
+  it('allows a corner height range of 0.3 per tile of the longer footprint side', () => {
+    const cases: [ObjectKind, number, number][] = [
+      [ObjectKind.Hovel, 0.6, 0.7], // 2 x 2
+      [ObjectKind.Stockpile, 0.9, 1.0], // 3 x 3
+      [ObjectKind.Keep, 1.2, 1.3], // 4 x 4
+    ];
+    for (const [kind, okRange, steepRange] of cases) {
+      const { width } = OBJECT_KINDS[kind];
+      const edge = flatMap();
+      setCorner(edge, 3 + width, 3 + width, okRange);
+      expect(new World(edge).canPlace(kind, 3, 3), `${OBJECT_KINDS[kind].name} at ${okRange}`).toEqual({ ok: true });
+      const steep = flatMap();
+      setCorner(steep, 3 + width, 3 + width, steepRange);
+      expect(new World(steep).canPlace(kind, 3, 3), `${OBJECT_KINDS[kind].name} at ${steepRange}`).toEqual({
+        ok: false,
+        reason: 'TooSteep',
+      });
+    }
+  });
+
+  it('places a Quarry only with rock touching an edge of its footprint', () => {
+    const bare = flatMap();
+    expect(new World(bare).canPlace(ObjectKind.Quarry, 5, 5)).toEqual({ ok: false, reason: 'NeedsRock' });
     const edge = flatMap();
-    setCorner(edge, 5, 5, 0.6);
-    expect(new World(edge).canPlace(ObjectKind.Hovel, 3, 3)).toEqual({ ok: true });
+    setTile(edge, 8, 6, TileType.Rock); // right of the footprint's middle row
+    expect(new World(edge).canPlace(ObjectKind.Quarry, 5, 5)).toEqual({ ok: true });
+    const diagonal = flatMap();
+    setTile(diagonal, 8, 8, TileType.Rock); // off the bottom-right corner only
+    expect(new World(diagonal).canPlace(ObjectKind.Quarry, 5, 5)).toEqual({ ok: false, reason: 'NeedsRock' });
+  });
+
+  it('places a Wheat farm only on grass', () => {
+    const sandy = flatMap();
+    setTile(sandy, 4, 4, TileType.Sand);
+    expect(new World(sandy).canPlace(ObjectKind.WheatFarm, 3, 3)).toEqual({ ok: false, reason: 'BadTerrain' });
+    expect(new World(flatMap()).canPlace(ObjectKind.WheatFarm, 3, 3)).toEqual({ ok: true });
+  });
+
+  it('does not look at resources', () => {
+    const world = new World(flatMap(), new Economy(NO_RESOURCES));
+    expect(world.canPlace(ObjectKind.Keep, 3, 3)).toEqual({ ok: true });
   });
 
   it('reports BadTerrain before Occupied', () => {
@@ -189,6 +248,76 @@ describe('World.apply', () => {
       ok: false,
       reason: 'UnknownObject',
     });
+  });
+});
+
+describe('World costs and storage', () => {
+  const amounts = (world: World): number[] => RESOURCE_KINDS.map((k) => world.economy.amount(k));
+  const capacities = (world: World): number[] => RESOURCE_KINDS.map((k) => world.economy.capacity(k));
+  const place = (world: World, kind: ObjectKind, tx: number, ty: number): CommandResult =>
+    world.apply({ type: 'placeBuilding', kind, tx, ty });
+
+  it('spends the cost of a placed building', () => {
+    const hovel = new World(flatMap());
+    expect(place(hovel, ObjectKind.Hovel, 1, 1).ok).toBe(true);
+    expect(amounts(hovel)).toEqual([85, 40, 50]);
+    const keep = new World(flatMap());
+    expect(place(keep, ObjectKind.Keep, 1, 1).ok).toBe(true);
+    expect(amounts(keep)).toEqual([50, 0, 50]);
+  });
+
+  it('rejects a building it cannot pay for and changes nothing', () => {
+    const world = new World(flatMap());
+    place(world, ObjectKind.Keep, 0, 0);
+    place(world, ObjectKind.WoodcutterHut, 5, 0);
+    place(world, ObjectKind.WoodcutterHut, 8, 0);
+    expect(amounts(world)).toEqual([10, 0, 50]);
+    const changes = recordChanges(world);
+    expect(place(world, ObjectKind.Hovel, 1, 8)).toEqual({ ok: false, reason: 'NotEnoughResources' });
+    expect(world.objectCount).toBe(3);
+    expect(world.objectAt(1, 8)).toBeUndefined();
+    expect(amounts(world)).toEqual([10, 0, 50]);
+    expect(changes).toEqual([]);
+  });
+
+  it('reports a placement rule before missing resources', () => {
+    const world = new World(flatMap(), new Economy(NO_RESOURCES));
+    expect(place(world, ObjectKind.Keep, SIZE - 3, 0)).toEqual({ ok: false, reason: 'OutOfBounds' });
+  });
+
+  it('refunds half the cost, rounded down, on demolish', () => {
+    const world = new World(flatMap());
+    const placed = place(world, ObjectKind.Hovel, 1, 1);
+    if (!placed.ok) throw new Error('placement failed');
+    world.apply({ type: 'demolish', objectId: placed.object.id });
+    expect(amounts(world)).toEqual([92, 40, 50]);
+  });
+
+  it('raises capacity with a Stockpile and lowers it again on demolish', () => {
+    const world = new World(flatMap());
+    const placed = place(world, ObjectKind.Stockpile, 1, 1);
+    if (!placed.ok) throw new Error('placement failed');
+    expect(capacities(world)).toEqual([250, 250, 100]);
+    world.apply({ type: 'demolish', objectId: placed.object.id });
+    expect(capacities(world)).toEqual([100, 100, 100]);
+    expect(amounts(world)).toEqual([95, 40, 50]);
+  });
+
+  it('raises food capacity with a Granary', () => {
+    const world = new World(flatMap());
+    expect(place(world, ObjectKind.Granary, 1, 1).ok).toBe(true);
+    expect(capacities(world)).toEqual([100, 100, 300]);
+  });
+
+  it('loses the excess, refund included, when a full Stockpile is demolished', () => {
+    const economy = new Economy();
+    const world = new World(flatMap(), economy);
+    const placed = place(world, ObjectKind.Stockpile, 1, 1);
+    if (!placed.ok) throw new Error('placement failed');
+    economy.add(ResourceKind.Wood, 150);
+    expect(world.economy.amount(ResourceKind.Wood)).toBe(240);
+    world.apply({ type: 'demolish', objectId: placed.object.id });
+    expect(world.economy.amount(ResourceKind.Wood)).toBe(100);
   });
 });
 
