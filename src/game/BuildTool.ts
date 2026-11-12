@@ -15,7 +15,11 @@ export const BUILD_TOOLS: readonly BuildToolEntry[] = Object.freeze([
   { label: 'Keep', key: 'Digit1', tool: { type: 'build', kind: ObjectKind.Keep } },
   { label: 'Hovel', key: 'Digit2', tool: { type: 'build', kind: ObjectKind.Hovel } },
   { label: 'Woodcutter', key: 'Digit3', tool: { type: 'build', kind: ObjectKind.WoodcutterHut } },
-  { label: 'Demolish', key: 'Digit4', tool: { type: 'demolish' } },
+  { label: 'Stockpile', key: 'Digit4', tool: { type: 'build', kind: ObjectKind.Stockpile } },
+  { label: 'Granary', key: 'Digit5', tool: { type: 'build', kind: ObjectKind.Granary } },
+  { label: 'Quarry', key: 'Digit6', tool: { type: 'build', kind: ObjectKind.Quarry } },
+  { label: 'Farm', key: 'Digit7', tool: { type: 'build', kind: ObjectKind.WheatFarm } },
+  { label: 'Demolish', key: 'Digit8', tool: { type: 'demolish' } },
 ]);
 
 /** True when `a` and `b` are the same tool (or both null). */

@@ -1,20 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { BuildController } from '../src/game/BuildController';
 import { BUILD_TOOLS, type BuildTool } from '../src/game/BuildTool';
+import { Economy } from '../src/sim/Economy';
 import { GameMap } from '../src/sim/GameMap';
 import { ObjectKind } from '../src/sim/ObjectKind';
+import { type ResourceAmounts, ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
 
 const SIZE = 16;
 const HOVEL: BuildTool = { type: 'build', kind: ObjectKind.Hovel };
 const KEEP: BuildTool = { type: 'build', kind: ObjectKind.Keep };
+const QUARRY: BuildTool = { type: 'build', kind: ObjectKind.Quarry };
 const DEMOLISH: BuildTool = { type: 'demolish' };
 
-function flatWorld(): World {
+/** A flat all-grass world; `start` gives the economy's start amounts (default: the normal ones). */
+function flatWorld(start?: ResourceAmounts): World {
   const heights = new Float32Array((SIZE + 1) * (SIZE + 1));
   const tiles = new Uint8Array(SIZE * SIZE).fill(TileType.Grass);
-  return new World(new GameMap(SIZE, SIZE, 1, heights, tiles));
+  return new World(new GameMap(SIZE, SIZE, 1, heights, tiles), start ? new Economy(start) : undefined);
 }
 
 function setup(world: World = flatWorld()): { world: World; controller: BuildController; messages: string[] } {
@@ -24,15 +28,29 @@ function setup(world: World = flatWorld()): { world: World; controller: BuildCon
 }
 
 describe('BUILD_TOOLS', () => {
-  it('lists Keep, Hovel, Woodcutter and Demolish on digit keys 1-4', () => {
+  it('lists seven buildings and Demolish on digit keys 1-8', () => {
     expect(BUILD_TOOLS.map((e) => [e.label, e.key])).toEqual([
       ['Keep', 'Digit1'],
       ['Hovel', 'Digit2'],
       ['Woodcutter', 'Digit3'],
-      ['Demolish', 'Digit4'],
+      ['Stockpile', 'Digit4'],
+      ['Granary', 'Digit5'],
+      ['Quarry', 'Digit6'],
+      ['Farm', 'Digit7'],
+      ['Demolish', 'Digit8'],
     ]);
-    expect(BUILD_TOOLS[2].tool).toEqual({ type: 'build', kind: ObjectKind.WoodcutterHut });
-    expect(BUILD_TOOLS[3].tool).toEqual(DEMOLISH);
+    expect(BUILD_TOOLS.slice(0, 7).map((e) => e.tool)).toEqual(
+      [
+        ObjectKind.Keep,
+        ObjectKind.Hovel,
+        ObjectKind.WoodcutterHut,
+        ObjectKind.Stockpile,
+        ObjectKind.Granary,
+        ObjectKind.Quarry,
+        ObjectKind.WheatFarm,
+      ].map((kind) => ({ type: 'build', kind })),
+    );
+    expect(BUILD_TOOLS[7].tool).toEqual(DEMOLISH);
   });
 });
 
@@ -118,5 +136,40 @@ describe('BuildController', () => {
     expect(worldB.objectAt(5, 5)?.kind).toBe(ObjectKind.Hovel);
     expect(worldA.objectCount).toBe(1);
     expect(worldA.objectAt(5, 5)).toBeUndefined();
+  });
+
+  it('previews red and rejects a building the player cannot pay for', () => {
+    const { world, controller, messages } = setup(flatWorld(resources(10, 0, 0)));
+    controller.selectTool(HOVEL);
+    expect(controller.preview(world, { tx: 2, ty: 2 })).toEqual({ kind: ObjectKind.Hovel, tx: 2, ty: 2, ok: false });
+    expect(controller.click(world, { tx: 2, ty: 2 })).toEqual({ ok: false, reason: 'NotEnoughResources' });
+    expect(messages).toEqual(['Cannot build: not enough wood']);
+    expect(world.objectCount).toBe(0);
+    expect(world.economy.amount(ResourceKind.Wood)).toBe(10);
+  });
+
+  it('names the resource that falls short', () => {
+    const { world, controller, messages } = setup(flatWorld(resources(100, 0, 0)));
+    controller.selectTool(KEEP);
+    controller.click(world, { tx: 2, ty: 2 });
+    expect(messages).toEqual(['Cannot build: not enough stone']);
+  });
+
+  it('rejects a Quarry away from rock', () => {
+    const { world, controller, messages } = setup();
+    controller.selectTool(QUARRY);
+    expect(controller.preview(world, { tx: 2, ty: 2 })?.ok).toBe(false);
+    expect(controller.click(world, { tx: 2, ty: 2 })).toEqual({ ok: false, reason: 'NeedsRock' });
+    expect(messages).toEqual(['Cannot build: needs rock nearby']);
+  });
+
+  it('places and pays when the cost can be covered', () => {
+    const { world, controller, messages } = setup(flatWorld(resources(100, 40, 0)));
+    controller.selectTool(KEEP);
+    expect(controller.preview(world, { tx: 2, ty: 2 })?.ok).toBe(true);
+    expect(controller.click(world, { tx: 2, ty: 2 })?.ok).toBe(true);
+    expect(world.economy.amount(ResourceKind.Wood)).toBe(50);
+    expect(world.economy.amount(ResourceKind.Stone)).toBe(0);
+    expect(messages).toEqual([]);
   });
 });
