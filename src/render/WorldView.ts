@@ -1,10 +1,12 @@
-// The 3D scene for a world: background, lights, terrain, water, trees and buildings.
+// The 3D scene for a world: background, lights, terrain, water, trees, buildings, stockpile stacks and crops.
 import * as THREE from 'three';
 import { MAPGEN_CONFIG } from '../sim/MapGenerator';
 import type { World } from '../sim/World';
 import { BuildingLayer } from './BuildingLayer';
 import { BuildingMeshFactory } from './BuildingMeshFactory';
 import { disposeObject } from './disposeObject';
+import { FarmCrops } from './FarmCrops';
+import { StockpileStacks } from './StockpileStacks';
 import { TerrainMeshBuilder } from './TerrainMeshBuilder';
 import { TreeLayer } from './TreeLayer';
 import { WaterMeshBuilder } from './WaterMeshBuilder';
@@ -18,6 +20,8 @@ export class WorldView {
   private waterMesh: THREE.Mesh | null = null;
   private treeLayer: TreeLayer | null = null;
   private buildingLayer: BuildingLayer | null = null;
+  private stockpileStacks: StockpileStacks | null = null;
+  private farmCrops: FarmCrops | null = null;
 
   /** Creates the scene with background and lights; no world is shown until `showWorld`. */
   public constructor() {
@@ -29,8 +33,8 @@ export class WorldView {
   }
 
   /**
-   * Replaces everything shown with meshes for `world`: terrain, water, trees and buildings (which then follow the
-   * world's changes). Call on every world load.
+   * Replaces everything shown with meshes for `world`: terrain, water, trees, and buildings, stockpile stacks and crops
+   * (which then follow the world's changes). Call on every world load.
    */
   public showWorld(world: World): void {
     const { map } = world;
@@ -39,7 +43,16 @@ export class WorldView {
     this.waterMesh = this.waterBuilder.build(map, MAPGEN_CONFIG.seaLevel);
     this.treeLayer = new TreeLayer(world);
     this.buildingLayer = new BuildingLayer(world, this.buildingFactory);
+    this.stockpileStacks = new StockpileStacks(world);
+    this.farmCrops = new FarmCrops(world);
     this.scene.add(this.terrainChunks, this.waterMesh, this.treeLayer.object, this.buildingLayer.object);
+    this.scene.add(this.stockpileStacks.object, this.farmCrops.object);
+  }
+
+  /** Brings the stockpile stacks and crops in line with the shown world's stock and production. Call once per frame. */
+  public update(): void {
+    this.stockpileStacks?.update();
+    this.farmCrops?.update();
   }
 
   /** Removes and frees everything shown. Call when the view is no longer needed. */
@@ -53,7 +66,7 @@ export class WorldView {
       this.scene.remove(object);
       disposeObject(object);
     }
-    for (const layer of [this.treeLayer, this.buildingLayer]) {
+    for (const layer of [this.treeLayer, this.buildingLayer, this.stockpileStacks, this.farmCrops]) {
       if (!layer) continue;
       this.scene.remove(layer.object);
       layer.dispose();
@@ -62,5 +75,7 @@ export class WorldView {
     this.waterMesh = null;
     this.treeLayer = null;
     this.buildingLayer = null;
+    this.stockpileStacks = null;
+    this.farmCrops = null;
   }
 }

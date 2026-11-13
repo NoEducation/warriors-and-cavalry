@@ -133,6 +133,7 @@ export class Game {
     this.lastFrameTime = time;
     for (let ticks = this.runner.ticksFor(dt); ticks > 0; ticks--) this.world.tick();
     this.status.update(this.world);
+    this.worldView.update();
     this.rig.update(dt, this.keyboard);
     this.tileHover.update(this.rig.camera, this.world);
     this.fpsDisplay.addFrame(dt, time);
@@ -142,8 +143,7 @@ export class Game {
 
   private readonly onResize = (): void => {
     const size = this.pixelRenderer.resize();
-    if (!size) return;
-    this.rig.setAspect(size.width / size.height);
+    if (size) this.rig.setAspect(size.width / size.height);
   };
 
   private readonly onWheel = (e: WheelEvent): void => {
