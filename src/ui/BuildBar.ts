@@ -1,5 +1,5 @@
 // HTML bar with one button per build tool: its key, label and cost. Shows the active tool and what cannot be paid.
-import { BUILD_TOOLS, type BuildTool, sameTool } from '../game/BuildTool';
+import { BUILD_TOOLS, type BuildTool, sameTool } from './BuildTool';
 import type { EconomyView } from '../sim/Economy';
 import { OBJECT_KINDS } from '../sim/ObjectKind';
 import { costText, shortCostText } from './costText';

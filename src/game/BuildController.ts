@@ -5,7 +5,7 @@ import { RESOURCE_NAMES } from '../sim/ResourceKind';
 import type { TileCoord } from '../sim/TileCoord';
 import type { World } from '../sim/World';
 import type { CommandResult } from '../sim/WorldCommand';
-import type { BuildTool } from './BuildTool';
+import type { BuildTool } from '../ui/BuildTool';
 
 type FailureReason = Extract<CommandResult, { ok: false }>['reason'];
 

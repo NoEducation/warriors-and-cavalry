@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BuildController } from '../src/game/BuildController';
-import { BUILD_TOOLS, type BuildTool } from '../src/game/BuildTool';
+import { BUILD_TOOLS, type BuildTool } from '../src/ui/BuildTool';
 import { Economy } from '../src/sim/Economy';
 import { GameMap } from '../src/sim/GameMap';
 import { ObjectKind } from '../src/sim/ObjectKind';
