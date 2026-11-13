@@ -4,8 +4,8 @@ import type { EconomyView } from '../sim/Economy';
 import type { TileCoord } from '../sim/TileCoord';
 import type { World } from '../sim/World';
 import { BuildBar } from '../ui/BuildBar';
-import type { BuildController } from './BuildController';
 import { BUILD_TOOLS, type BuildTool } from '../ui/BuildTool';
+import type { BuildController } from './BuildController';
 
 const LEFT_BUTTON = 0;
 const RIGHT_BUTTON = 2;

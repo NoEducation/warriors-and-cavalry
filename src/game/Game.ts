@@ -1,48 +1,39 @@
 // Owns every game object and the current world, and runs the frame loop.
-import { Keyboard } from '../input/Keyboard';
-import { Pointer } from '../input/Pointer';
 import { BuildingMeshFactory } from '../render/BuildingMeshFactory';
 import { CameraRig } from '../render/CameraRig';
 import { PixelRenderer } from '../render/PixelRenderer';
 import { PlacementGhost } from '../render/PlacementGhost';
 import { TileHighlight } from '../render/TileHighlight';
-import { TilePicker } from '../render/TilePicker';
 import { WorldView } from '../render/WorldView';
 import { TICKS_PER_SECOND } from '../sim/gameTime';
 import { MapGenerator } from '../sim/MapGenerator';
 import type { World } from '../sim/World';
 import { Hud } from '../ui/Hud';
 import { ResourceBar } from '../ui/ResourceBar';
-import { BuildController } from './BuildController';
-import { BuildInput, type MapClickTarget } from './BuildInput';
-import { CameraDragInput } from './CameraDragInput';
 import { FpsDisplay } from './FpsDisplay';
 import { GAME_CONFIG } from './GameConfig';
+import { GameInput } from './GameInput';
 import { parseSeed, randomSeed } from './seed';
 import { SimulationRunner } from './SimulationRunner';
 import { StatusDisplay } from './StatusDisplay';
-import { TileHover } from './TileHover';
-import { TimeInput } from './TimeInput';
+
+/** The status widgets the frame loop refreshes. */
+interface GameWidgets {
+  readonly fpsDisplay: FpsDisplay;
+  readonly status: StatusDisplay;
+}
 
 export class Game {
   private readonly mapGenerator = new MapGenerator();
   private readonly worldView = new WorldView();
   private readonly highlight = new TileHighlight();
   private readonly ghost = new PlacementGhost(new BuildingMeshFactory());
-  private readonly picker = new TilePicker();
   private readonly rig = new CameraRig(GAME_CONFIG.mapSize, GAME_CONFIG.mapSize);
   private readonly runner = new SimulationRunner(TICKS_PER_SECOND);
   private readonly pixelRenderer: PixelRenderer;
-  private readonly keyboard: Keyboard;
-  private readonly pointer: Pointer;
   private readonly hud: Hud;
-  private readonly fpsDisplay: FpsDisplay;
-  private readonly builder: BuildController;
-  private readonly tileHover: TileHover;
-  private readonly buildInput: BuildInput;
-  private readonly cameraDragInput: CameraDragInput;
-  private readonly timeInput: TimeInput;
-  private readonly status: StatusDisplay;
+  private readonly input: GameInput;
+  private readonly widgets: GameWidgets;
   /** The world currently shown. Game is its only owner and passes it to whoever needs it; `loadMap` replaces it. */
   private world: World;
   private lastFrameTime: number | null = null;
@@ -56,19 +47,11 @@ export class Game {
   ) {
     this.pixelRenderer = new PixelRenderer(canvas, GAME_CONFIG.pixelScale);
     this.world = this.generateWorld(parseSeed(location.search));
-    this.keyboard = new Keyboard(window);
-    this.pointer = new Pointer(canvas);
     this.hud = new Hud(hudRoot, () => this.onNewMap());
-    this.fpsDisplay = new FpsDisplay(this.hud, GAME_CONFIG.fpsSamples, GAME_CONFIG.fpsUpdateMs);
-    this.builder = new BuildController((text) => this.hud.showMessage(text, GAME_CONFIG.messageSeconds));
-    this.tileHover = new TileHover(this.pointer, this.picker, this.highlight, this.ghost, this.hud, this.builder);
-    this.buildInput = new BuildInput(this.builder, buildBarRoot, window, this.pointer, () => this.mapClickTarget());
-    this.cameraDragInput = new CameraDragInput(this.pointer, this.rig);
-    this.timeInput = new TimeInput(window, this.runner);
-    this.status = new StatusDisplay(this.hud, new ResourceBar(resourceRoot), this.buildInput, this.runner);
+    this.input = this.createInput(canvas, buildBarRoot);
+    this.widgets = this.createWidgets(resourceRoot);
     // The hover outline and placement ghost stay in the scene across maps.
     this.worldView.scene.add(this.highlight.object, this.ghost.object);
-    this.listenToCanvas(canvas);
     this.showWorld();
   }
 
@@ -87,6 +70,20 @@ export class Game {
     this.showWorld();
   }
 
+  /** Creates the keyboard, pointer and canvas input, acting on the HUD, hover outline, ghost, camera and runner. */
+  private createInput(canvas: HTMLCanvasElement, buildBarRoot: HTMLElement): GameInput {
+    const { hud, highlight, ghost, rig, runner } = this;
+    return new GameInput(canvas, buildBarRoot, { hud, highlight, ghost, rig, runner, currentWorld: () => this.world });
+  }
+
+  /** Creates the FPS reading and the clock, resource bar and affordability display. Call after `createInput`. */
+  private createWidgets(resourceRoot: HTMLElement): GameWidgets {
+    return {
+      fpsDisplay: new FpsDisplay(this.hud, GAME_CONFIG.fpsSamples, GAME_CONFIG.fpsUpdateMs),
+      status: new StatusDisplay(this.hud, new ResourceBar(resourceRoot), this.input.buildInput, this.runner),
+    };
+  }
+
   private generateWorld(seed: number): World {
     return this.mapGenerator.generate({ seed, width: GAME_CONFIG.mapSize, height: GAME_CONFIG.mapSize });
   }
@@ -96,16 +93,6 @@ export class Game {
     this.worldView.showWorld(this.world);
     this.highlight.hide();
     this.hud.setSeed(this.world.map.seed);
-  }
-
-  /** Mouse wheel zooms; the browser's context menu is suppressed so right-click can deselect the build tool. */
-  private listenToCanvas(canvas: HTMLCanvasElement): void {
-    canvas.addEventListener('wheel', this.onWheel, { passive: false });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  }
-
-  private mapClickTarget(): MapClickTarget {
-    return { world: this.world, tile: this.tileHover.tileUnderCursor(this.rig.camera, this.world.map) };
   }
 
   private exposeDebugHandles(): void {
@@ -129,14 +116,15 @@ export class Game {
   }
 
   private readonly onFrame = (time: number): void => {
+    // Frame order: ticks → camera → hover → world view update → status (clock, resources, FPS) → render.
     const dt = this.lastFrameTime === null ? 0 : (time - this.lastFrameTime) / 1000;
     this.lastFrameTime = time;
     for (let ticks = this.runner.ticksFor(dt); ticks > 0; ticks--) this.world.tick();
-    this.status.update(this.world);
+    this.rig.update(dt, this.input.keyboard);
+    this.input.tileHover.update(this.rig.camera, this.world);
     this.worldView.update();
-    this.rig.update(dt, this.keyboard);
-    this.tileHover.update(this.rig.camera, this.world);
-    this.fpsDisplay.addFrame(dt, time);
+    this.widgets.status.update(this.world);
+    this.widgets.fpsDisplay.addFrame(dt, time);
     this.pixelRenderer.render(this.worldView.scene, this.rig.camera);
     requestAnimationFrame(this.onFrame);
   };
@@ -144,10 +132,5 @@ export class Game {
   private readonly onResize = (): void => {
     const size = this.pixelRenderer.resize();
     if (size) this.rig.setAspect(size.width / size.height);
-  };
-
-  private readonly onWheel = (e: WheelEvent): void => {
-    e.preventDefault();
-    this.rig.zoom(e.deltaY);
   };
 }

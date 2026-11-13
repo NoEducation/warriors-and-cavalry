@@ -5,6 +5,7 @@ import type { World } from '../sim/World';
 import { treeAppearance, type TreeAppearance } from './treeAppearance';
 import { TreeGeometryFactory } from './TreeGeometryFactory';
 import { ALL_TREE_SPECIES, type TreeSpecies } from './TreeSpecies';
+import type { WorldLayer } from './WorldLayer';
 
 /** Tiles per region side. Each region gets its own meshes and bounding spheres for frustum culling. */
 export const TREE_REGION_SIZE = 64;
@@ -18,7 +19,7 @@ interface TreeBatch {
   readonly tints: number[];
 }
 
-export class TreeLayer {
+export class TreeLayer implements WorldLayer {
   /** Add this to the scene; contains one instanced mesh per species and region that has trees. */
   public readonly object = new THREE.Group();
   private readonly geometries = new Map<TreeSpecies, THREE.BufferGeometry>();
@@ -37,6 +38,9 @@ export class TreeLayer {
     for (const batch of batches) this.meshes.push(this.createMesh(batch));
     this.object.add(...this.meshes);
   }
+
+  /** Nothing changes per frame: the trees are built once per world. Part of WorldLayer. */
+  public update(): void {}
 
   /** Removes the meshes and frees the shared geometries, the material and the instance buffers. Call once. */
   public dispose(): void {

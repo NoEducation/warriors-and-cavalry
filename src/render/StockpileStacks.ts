@@ -1,5 +1,6 @@
 // Log bundles and stone blocks on every stockpile, showing how full the camp's wood and stone storage is.
 import * as THREE from 'three';
+import type { MapObject } from '../sim/MapObject';
 import { ObjectKind } from '../sim/ObjectKind';
 import { ResourceKind } from '../sim/ResourceKind';
 import type { World } from '../sim/World';
@@ -7,6 +8,7 @@ import type { WorldChange } from '../sim/WorldCommand';
 import { StockpileShape } from './buildings/StockpileShape';
 import { SHAPE_COLORS } from './buildings/shapeParts';
 import { floorHeight } from './floorHeight';
+import type { WorldLayer } from './WorldLayer';
 
 /** Stack slots per resource on one stockpile: 2 columns x 2 rows x 2 layers. */
 const SLOTS = 8;
@@ -29,7 +31,7 @@ interface StackStyle {
   readonly layerStep: number;
 }
 
-export class StockpileStacks {
+export class StockpileStacks implements WorldLayer {
   /** Add this to the scene; holds one instanced mesh for all logs and one for all stones while a stockpile stands. */
   public readonly object = new THREE.Group();
   private readonly styles: readonly StackStyle[];
@@ -61,7 +63,7 @@ export class StockpileStacks {
         layerStep: STONE_SIZE.y,
       },
     ];
-    for (const object of world.objects()) this.onChange({ type: 'added', object });
+    for (const object of world.objects()) this.add(object);
     this.unsubscribe = world.onChange(this.onChange);
   }
 
@@ -92,16 +94,22 @@ export class StockpileStacks {
   }
 
   private readonly onChange = (change: WorldChange): void => {
-    const { object } = change;
-    if (object.kind !== ObjectKind.Stockpile) return;
-    if (change.type === 'added') {
-      const y = floorHeight(this.world.map, object.kind, object.tx, object.ty) + StockpileShape.deckTop;
-      this.stockpiles.set(object.id, new THREE.Vector3(object.tx, y, object.ty));
-    } else {
-      this.stockpiles.delete(object.id);
-    }
-    this.stockpilesChanged = true;
+    if (change.type === 'added') this.add(change.object);
+    else this.remove(change.object);
   };
+
+  /** Ignores objects that are not stockpiles. The stacks follow at the next `update`. */
+  private add(object: MapObject): void {
+    if (object.kind !== ObjectKind.Stockpile) return;
+    const y = floorHeight(this.world.map, object.kind, object.tx, object.ty) + StockpileShape.deckTop;
+    this.stockpiles.set(object.id, new THREE.Vector3(object.tx, y, object.ty));
+    this.stockpilesChanged = true;
+  }
+
+  private remove(object: MapObject): void {
+    if (!this.stockpiles.delete(object.id)) return;
+    this.stockpilesChanged = true;
+  }
 
   /** `ceil(SLOTS × amount / capacity)`: how many stacks of `kind` each stockpile shows. */
   private stackCount(kind: ResourceKind): number {

@@ -10,6 +10,7 @@ import { StockpileStacks } from './StockpileStacks';
 import { TerrainMeshBuilder } from './TerrainMeshBuilder';
 import { TreeLayer } from './TreeLayer';
 import { WaterMeshBuilder } from './WaterMeshBuilder';
+import type { WorldLayer } from './WorldLayer';
 
 export class WorldView {
   public readonly scene = new THREE.Scene();
@@ -18,10 +19,8 @@ export class WorldView {
   private readonly buildingFactory = new BuildingMeshFactory();
   private terrainChunks: THREE.Group | null = null;
   private waterMesh: THREE.Mesh | null = null;
-  private treeLayer: TreeLayer | null = null;
-  private buildingLayer: BuildingLayer | null = null;
-  private stockpileStacks: StockpileStacks | null = null;
-  private farmCrops: FarmCrops | null = null;
+  /** Trees, buildings, stockpile stacks and crops of the shown world, in drawing order; empty before `showWorld`. */
+  private readonly layers: WorldLayer[] = [];
 
   /** Creates the scene with background and lights; no world is shown until `showWorld`. */
   public constructor() {
@@ -41,18 +40,19 @@ export class WorldView {
     this.clearWorld();
     this.terrainChunks = this.terrainBuilder.build(map);
     this.waterMesh = this.waterBuilder.build(map, MAPGEN_CONFIG.seaLevel);
-    this.treeLayer = new TreeLayer(world);
-    this.buildingLayer = new BuildingLayer(world, this.buildingFactory);
-    this.stockpileStacks = new StockpileStacks(world);
-    this.farmCrops = new FarmCrops(world);
-    this.scene.add(this.terrainChunks, this.waterMesh, this.treeLayer.object, this.buildingLayer.object);
-    this.scene.add(this.stockpileStacks.object, this.farmCrops.object);
+    this.scene.add(this.terrainChunks, this.waterMesh);
+    this.layers.push(
+      new TreeLayer(world),
+      new BuildingLayer(world, this.buildingFactory),
+      new StockpileStacks(world),
+      new FarmCrops(world),
+    );
+    for (const layer of this.layers) this.scene.add(layer.object);
   }
 
-  /** Brings the stockpile stacks and crops in line with the shown world's stock and production. Call once per frame. */
+  /** Brings every layer (e.g. stockpile stacks and crops) in line with the shown world. Call once per frame. */
   public update(): void {
-    this.stockpileStacks?.update();
-    this.farmCrops?.update();
+    for (const layer of this.layers) layer.update();
   }
 
   /** Removes and frees everything shown. Call when the view is no longer needed. */
@@ -66,16 +66,12 @@ export class WorldView {
       this.scene.remove(object);
       disposeObject(object);
     }
-    for (const layer of [this.treeLayer, this.buildingLayer, this.stockpileStacks, this.farmCrops]) {
-      if (!layer) continue;
+    for (const layer of this.layers) {
       this.scene.remove(layer.object);
       layer.dispose();
     }
     this.terrainChunks = null;
     this.waterMesh = null;
-    this.treeLayer = null;
-    this.buildingLayer = null;
-    this.stockpileStacks = null;
-    this.farmCrops = null;
+    this.layers.length = 0;
   }
 }

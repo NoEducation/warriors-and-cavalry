@@ -18,15 +18,16 @@ export class World {
   private nextId = 1;
   private ticks = 0;
 
-  /** Creates a world with no objects on `map`, holding `stock` (by default the usual start amounts). */
-  public constructor(public readonly map: GameMap, private readonly stock: Economy = new Economy()) {
+  /** Creates a world with no objects on `map`, holding `economyState` (by default the usual start amounts). */
+  public constructor(public readonly map: GameMap, private readonly economyState: Economy = new Economy()) {
     this.occupancy = new Int32Array(map.width * map.height);
-    this.production = new Production(map, stock, (tx, ty) => this.objectAt(tx, ty)?.kind === ObjectKind.Tree);
+    const isTreeAt = (tx: number, ty: number): boolean => this.objectAt(tx, ty)?.kind === ObjectKind.Tree;
+    this.production = new Production(map, economyState, isTreeAt);
   }
 
-  /** Resource amounts and capacities. Read-only: they change only through `apply` and `tick`. */
+  /** Read-only view of `economyState`: resource amounts and capacities, changed only through `apply` and `tick`. */
   public get economy(): EconomyView {
-    return this.stock;
+    return this.economyState;
   }
 
   /** Number of simulation ticks run since the world was generated. */
@@ -84,7 +85,8 @@ export class World {
       case 'placeBuilding': {
         const check = this.canPlace(command.kind, command.tx, command.ty);
         if (!check.ok) return check;
-        if (!this.stock.spend(OBJECT_KINDS[command.kind].cost)) return { ok: false, reason: 'NotEnoughResources' };
+        const paid = this.economyState.spend(OBJECT_KINDS[command.kind].cost);
+        if (!paid) return { ok: false, reason: 'NotEnoughResources' };
         return { ok: true, object: this.add(command.kind, command.tx, command.ty) };
       }
       case 'demolish':
@@ -120,10 +122,11 @@ export class World {
     if (!object) return { ok: false, reason: 'UnknownObject' };
     const info = OBJECT_KINDS[object.kind];
     if (!info.buildable) return { ok: false, reason: 'NotDemolishable' };
+    // Fixed order: occupancy -> capacity (and refund) -> production -> listeners, so listeners see the final state.
     this.fill(Footprint.of(object.kind, object.tx, object.ty), 0);
     this.byId.delete(objectId);
-    this.stock.removeCapacity(info.storage);
-    this.stock.refund(info.cost);
+    this.economyState.removeCapacity(info.storage);
+    this.economyState.refund(info.cost);
     this.production.removed(object);
     this.notify({ type: 'removed', object });
     return { ok: true, object };
@@ -132,9 +135,10 @@ export class World {
   /** Adds the object, its storage capacity and its production, then tells the listeners. */
   private add(kind: ObjectKind, tx: number, ty: number): MapObject {
     const object: MapObject = Object.freeze({ id: this.nextId++, kind, tx, ty });
+    // Fixed order: occupancy -> capacity -> production -> listeners, so listeners see the final state.
     this.byId.set(object.id, object);
     this.fill(Footprint.of(kind, tx, ty), object.id);
-    this.stock.addCapacity(OBJECT_KINDS[kind].storage);
+    this.economyState.addCapacity(OBJECT_KINDS[kind].storage);
     this.production.added(object);
     this.notify({ type: 'added', object });
     return object;

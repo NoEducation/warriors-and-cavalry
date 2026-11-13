@@ -1,7 +1,14 @@
 // Collects the coloured parts of one building and merges them into a single mesh, so each building is one draw call.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { type BoxSpec, boxGeometry, FOOTPRINT_MARGIN, FOUNDATION_DEPTH, FOUNDATION_LIFT, SHAPE_COLORS } from './shapeParts';
+import {
+  type BoxSpec,
+  boxGeometry,
+  FOOTPRINT_MARGIN,
+  FOUNDATION_DEPTH,
+  FOUNDATION_LIFT,
+  SHAPE_COLORS,
+} from './shapeParts';
 
 /** The attributes every part keeps; merging needs the same set on every part. */
 const KEPT_ATTRIBUTES: readonly string[] = ['position', 'normal'];
@@ -9,7 +16,7 @@ const KEPT_ATTRIBUTES: readonly string[] = ['position', 'normal'];
 export class ShapeBuilder {
   private readonly parts: THREE.BufferGeometry[] = [];
 
-  /** Adds `geometry` painted in `color`. The builder takes `geometry` over (it may dispose it). Returns this builder. */
+  /** Adds `geometry` painted in `color`; the builder takes it over and may dispose it. Returns this builder. */
   public add(geometry: THREE.BufferGeometry, color: number): this {
     const part = geometry.index ? geometry.toNonIndexed() : geometry;
     if (part !== geometry) geometry.dispose();

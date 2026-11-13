@@ -7,8 +7,9 @@ import type { WorldChange } from '../sim/WorldCommand';
 import type { BuildingMeshFactory } from './BuildingMeshFactory';
 import { disposeObject } from './disposeObject';
 import { floorHeight } from './floorHeight';
+import type { WorldLayer } from './WorldLayer';
 
-export class BuildingLayer {
+export class BuildingLayer implements WorldLayer {
   /** Add this to the scene; holds one child per building. */
   public readonly object = new THREE.Group();
   private readonly meshes = new Map<number, THREE.Object3D>();
@@ -27,6 +28,9 @@ export class BuildingLayer {
   public get buildingCount(): number {
     return this.meshes.size;
   }
+
+  /** Nothing changes per frame: the buildings follow the world's changes as they happen. Part of WorldLayer. */
+  public update(): void {}
 
   /** Stops following the world and frees every building mesh. Call after removing `object` from the scene. */
   public dispose(): void {

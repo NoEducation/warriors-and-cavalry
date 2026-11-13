@@ -7,6 +7,7 @@ import type { WorldChange } from '../sim/WorldCommand';
 import { SHAPE_COLORS } from './buildings/shapeParts';
 import { WheatFarmShape } from './buildings/WheatFarmShape';
 import { floorHeight } from './floorHeight';
+import type { WorldLayer } from './WorldLayer';
 
 /** Crop height right after a harvest and at the end of a cycle. */
 const STUBBLE_HEIGHT = 0.05;
@@ -21,7 +22,7 @@ interface Crop {
   shownProgress: number;
 }
 
-export class FarmCrops {
+export class FarmCrops implements WorldLayer {
   /** Add this to the scene; holds one crop mesh per wheat farm. */
   public readonly object = new THREE.Group();
   /** A field-sized box one unit tall standing on y = 0; each crop scales it to its height. */
