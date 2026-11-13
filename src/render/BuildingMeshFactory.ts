@@ -22,10 +22,11 @@ export class BuildingMeshFactory {
   ]);
 
   /**
-   * Creates a new group for a building of `kind`. Local origin is the footprint's lowest-coordinate corner, y = 0 is the
-   * floor. The caller owns the result and disposes it. Throws for kinds that are not buildings (trees).
+   * Creates a new single mesh (one draw call) for a building of `kind`. Local origin is the footprint's
+   * lowest-coordinate corner, y = 0 is the floor. The caller owns the result and disposes it (`disposeObject`).
+   * Throws for kinds that are not buildings (trees).
    */
-  public create(kind: ObjectKind): THREE.Group {
+  public create(kind: ObjectKind): THREE.Mesh {
     const shape = this.shapes.get(kind);
     if (!shape) throw new Error(`${OBJECT_KINDS[kind]?.name ?? kind} is not a building`);
     return shape.build();

@@ -2,7 +2,8 @@
 import type * as THREE from 'three';
 import { OBJECT_KINDS, ObjectKind } from '../../sim/ObjectKind';
 import type { BuildingShape } from './BuildingShape';
-import { type BoxSpec, boxMesh, groupWithFoundation, SHAPE_COLORS } from './shapeParts';
+import { ShapeBuilder } from './ShapeBuilder';
+import { type BoxSpec, SHAPE_COLORS } from './shapeParts';
 
 /** The steps of the rock face, from the tall back wall (low z, away from the default camera) to the front. */
 const STEPS: readonly BoxSpec[] = [
@@ -26,12 +27,12 @@ const HOIST: readonly BoxSpec[] = [
 
 export class QuarryShape implements BuildingShape {
   /** Creates a new Quarry model (see `BuildingShape.build`). */
-  public build(): THREE.Group {
+  public build(): THREE.Mesh {
     const { width: w, height: d } = OBJECT_KINDS[ObjectKind.Quarry];
-    const group = groupWithFoundation(w, d, SHAPE_COLORS.darkStone);
-    STEPS.forEach((step, i) => group.add(boxMesh(step, i % 2 === 0 ? SHAPE_COLORS.stone : SHAPE_COLORS.darkStone)));
-    for (const block of BLOCKS) group.add(boxMesh(block, SHAPE_COLORS.stone));
-    for (const part of HOIST) group.add(boxMesh(part, SHAPE_COLORS.timber));
-    return group;
+    const shape = new ShapeBuilder().addFoundation(w, d, SHAPE_COLORS.darkStone);
+    STEPS.forEach((step, i) => shape.addBox(step, i % 2 === 0 ? SHAPE_COLORS.cutStone : SHAPE_COLORS.darkCutStone));
+    for (const block of BLOCKS) shape.addBox(block, SHAPE_COLORS.cutStone);
+    for (const part of HOIST) shape.addBox(part, SHAPE_COLORS.timber);
+    return shape.build();
   }
 }

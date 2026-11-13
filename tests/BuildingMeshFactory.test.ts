@@ -55,13 +55,22 @@ describe('BuildingMeshFactory', () => {
     }
   });
 
-  it('uses flat-shaded Lambert materials', () => {
+  it('makes each building one mesh: one merged geometry with vertex colours, one flat-shaded Lambert material', () => {
     for (const kind of BUILDABLE_KINDS) {
-      factory.create(kind).traverse((node) => {
-        if (!(node instanceof THREE.Mesh)) return;
-        expect(node.material).toBeInstanceOf(THREE.MeshLambertMaterial);
-        expect((node.material as THREE.MeshLambertMaterial).flatShading).toBe(true);
+      const name = OBJECT_KINDS[kind].name;
+      const model = factory.create(kind);
+      expect(meshCount(model), name).toBe(1);
+      const meshes: THREE.Mesh[] = [];
+      model.traverse((node) => {
+        if (node instanceof THREE.Mesh) meshes.push(node);
       });
+      const [mesh] = meshes;
+      expect(mesh.geometry.getAttribute('color'), name).toBeDefined();
+      expect(mesh.geometry.getAttribute('color').count, name).toBe(mesh.geometry.getAttribute('position').count);
+      expect(mesh.material, name).toBeInstanceOf(THREE.MeshLambertMaterial);
+      const material = mesh.material as THREE.MeshLambertMaterial;
+      expect(material.vertexColors, name).toBe(true);
+      expect(material.flatShading, name).toBe(true);
     }
   });
 
