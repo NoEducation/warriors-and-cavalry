@@ -17,14 +17,14 @@ A browser strategy game in the spirit of Stronghold: TypeScript (strict), Vite, 
 
 | Folder | Holds | May depend on |
 | --- | --- | --- |
-| `src/sim/` | Deterministic game state and rules: `GameMap`, `MapGenerator`, `World`, commands, `Footprint`, trees | nothing outside `src/sim/` |
+| `src/sim/` | Deterministic game state and rules: `GameMap`, `MapGenerator`, `World`, commands, `Footprint`, trees, game time, `Economy`, `Production` | nothing outside `src/sim/` |
 | `src/render/` | three.js drawing: terrain, water, trees, buildings, ghost, highlight, camera | `src/sim/` |
 | `src/input/` | Keyboard and pointer state, click-versus-drag | — |
-| `src/ui/` | HTML widgets: `Hud`, `BuildBar` | `src/sim/` types |
-| `src/game/` | The frame loop and the wiring between the layers: `Game`, `BuildController`, `TileHover` | all of the above |
+| `src/ui/` | HTML widgets: `Hud`, `BuildBar`, `ResourceBar`; the build tool table (`BuildTool`) | `src/sim/` types |
+| `src/game/` | The frame loop and the wiring between the layers: `Game`, `SimulationRunner`, `BuildController`, `TileHover` | all of the above |
 
-- **Simulation purity.** Nothing under `src/sim/` may import `three`, touch `document`/`window`, use `Date`, `performance`, `crypto`, or any `Math` member other than `floor`, `sqrt`, `abs`, `min`, `max`, `imul`. `tests/simPurity.test.ts` enforces this. Randomness comes only from the seed (`rng.ts`, `noise.ts`).
-- **One way to change the world.** After generation, the world changes only through `World.apply(command)`. Commands and results are plain serialisable data. Render, UI and game code never mutate a `GameMap` or `World` directly; `World.spawn` is for the map generator only.
+- **Simulation purity.** Nothing under `src/sim/` may import `three`, touch `document`/`window`, use `Date`, `performance`, `crypto`, or any `Math` member other than `floor`, `sqrt`, `abs`, `min`, `max`, `imul`. `tests/simPurity.test.ts` enforces this, and `tests/layers.test.ts` enforces the layer table. Randomness comes only from the seed (`rng.ts`, `noise.ts`).
+- **One way to change the world.** After generation, the world changes only through `World.apply(command)` and `World.tick()`. All simulation time is whole ticks (10 per second); per-tick loops run in ascending object id order. Commands and results are plain serialisable data. Render, UI and game code never mutate a `GameMap` or `World` directly; `World.spawn` is for the map generator only.
 - **A map is its seed.** A world must be fully reproducible from `{ seed, width, height }`. Generator settings (`MAPGEN_CONFIG`, `TREE_CONFIG`) are frozen; tune them by editing the source.
 - **One owner of the current world.** `Game` owns the current `World` and passes it to whoever needs it on each call; other classes do not keep their own reference.
 - **World coordinates.** Tile `(tx, ty)` covers `x ∈ [tx, tx+1]`, `z ∈ [ty, ty+1]`; `y` is height. A building's `tx, ty` is the lowest-coordinate corner of its footprint.
