@@ -1,11 +1,11 @@
 // Translucent preview of the building about to be placed, tinted by whether it fits.
 import * as THREE from 'three';
-import { Footprint } from '../sim/Footprint';
 import type { ObjectKind } from '../sim/ObjectKind';
 import type { PlacementPreview } from '../sim/PlacementPreview';
 import type { World } from '../sim/World';
 import type { BuildingMeshFactory } from './BuildingMeshFactory';
 import { disposeObject } from './disposeObject';
+import { floorHeight } from './floorHeight';
 
 const OK_COLOR = 0x44ff66;
 const BLOCKED_COLOR = 0xff4444;
@@ -32,7 +32,7 @@ export class PlacementGhost {
       for (const material of this.materials) material.color.setHex(color);
       this.tintedOk = preview.ok;
     }
-    this.object.position.set(preview.tx, this.floorHeight(world, preview), preview.ty);
+    this.object.position.set(preview.tx, floorHeight(world.map, preview.kind, preview.tx, preview.ty), preview.ty);
     this.object.visible = true;
   }
 
@@ -67,10 +67,5 @@ export class PlacementGhost {
     this.model = model;
     this.modelKind = kind;
     this.tintedOk = null;
-  }
-
-  /** Highest corner height under the footprint, ignoring corners outside the map (0 when none is inside). */
-  private floorHeight(world: World, preview: PlacementPreview): number {
-    return Footprint.of(preview.kind, preview.tx, preview.ty).cornerHeightRange(world.map)?.max ?? 0;
   }
 }

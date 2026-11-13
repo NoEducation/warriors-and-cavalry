@@ -1,12 +1,12 @@
 // Meshes for every building in a world, kept in step with the world's changes.
 import * as THREE from 'three';
-import { Footprint } from '../sim/Footprint';
 import type { MapObject } from '../sim/MapObject';
 import { OBJECT_KINDS } from '../sim/ObjectKind';
 import type { World } from '../sim/World';
 import type { WorldChange } from '../sim/WorldCommand';
 import type { BuildingMeshFactory } from './BuildingMeshFactory';
 import { disposeObject } from './disposeObject';
+import { floorHeight } from './floorHeight';
 
 export class BuildingLayer {
   /** Add this to the scene; holds one child per building. */
@@ -48,7 +48,7 @@ export class BuildingLayer {
     const info = OBJECT_KINDS[object.kind];
     if (!info.buildable) return;
     const mesh = this.factory.create(object.kind);
-    mesh.position.set(object.tx, this.floorHeight(object), object.ty);
+    mesh.position.set(object.tx, floorHeight(this.world.map, object.kind, object.tx, object.ty), object.ty);
     this.meshes.set(object.id, mesh);
     this.object.add(mesh);
   }
@@ -59,10 +59,5 @@ export class BuildingLayer {
     this.meshes.delete(object.id);
     this.object.remove(mesh);
     disposeObject(mesh);
-  }
-
-  /** Highest corner height under the object's footprint (objects always stand inside the map). */
-  private floorHeight(object: MapObject): number {
-    return Footprint.of(object.kind, object.tx, object.ty).cornerHeightRange(this.world.map)?.max ?? 0;
   }
 }
