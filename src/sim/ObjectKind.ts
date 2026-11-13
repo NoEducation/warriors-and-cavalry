@@ -43,7 +43,16 @@ export interface ObjectKindInfo {
 /** Shared values of the kinds that neither store, produce nor have extra placement rules. */
 const PLAIN = { storage: NO_RESOURCES, grassOnly: false, needsRock: false, production: null } as const;
 
-export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = Object.freeze({
+/** Freezes alue and every object reachable from it, so no nested table entry can be changed at run time. */
+function deepFreeze<T extends object>(value: T): T {
+  for (const child of Object.values(value)) {
+    if (typeof child === 'object' && child !== null) deepFreeze(child);
+  }
+  return Object.freeze(value);
+}
+
+/** Frozen all the way down (entries and their cost, storage and production); tune by editing the source. */
+export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   [ObjectKind.Tree]: { ...PLAIN, name: 'Tree', width: 1, height: 1, buildable: false, cost: NO_RESOURCES },
   [ObjectKind.Keep]: { ...PLAIN, name: 'Keep', width: 4, height: 4, buildable: true, cost: resources(50, 40, 0) },
   [ObjectKind.Hovel]: { ...PLAIN, name: 'Hovel', width: 2, height: 2, buildable: true, cost: resources(15, 0, 0) },

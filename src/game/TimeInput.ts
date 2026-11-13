@@ -1,4 +1,4 @@
-// Player input for game time: Space pauses and resumes, + and - step the simulation speed.
+// Player input for game time: Space pauses and resumes, + and - step the simulation speed (without Ctrl, Meta or Alt).
 import type { SimulationRunner } from './SimulationRunner';
 
 const PAUSE_KEYS: readonly string[] = ['Space'];
@@ -20,7 +20,9 @@ export class TimeInput {
   }
 
   private readonly onKeyDown = (e: Event): void => {
-    const { code, repeat } = e as KeyboardEvent;
+    const { code, repeat, ctrlKey, metaKey, altKey } = e as KeyboardEvent;
+    // Leave shortcuts such as Ctrl+- (browser zoom) to the browser.
+    if (ctrlKey || metaKey || altKey) return;
     const action = this.actionFor(code);
     if (!action) return;
     // Prevent even repeats, so a held Space never scrolls the page or presses a focused button.

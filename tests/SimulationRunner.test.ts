@@ -30,7 +30,7 @@ describe('SimulationRunner', () => {
     expect(runner.ticksFor(0.5)).toBe(0);
     runner.togglePause();
     expect(runner.paused).toBe(false);
-    expect(runner.ticksFor(0)).toBe(0);
+    expect(runner.ticksFor(0.05)).toBe(0); // nothing built up while paused
   });
 
   it('runs 2 and 4 ticks per 0.1 s at 2x and 4x', () => {
@@ -41,12 +41,13 @@ describe('SimulationRunner', () => {
     runner.faster();
     expect(runner.speed).toBe(4);
     expect(runner.ticksFor(0.1)).toBe(4);
+    expect(runner.ticksFor(1)).toBe(10);
   });
 
   it('caps a long frame at MAX_TICKS_PER_FRAME and drops the backlog', () => {
     const runner = new SimulationRunner(10);
     expect(runner.ticksFor(5)).toBe(10);
-    expect(runner.ticksFor(0)).toBe(0);
+    expect(runner.ticksFor(0.05)).toBe(0); // the backlog was dropped
   });
 
   it('stops at the fastest and slowest speed', () => {
@@ -66,7 +67,7 @@ describe('SimulationRunner', () => {
     const runner = new SimulationRunner(10);
     expect(runner.ticksFor(0.09)).toBe(0);
     runner.reset();
-    expect(runner.ticksFor(0.02)).toBe(0);
+    expect(runner.ticksFor(0.09)).toBe(0);
 
     runner.faster();
     runner.togglePause();

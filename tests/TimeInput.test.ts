@@ -2,8 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { SimulationRunner } from '../src/game/SimulationRunner';
 import { TimeInput } from '../src/game/TimeInput';
 
-function keydown(code: string, repeat = false): Event {
-  return Object.assign(new Event('keydown', { cancelable: true }), { code, repeat });
+/** Modifier keys held during a key press. */
+interface Modifiers {
+  readonly ctrlKey?: boolean;
+  readonly metaKey?: boolean;
+  readonly altKey?: boolean;
+}
+
+function keydown(code: string, repeat = false, modifiers: Modifiers = {}): Event {
+  const { ctrlKey = false, metaKey = false, altKey = false } = modifiers;
+  return Object.assign(new Event('keydown', { cancelable: true }), { code, repeat, ctrlKey, metaKey, altKey });
 }
 
 function setup(): { target: EventTarget; runner: SimulationRunner; input: TimeInput } {
@@ -47,6 +55,19 @@ describe('TimeInput', () => {
     expect(plus.defaultPrevented).toBe(true);
     target.dispatchEvent(keydown('NumpadSubtract'));
     expect(runner.speed).toBe(1);
+  });
+
+  it('ignores keys pressed with Ctrl, Meta or Alt, so browser zoom keeps working', () => {
+    const { target, runner } = setup();
+    runner.faster();
+    const zoomOut = keydown('Minus', false, { ctrlKey: true });
+    target.dispatchEvent(zoomOut);
+    expect(runner.speed).toBe(2);
+    expect(zoomOut.defaultPrevented).toBe(false);
+    target.dispatchEvent(keydown('Space', false, { metaKey: true }));
+    target.dispatchEvent(keydown('Equal', false, { altKey: true }));
+    expect(runner.paused).toBe(false);
+    expect(runner.speed).toBe(2);
   });
 
   it('does not prevent other keys', () => {
