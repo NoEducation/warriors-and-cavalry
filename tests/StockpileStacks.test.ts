@@ -79,6 +79,40 @@ describe('StockpileStacks', () => {
     stacks.dispose();
   });
 
+  it('keeps the same mesh and changes only its count when the wood amount changes', () => {
+    const { world } = worldWithStockpile();
+    const stacks = new StockpileStacks(world);
+    stacks.update();
+    const logs = stacks.object.getObjectByName('logs') as THREE.InstancedMesh;
+    expect(logs.count).toBe(4);
+    place(world, ObjectKind.Hovel, 10, 2); // 100 - 15 = 85 wood → 3
+    stacks.update();
+    expect(stacks.object.getObjectByName('logs')).toBe(logs);
+    expect(logs.count).toBe(3);
+    stacks.dispose();
+  });
+
+  it('stacks the second layer of stones directly on the first', () => {
+    const economy = new Economy(resources(100, 100, 50));
+    const heights = new Float32Array((SIZE + 1) * (SIZE + 1));
+    const tiles = new Uint8Array(SIZE * SIZE).fill(TileType.Grass);
+    const world = new World(new GameMap(SIZE, SIZE, 1, heights, tiles), economy);
+    place(world, ObjectKind.Stockpile, 2, 2); // 100 of 250 stone → 4 blocks, one layer; 5 starts the second
+    const stacks = new StockpileStacks(world);
+    stacks.update();
+    const stones = stacks.object.getObjectByName('stones') as THREE.InstancedMesh;
+    const position = (i: number): THREE.Vector3 => {
+      const matrix = new THREE.Matrix4();
+      stones.getMatrixAt(i, matrix);
+      return new THREE.Vector3().setFromMatrixPosition(matrix);
+    };
+    stones.geometry.computeBoundingBox();
+    const blockHeight = stones.geometry.boundingBox!.getSize(new THREE.Vector3()).y;
+    // The mesh holds every slot, slot by slot; with one stockpile, slot 4 (first of the upper layer) is instance 4.
+    expect(position(4).y - position(0).y).toBeCloseTo(blockHeight);
+    stacks.dispose();
+  });
+
   it('shows the same counts on a second stockpile and drops a demolished one', () => {
     const { world, stockpile } = worldWithStockpile();
     const second = place(world, ObjectKind.Stockpile, 2, 8); // 90 of 400 wood → ceil(1.8) = 2 each

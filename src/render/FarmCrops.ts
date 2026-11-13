@@ -27,6 +27,8 @@ export class FarmCrops {
   /** A field-sized box one unit tall standing on y = 0; each crop scales it to its height. */
   private readonly geometry: THREE.BoxGeometry;
   private readonly crops = new Map<number, Crop>();
+  /** Length of a wheat farm's production cycle; a crop is ripe at the end of it. */
+  private readonly cycleTicks = OBJECT_KINDS[ObjectKind.WheatFarm].production?.cycleTicks ?? 1;
   private readonly unsubscribe: () => void;
 
   /** Shows a crop on every wheat farm of `world` and follows farms placed and demolished until `dispose`. */
@@ -42,10 +44,10 @@ export class FarmCrops {
   /** Sets each crop's height and colour from its farm's cycle progress. Call once per frame; skips unchanged crops. */
   public update(): void {
     for (const [id, crop] of this.crops) {
-      const state = this.world.productionState(id);
-      if (!state || state.progress === crop.shownProgress) continue;
-      this.show(crop, state.progress / state.cycleTicks);
-      crop.shownProgress = state.progress;
+      const progress = this.world.productionProgress(id);
+      if (progress === null || progress === crop.shownProgress) continue;
+      this.show(crop, progress / this.cycleTicks);
+      crop.shownProgress = progress;
     }
   }
 

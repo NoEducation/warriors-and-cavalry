@@ -158,6 +158,20 @@ describe('Production in World.tick', () => {
     expect(world.productionState(hovel.id)).toBeNull();
     expect(world.productionState(99)).toBeNull();
   });
+
+  it('reports a producer\'s progress into its cycle, and null for anything else', () => {
+    const { world, hut } = hutWorld([24, 20]);
+    const tree = world.objectAt(24, 20)!;
+    const hovel = place(world, ObjectKind.Hovel, 40, 40);
+    expect(world.productionProgress(hut.id)).toBe(0);
+    ticks(world, 37);
+    expect(world.productionProgress(hut.id)).toBe(37);
+    ticks(world, 63);
+    expect(world.productionProgress(hut.id)).toBe(0);
+    expect(world.productionProgress(tree.id)).toBeNull();
+    expect(world.productionProgress(hovel.id)).toBeNull();
+    expect(world.productionProgress(99)).toBeNull();
+  });
 });
 
 describe('Production', () => {

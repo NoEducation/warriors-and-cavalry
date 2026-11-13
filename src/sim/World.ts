@@ -45,6 +45,14 @@ export class World {
     return this.production.state(objectId);
   }
 
+  /**
+   * Ticks the production building `objectId` has done in its current cycle; null for objects that do not produce or do
+   * not exist. Allocates nothing, so render code may call it per building per frame.
+   */
+  public productionProgress(objectId: number): number | null {
+    return this.production.progress(objectId);
+  }
+
   /** Number of objects currently in the world. */
   public get objectCount(): number {
     return this.byId.size;

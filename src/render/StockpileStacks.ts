@@ -12,56 +12,83 @@ import { floorHeight } from './floorHeight';
 const SLOTS = 8;
 const COLUMN_STEP = 0.5;
 const ROW_STEP = 1.1;
-const LAYER_STEP = 0.36;
-/** Centre of the first slot of the log half (low x) and of the stone half, from the stockpile's corner. */
-const LOG_ORIGIN = new THREE.Vector3(0.62, 0.18, 0.95);
-const STONE_ORIGIN = new THREE.Vector3(1.88, 0.16, 0.95);
 const LOG_RADIUS = 0.19;
 const LOG_LENGTH = 1.0;
+/** Log bundles (0.38 across) nest slightly into the layer below; stone blocks sit flat on each other. */
+const LOG_LAYER_STEP = 0.36;
+const STONE_SIZE = new THREE.Vector3(0.44, 0.32, 0.8);
+
+/** How one resource is stacked: its mesh name, shape, first slot's centre and the height of one layer. */
+interface StackStyle {
+  readonly name: string;
+  readonly resource: ResourceKind;
+  readonly geometry: THREE.BufferGeometry;
+  readonly material: THREE.Material;
+  /** Centre of the first slot, from the stockpile's corner on its deck. */
+  readonly origin: THREE.Vector3;
+  readonly layerStep: number;
+}
 
 export class StockpileStacks {
-  /** Add this to the scene; holds one instanced mesh for all logs and one for all stones while any are shown. */
+  /** Add this to the scene; holds one instanced mesh for all logs and one for all stones while a stockpile stands. */
   public readonly object = new THREE.Group();
-  private readonly logGeometry = new THREE.CylinderGeometry(LOG_RADIUS, LOG_RADIUS, LOG_LENGTH, 6).rotateX(Math.PI / 2);
-  private readonly stoneGeometry = new THREE.BoxGeometry(0.44, 0.32, 0.8);
-  private readonly logMaterial = new THREE.MeshLambertMaterial({ color: SHAPE_COLORS.logs, flatShading: true });
-  private readonly stoneMaterial = new THREE.MeshLambertMaterial({ color: SHAPE_COLORS.stone, flatShading: true });
+  private readonly styles: readonly StackStyle[];
   /** Corner (x, floor + deck, z) of each stockpile, by object id. */
   private readonly stockpiles = new Map<number, THREE.Vector3>();
+  /** One mesh per style (same order), with room for every slot of every stockpile; empty without stockpiles. */
   private readonly meshes: THREE.InstancedMesh[] = [];
   private readonly unsubscribe: () => void;
   private readonly matrix = new THREE.Matrix4();
-  private shownLogs = -1;
-  private shownStones = -1;
   private stockpilesChanged = true;
 
   /** Follows the stockpiles of `world` until `dispose`; draws nothing before the first `update`. Reads only. */
   public constructor(private readonly world: World) {
+    this.styles = [
+      {
+        name: 'logs',
+        resource: ResourceKind.Wood,
+        geometry: new THREE.CylinderGeometry(LOG_RADIUS, LOG_RADIUS, LOG_LENGTH, 6).rotateX(Math.PI / 2),
+        material: new THREE.MeshLambertMaterial({ color: SHAPE_COLORS.logs, flatShading: true }),
+        origin: new THREE.Vector3(0.62, 0.18, 0.95),
+        layerStep: LOG_LAYER_STEP,
+      },
+      {
+        name: 'stones',
+        resource: ResourceKind.Stone,
+        geometry: new THREE.BoxGeometry(STONE_SIZE.x, STONE_SIZE.y, STONE_SIZE.z),
+        material: new THREE.MeshLambertMaterial({ color: SHAPE_COLORS.stone, flatShading: true }),
+        origin: new THREE.Vector3(1.88, STONE_SIZE.y / 2, 0.95),
+        layerStep: STONE_SIZE.y,
+      },
+    ];
     for (const object of world.objects()) this.onChange({ type: 'added', object });
     this.unsubscribe = world.onChange(this.onChange);
   }
 
-  /** Brings the stacks in line with the stored wood and stone. Call once per frame; rebuilds only on a change. */
+  /**
+   * Brings the stacks in line with the stored wood and stone. Call once per frame. Allocates meshes only when
+   * stockpiles were placed or demolished; otherwise only the instance counts change.
+   */
   public update(): void {
-    const logs = this.stackCount(ResourceKind.Wood);
-    const stones = this.stackCount(ResourceKind.Stone);
-    if (!this.stockpilesChanged && logs === this.shownLogs && stones === this.shownStones) return;
-    this.clearMeshes();
-    this.addMesh('logs', this.logGeometry, this.logMaterial, LOG_ORIGIN, logs);
-    this.addMesh('stones', this.stoneGeometry, this.stoneMaterial, STONE_ORIGIN, stones);
-    this.shownLogs = logs;
-    this.shownStones = stones;
-    this.stockpilesChanged = false;
+    if (this.stockpilesChanged) this.allocateMeshes();
+    this.styles.forEach((style, i) => {
+      const mesh = this.meshes[i];
+      if (!mesh) return;
+      const count = this.stackCount(style.resource) * this.stockpiles.size;
+      if (count === mesh.count) return;
+      mesh.count = count;
+      mesh.visible = count > 0; // an empty instanced mesh would still cost a draw call
+    });
   }
 
   /** Stops following the world and frees every mesh, geometry and material. Call after removing `object`. */
   public dispose(): void {
     this.unsubscribe();
     this.clearMeshes();
-    this.logGeometry.dispose();
-    this.stoneGeometry.dispose();
-    this.logMaterial.dispose();
-    this.stoneMaterial.dispose();
+    for (const style of this.styles) {
+      style.geometry.dispose();
+      style.material.dispose();
+    }
   }
 
   private readonly onChange = (change: WorldChange): void => {
@@ -82,31 +109,35 @@ export class StockpileStacks {
     return capacity > 0 ? Math.min(SLOTS, Math.ceil((SLOTS * this.world.economy.amount(kind)) / capacity)) : 0;
   }
 
-  /** Adds one instanced mesh with `perStockpile` stacks on every stockpile, filling the bottom layer first. */
-  private addMesh(
-    name: string,
-    geometry: THREE.BufferGeometry,
-    material: THREE.Material,
-    origin: THREE.Vector3,
-    perStockpile: number,
-  ): void {
-    const count = perStockpile * this.stockpiles.size;
-    if (count === 0) return;
-    const mesh = new THREE.InstancedMesh(geometry, material, count);
-    mesh.name = name;
-    let index = 0;
-    for (const corner of this.stockpiles.values()) {
-      for (let slot = 0; slot < perStockpile; slot++) {
-        const x = corner.x + origin.x + (slot % 2) * COLUMN_STEP;
-        const y = corner.y + origin.y + Math.floor(slot / 4) * LAYER_STEP;
-        const z = corner.z + origin.z + (Math.floor(slot / 2) % 2) * ROW_STEP;
-        mesh.setMatrixAt(index++, this.matrix.makeTranslation(x, y, z));
+  /**
+   * Replaces the meshes with ones holding every slot of every stockpile, slot by slot (slot 0 of each stockpile, then
+   * slot 1, …), so a count of `n × stockpiles` shows the first `n` slots on each, bottom layer first. Starts empty.
+   */
+  private allocateMeshes(): void {
+    this.clearMeshes();
+    this.stockpilesChanged = false;
+    if (this.stockpiles.size === 0) return;
+    for (const style of this.styles) {
+      const mesh = new THREE.InstancedMesh(style.geometry, style.material, SLOTS * this.stockpiles.size);
+      mesh.name = style.name;
+      let index = 0;
+      for (let slot = 0; slot < SLOTS; slot++) {
+        for (const corner of this.stockpiles.values()) {
+          const x = corner.x + style.origin.x + (slot % 2) * COLUMN_STEP;
+          const y = corner.y + style.origin.y + Math.floor(slot / 4) * style.layerStep;
+          const z = corner.z + style.origin.z + (Math.floor(slot / 2) % 2) * ROW_STEP;
+          mesh.setMatrixAt(index++, this.matrix.makeTranslation(x, y, z));
+        }
       }
+      mesh.instanceMatrix.needsUpdate = true;
+      // Bounds cover every slot (computed while count is still full), so culling stays right as stacks come and go.
+      mesh.computeBoundingSphere();
+      mesh.computeBoundingBox();
+      mesh.count = 0;
+      mesh.visible = false;
+      this.meshes.push(mesh);
+      this.object.add(mesh);
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere(); // after the matrices, so culling covers every stack
-    this.meshes.push(mesh);
-    this.object.add(mesh);
   }
 
   /** Removes the instanced meshes and frees their instance buffers; the shared geometries and materials stay. */

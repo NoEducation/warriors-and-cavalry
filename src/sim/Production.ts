@@ -77,6 +77,11 @@ export class Production {
     return p ? { status: this.status(p), progress: p.progress, cycleTicks: p.info.cycleTicks } : null;
   }
 
+  /** Ticks done in the current cycle of the producer with `objectId`; null when it does not exist or produce. */
+  public progress(objectId: number): number | null {
+    return this.producers.get(objectId)?.progress ?? null;
+  }
+
   private status(p: Producer): ProductionStatus {
     if (p.info.treeRadius !== null && !this.hasTreesNearby(p)) return 'noTrees';
     const { resource } = p.info;
