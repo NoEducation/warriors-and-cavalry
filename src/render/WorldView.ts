@@ -1,4 +1,4 @@
-// The 3D scene for a world: background, lights, terrain, water, trees, buildings, stockpile stacks and crops.
+// The 3D scene for a world: background, lights, terrain, water, trees, buildings, stockpile stacks, crops and peasants.
 import * as THREE from 'three';
 import { MAPGEN_CONFIG } from '../sim/MapGenerator';
 import type { World } from '../sim/World';
@@ -6,6 +6,7 @@ import { BuildingLayer } from './BuildingLayer';
 import { BuildingMeshFactory } from './BuildingMeshFactory';
 import { disposeObject } from './disposeObject';
 import { FarmCrops } from './FarmCrops';
+import { PeasantLayer } from './PeasantLayer';
 import { StockpileStacks } from './StockpileStacks';
 import { TerrainMeshBuilder } from './TerrainMeshBuilder';
 import { TreeLayer } from './TreeLayer';
@@ -19,7 +20,7 @@ export class WorldView {
   private readonly buildingFactory = new BuildingMeshFactory();
   private terrainChunks: THREE.Group | null = null;
   private waterMesh: THREE.Mesh | null = null;
-  /** Trees, buildings, stockpile stacks and crops of the shown world, in drawing order; empty before `showWorld`. */
+  /** Trees, buildings, stockpile stacks, crops and peasants of the shown world, in drawing order; empty at first. */
   private readonly layers: WorldLayer[] = [];
 
   /** Creates the scene with background and lights; no world is shown until `showWorld`. */
@@ -32,8 +33,8 @@ export class WorldView {
   }
 
   /**
-   * Replaces everything shown with meshes for `world`: terrain, water, trees, and buildings, stockpile stacks and crops
-   * (which then follow the world's changes). Call on every world load.
+   * Replaces everything shown with meshes for `world`: terrain, water, trees, and buildings, stockpile stacks, crops
+   * and peasants (which then follow the world's changes). Call on every world load.
    */
   public showWorld(world: World): void {
     const { map } = world;
@@ -46,13 +47,17 @@ export class WorldView {
       new BuildingLayer(world, this.buildingFactory),
       new StockpileStacks(world),
       new FarmCrops(world),
+      new PeasantLayer(world),
     );
     for (const layer of this.layers) this.scene.add(layer.object);
   }
 
-  /** Brings every layer (e.g. stockpile stacks and crops) in line with the shown world. Call once per frame. */
-  public update(): void {
-    for (const layer of this.layers) layer.update();
+  /**
+   * Brings every layer (e.g. stockpile stacks, crops and peasants) in line with the shown world, `tickFraction` of a
+   * tick past the last simulation tick. Call once per frame, after ticking.
+   */
+  public update(tickFraction: number): void {
+    for (const layer of this.layers) layer.update(tickFraction);
   }
 
   /** Removes and frees everything shown. Call when the view is no longer needed. */

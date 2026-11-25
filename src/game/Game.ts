@@ -116,13 +116,13 @@ export class Game {
   }
 
   private readonly onFrame = (time: number): void => {
-    // Frame order: ticks → camera → hover → world view update → status (clock, resources, FPS) → render.
+    // Frame order: ticks → camera → hover → world view update (at the tick fraction) → status → FPS → render.
     const dt = this.lastFrameTime === null ? 0 : (time - this.lastFrameTime) / 1000;
     this.lastFrameTime = time;
     for (let ticks = this.runner.ticksFor(dt); ticks > 0; ticks--) this.world.tick();
     this.rig.update(dt, this.input.keyboard);
     this.input.tileHover.update(this.rig.camera, this.world);
-    this.worldView.update();
+    this.worldView.update(this.runner.tickFraction);
     this.widgets.status.update(this.world);
     this.widgets.fpsDisplay.addFrame(dt, time);
     this.pixelRenderer.render(this.worldView.scene, this.rig.camera);
