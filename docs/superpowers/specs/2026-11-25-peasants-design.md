@@ -104,7 +104,8 @@ States: `idle`, `toWork`, `working`, `toStore`, `toWorkBack`.
    - wood and stone: Stockpiles and the Keep;
    - food: Granaries and the Keep.
    "Nearest" is the one the path-finder reaches with the shortest path
-   (ties: lowest id). This is one search with every candidate as a goal,
+   (ties between equally short paths follow the path-finder's fixed tile order;
+   revised during Task 3). This is one search with every candidate as a goal,
    stopping at the first goal reached, not one search per candidate.
    *(Builder call.)* The Keep counts as storage because it
    holds the camp's base capacity (100 of each).
