@@ -1,9 +1,10 @@
-// Every peasant of a world, drawn each frame between its last and next tile, with a bundle on a carrier's back.
+// Every peasant of a world, drawn each frame one tick behind the simulation, with a bundle on a carrier's back.
 import * as THREE from 'three';
 import type { PeasantView } from '../sim/Peasant';
 import { ResourceKind } from '../sim/ResourceKind';
 import type { World } from '../sim/World';
 import { PeasantGeometryFactory } from './PeasantGeometryFactory';
+import { PeasantTracks } from './PeasantTracks';
 import type { WorldLayer } from './WorldLayer';
 
 /** Peasants the meshes have room for at first; the room doubles whenever more are needed. */
@@ -28,8 +29,8 @@ export class PeasantLayer implements WorldLayer {
   private bodies: THREE.InstancedMesh;
   private bundles: THREE.InstancedMesh;
   private capacity = PEASANT_CAPACITY;
-  /** The way each peasant last walked (yaw about +y, 0 facing +z), so it keeps facing that way when it stops. */
-  private readonly headings = new Map<number, number>();
+  /** Each peasant's positions at the last two ticks and the way it last walked. */
+  private readonly tracks = new PeasantTracks();
   private readonly position = new THREE.Vector3();
   private readonly turn = new THREE.Quaternion();
   private readonly matrix = new THREE.Matrix4();
@@ -44,10 +45,12 @@ export class PeasantLayer implements WorldLayer {
   }
 
   /**
-   * Places every peasant `tickFraction` of a tick past the last simulation tick, and a bundle on each carrier.
-   * Call once per frame, after ticking. Allocates only when the peasants outgrow the meshes or some have left.
+   * Places every peasant one tick behind the simulation, `tickFraction` of the way from where it stood at the
+   * previous tick to where it stands at the last one (so it moves every frame), and a bundle on each carrier.
+   * Call once per frame, after ticking. Allocates only when the peasants outgrow the meshes or new ones arrive.
    */
   public update(tickFraction: number): void {
+    this.tracks.refresh(this.world);
     let count = 0;
     for (const _ of this.world.peasants()) count++;
     if (count > this.capacity) this.grow(count);
@@ -60,7 +63,6 @@ export class PeasantLayer implements WorldLayer {
       this.bundles.setMatrixAt(bundleCount, this.matrix);
       this.bundles.setColorAt(bundleCount++, BUNDLE_COLORS[peasant.load.resource]);
     }
-    if (this.headings.size > bodyCount) this.forgetGone();
     this.show(this.bodies, bodyCount);
     this.show(this.bundles, bundleCount);
   }
@@ -74,28 +76,14 @@ export class PeasantLayer implements WorldLayer {
     this.bundleGeometry.dispose();
     this.bodyMaterial.dispose();
     this.bundleMaterial.dispose();
-    this.headings.clear();
+    this.tracks.clear();
   }
 
-  /** Sets `matrix` to where `peasant` stands now, turned the way it walks. */
+  /** Sets `matrix` to where `peasant` is drawn this frame, turned the way it walks. */
   private place(peasant: PeasantView, tickFraction: number): void {
-    const { map } = this.world;
-    const { tx, ty, nextTx, nextTy, stepTicks } = peasant;
-    const t = stepTicks > 0 ? Math.min(1, (peasant.stepProgress + tickFraction) / stepTicks) : 0;
-    const dx = nextTx - tx;
-    const dz = nextTy - ty;
-    const height = map.tileHeight(tx, ty) + (map.tileHeight(nextTx, nextTy) - map.tileHeight(tx, ty)) * t;
-    this.position.set(tx + 0.5 + dx * t, height, ty + 0.5 + dz * t);
-    if (dx !== 0 || dz !== 0) this.headings.set(peasant.id, Math.atan2(dx, dz));
-    this.turn.setFromAxisAngle(UP, this.headings.get(peasant.id) ?? 0);
+    const heading = this.tracks.place(this.world.map, peasant, tickFraction, this.position);
+    this.turn.setFromAxisAngle(UP, heading);
     this.matrix.compose(this.position, this.turn, ONE);
-  }
-
-  /** Drops the headings of peasants who have left. */
-  private forgetGone(): void {
-    const present = new Set<number>();
-    for (const peasant of this.world.peasants()) present.add(peasant.id);
-    for (const id of this.headings.keys()) if (!present.has(id)) this.headings.delete(id);
   }
 
   private show(mesh: THREE.InstancedMesh, count: number): void {

@@ -77,25 +77,53 @@ describe('PeasantLayer', () => {
     layer.dispose();
   });
 
-  it('draws a peasant halfway through a straight step east at the tile edge between the two centres', () => {
+  it('draws a peasant one tick behind: from where it was at the last tick toward where it is now', () => {
     const world = camp();
     const layer = new PeasantLayer(world);
     let walker: PeasantView | undefined;
     tickUntil(world, () => {
+      layer.update(0);
       walker = [...world.peasants()].find(
         (p) => p.stepTicks === 4 && p.stepProgress === 2 && p.nextTx === p.tx + 1 && p.nextTy === p.ty,
       );
       return walker !== undefined;
     });
     const index = [...world.peasants()].indexOf(walker!);
+    // Now at 2/4 of the step (tx + 1.0); at the last tick it was at 1/4 (tx + 0.75).
     layer.update(0);
     const position = positionOf(bodies(layer), index);
-    expect(position.x).toBeCloseTo(walker!.tx + 1.0);
+    expect(position.x).toBeCloseTo(walker!.tx + 0.75);
     expect(position.z).toBeCloseTo(walker!.ty + 0.5);
     expect(position.y).toBeCloseTo(0);
-    // The tick fraction moves it on: a quarter tick more is 1/16 of a tile further.
-    layer.update(0.25);
-    expect(positionOf(bodies(layer), index).x).toBeCloseTo(walker!.tx + 1.0625);
+    layer.update(0.5);
+    expect(positionOf(bodies(layer), index).x).toBeCloseTo(walker!.tx + 0.875);
+    layer.dispose();
+  });
+
+  it('moves a walker every frame, evenly, across step boundaries', () => {
+    const world = new World(flatMap(32), new Economy(resources(100, 40, 5)));
+    world.spawn(ObjectKind.Tree, 26, 6);
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 2, ty: 2 });
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 20, ty: 6 }); // a long walk east
+    const layer = new PeasantLayer(world);
+    tickUntil(world, () => world.population.count === 1);
+    for (let i = 0; i < 3; i++) {
+      layer.update(0);
+      world.tick();
+    }
+    const samples: THREE.Vector3[] = [];
+    for (let tick = 0; tick < 16; tick++) {
+      for (const fraction of [0, 0.25, 0.5, 0.75]) {
+        layer.update(fraction);
+        samples.push(positionOf(bodies(layer), 0));
+      }
+      world.tick();
+    }
+    expect([...world.peasants()][0].state).toBe('toWork'); // still walking at the end
+    const moves = samples.slice(1).map((s, i) => s.distanceTo(samples[i]));
+    const average = moves.reduce((sum, d) => sum + d, 0) / moves.length;
+    expect(Math.min(...moves), 'no frozen frame').toBeGreaterThan(0);
+    expect(Math.max(...moves), 'no jump').toBeLessThanOrEqual(2 * average);
     layer.dispose();
   });
 
