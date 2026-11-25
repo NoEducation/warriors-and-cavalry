@@ -1,11 +1,29 @@
-// Production buildings: per-building cycle progress, whether each can work, and adding their yield every tick.
+// Production buildings: per-building cycle progress, whether each can work, and the batches finished every tick.
 import type { Economy } from './Economy';
 import type { GameMap } from './GameMap';
 import type { MapObject } from './MapObject';
 import { OBJECT_KINDS, ObjectKind, type ProductionInfo } from './ObjectKind';
+import type { ResourceKind } from './ResourceKind';
 
-/** Why a production building is or is not advancing. */
-export type ProductionStatus = 'working' | 'noTrees' | 'storageFull';
+/**
+ * Why a production building is or is not advancing. `Production` itself reports only `working`, `noTrees` and
+ * `storageFull`; the worker statuses come from the building's job (see `Jobs.status`).
+ */
+export type ProductionStatus =
+  | 'working'
+  | 'noTrees'
+  | 'storageFull'
+  | 'noWorker'
+  | 'workerOnTheWay'
+  | 'workerDelivering'
+  | 'workerCannotReach';
+
+/** A batch finished by a production building this tick, to be carried to storage by its worker. */
+export interface ProductionOutput {
+  readonly buildingId: number;
+  readonly resource: ResourceKind;
+  readonly amount: number;
+}
 
 /** What a production building is doing: its status and how many of `cycleTicks` it has done in this cycle. */
 export interface ProductionState {
@@ -60,15 +78,20 @@ export class Production {
     }
   }
 
-  /** Advances every working producer by one tick in ascending id order, adding its yield when a cycle completes. */
-  public tick(): void {
+  /**
+   * Advances by one tick, in ascending id order, every producer whose worker is present (`workerPresent(id)`) and
+   * that can work. Returns the batches of the cycles that completed; they are not added to the economy here.
+   */
+  public tick(workerPresent: (buildingId: number) => boolean): ProductionOutput[] {
+    const outputs: ProductionOutput[] = [];
     for (const p of this.producers.values()) {
-      if (this.status(p) !== 'working') continue;
+      if (!workerPresent(p.object.id) || this.status(p) !== 'working') continue;
       p.progress++;
       if (p.progress < p.info.cycleTicks) continue;
-      this.economy.add(p.info.resource, p.info.yield);
+      outputs.push({ buildingId: p.object.id, resource: p.info.resource, amount: p.info.yield });
       p.progress = 0;
     }
+    return outputs;
   }
 
   /** The state of the producer with `objectId`, or null when that object does not exist or does not produce. */

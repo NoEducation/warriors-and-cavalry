@@ -70,22 +70,53 @@ describe('worldChecksum', () => {
   });
 
   it('covers production progress', () => {
-    // Same objects, amounts and tick count; only the hut's progress differs (50 ticks against 0).
-    const hutWorld = (): World => {
-      const world = new World(flatMap());
-      world.spawn(ObjectKind.Tree, 6, 6);
+    // Same objects, amounts, peasants and tick count; only the hut's progress differs, because B's wood was at
+    // capacity (so its hut paused) for 10 ticks and was then spent back down.
+    const hutWorld = (economy: Economy): World => {
+      const world = new World(flatMap(), economy);
+      world.spawn(ObjectKind.Tree, 7, 7);
+      world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 0, ty: 0 });
+      world.apply({ type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 5, ty: 0 });
+      while (world.productionProgress(3) === 0) world.tick(); // until its worker has started
       return world;
     };
-    const hut = { type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 1, ty: 1 } as const;
-    const early = hutWorld();
-    early.apply(hut);
-    for (let i = 0; i < 50; i++) early.tick();
-    const late = hutWorld();
-    for (let i = 0; i < 50; i++) late.tick();
-    late.apply(hut);
-    expect(early.productionState(2)?.progress).toBe(50);
-    expect(late.productionState(2)?.progress).toBe(0);
-    expect(worldChecksum(early)).not.toBe(worldChecksum(late));
+    const a = hutWorld(new Economy(resources(100, 40, 5)));
+    const poorB = new Economy(resources(100, 40, 5));
+    const b = hutWorld(poorB);
+    poorB.add(ResourceKind.Wood, 70);
+    for (let i = 0; i < 10; i++) {
+      a.tick();
+      b.tick();
+    }
+    poorB.spend(resources(70, 0, 0));
+    expect([a.productionProgress(3), b.productionProgress(3)]).toEqual([11, 1]);
+    expect(a.economy.amount(ResourceKind.Wood)).toBe(b.economy.amount(ResourceKind.Wood));
+    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
+  });
+
+  it('covers the ticks a building is skipped by job assignment', () => {
+    // A hut cut off by water; in A it stands before the only peasant arrives (tick 50), in B it is placed 5 ticks
+    // later. Each peasant gives the hut up at once, so only the remaining skip ticks differ.
+    const size = 16;
+    const tiles = new Uint8Array(size * size).fill(TileType.Grass);
+    for (let i = 9; i < size; i++) tiles[9 * size + i] = tiles[i * size + 9] = TileType.Water;
+    const map = new GameMap(size, size, 1, new Float32Array((size + 1) * (size + 1)), tiles);
+    const hut = { type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 11, ty: 11 } as const;
+    const run = (hutTick: number): World => {
+      const world = new World(map, new Economy(resources(100, 40, 5)));
+      world.spawn(ObjectKind.Tree, 13, 13);
+      world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 0, ty: 0 });
+      for (let tick = 0; tick < 100; tick++) {
+        if (tick === hutTick) world.apply(hut);
+        world.tick();
+      }
+      return world;
+    };
+    const a = run(40);
+    const b = run(55);
+    expect([a.jobSkipTicks(3), b.jobSkipTicks(3)]).toEqual([150, 156]);
+    expect([...a.peasants()]).toEqual([...b.peasants()]);
+    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
   });
 
   it('is equal for worlds with the same peasants after the same ticks', () => {

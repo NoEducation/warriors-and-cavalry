@@ -35,13 +35,15 @@ function instances(stacks: StockpileStacks, name: string): number {
   return count;
 }
 
-/** World with one stockpile holding 100 of 250 wood and 0 stone (a woodcutter brings the wood up from 70). */
+/** World with one stockpile holding 100 of 250 wood and 0 stone (30 wood added to the 70 left after building). */
 function worldWithStockpile(): { world: World; stockpile: MapObject } {
-  const world = flatWorld();
-  world.spawn(ObjectKind.Tree, 20, 20);
+  const economy = new Economy(resources(100, 0, 50));
+  const heights = new Float32Array((SIZE + 1) * (SIZE + 1));
+  const tiles = new Uint8Array(SIZE * SIZE).fill(TileType.Grass);
+  const world = new World(new GameMap(SIZE, SIZE, 1, heights, tiles), economy);
   const stockpile = place(world, ObjectKind.Stockpile, 2, 2);
   place(world, ObjectKind.WoodcutterHut, 16, 16);
-  for (let i = 0; i < 1500; i++) world.tick();
+  economy.add(ResourceKind.Wood, 30);
   return { world, stockpile };
 }
 

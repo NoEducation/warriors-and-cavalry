@@ -20,6 +20,10 @@ const PRODUCTION_STATUS_TEXT: Record<ProductionStatus, string> = {
   working: 'working',
   noTrees: 'no trees nearby',
   storageFull: 'storage full',
+  noWorker: 'no worker',
+  workerOnTheWay: 'worker on the way',
+  workerDelivering: 'worker delivering',
+  workerCannotReach: 'worker cannot reach',
 };
 
 export class TileHover {

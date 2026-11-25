@@ -6,7 +6,7 @@ export const POPULATION_CONFIG = Object.freeze({
   arrivalTicks: 50,
   /** Food paid for each arriving peasant. */
   arrivalFoodCost: 5,
-  /** Ticks an idle peasant waits before looking for a job again. */
+  /** Ticks a carrier with no storage place in reach waits before searching again. */
   retryTicks: 50,
   /** Ticks a workplace without a path is skipped by job assignment. */
   unreachableSkipTicks: 200,

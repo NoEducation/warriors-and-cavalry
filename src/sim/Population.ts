@@ -1,23 +1,16 @@
-// The camp's peasants: housing, arrivals at the Keep, leaving when housing drops, and walking found paths.
+// The camp's peasants: arrivals and leaving, jobs at production buildings, and their trips.
+import { Arrivals } from './Arrivals';
 import type { Economy } from './Economy';
-import type { GameMap } from './GameMap';
+import { Jobs } from './Jobs';
 import type { MapObject } from './MapObject';
-import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import { Peasant, type PeasantView } from './Peasant';
-import type { IsWalkable } from './PathFinder';
 import { PeasantWalker } from './PeasantWalker';
-import { POPULATION_CONFIG } from './populationConfig';
-import { ResourceKind, resources } from './ResourceKind';
+import type { PopulationHost } from './PopulationHost';
+import type { ProductionOutput, ProductionState } from './Production';
 import type { TileCoord } from './TileCoord';
+import { WorkerTrips } from './WorkerTrips';
 
-/** What the population needs to know about the world it lives in. `World` is one. */
-export interface PopulationHost {
-  readonly map: GameMap;
-  isWalkable: IsWalkable;
-  accessTiles(objectId: number): TileCoord[];
-  objectById(id: number): MapObject | undefined;
-  objects(): Iterable<MapObject>;
-}
+export type { PopulationHost } from './PopulationHost';
 
 /** Population totals for the UI. */
 export interface PopulationSummary {
@@ -26,22 +19,21 @@ export interface PopulationSummary {
   readonly idle: number;
 }
 
-const ARRIVAL_COST = resources(0, 0, POPULATION_CONFIG.arrivalFoodCost);
-
 export class Population {
   /** Peasants by id; ids only increase, so insertion order is ascending id order. */
   private readonly byId = new Map<number, Peasant>();
-  /** Standing buildings that house peasants, by id (ascending). */
-  private readonly homes = new Map<number, MapObject>();
+  private readonly arrivals: Arrivals;
+  private readonly jobs = new Jobs();
   private readonly walker: PeasantWalker;
-  private totalHousing = 0;
-  private timer = 0;
+  private readonly trips: WorkerTrips;
   private nextId = 1;
 
-  /** Peasants living in `world`, paying for arrivals from `economy`. */
-  public constructor(private readonly world: PopulationHost, private readonly economy: Economy) {
+  /** Peasants living in `world`, paying for arrivals from `economy` and delivering their work into it. */
+  public constructor(world: PopulationHost, economy: Economy) {
     const isWalkable = (tx: number, ty: number): boolean => world.isWalkable(tx, ty);
     this.walker = new PeasantWalker(world.map.width, world.map.height, isWalkable);
+    this.arrivals = new Arrivals(world, economy);
+    this.trips = new WorkerTrips(world, economy, this.jobs, this.walker);
   }
 
   /** Number of peasants. */
@@ -51,7 +43,7 @@ export class Population {
 
   /** Peasants the standing buildings can house. */
   public get housing(): number {
-    return this.totalHousing;
+    return this.arrivals.housing;
   }
 
   /** Number of peasants without anything to do. */
@@ -63,7 +55,7 @@ export class Population {
 
   /** Ticks counted toward the next arrival; 0 while nobody can arrive. */
   public get arrivalTimer(): number {
-    return this.timer;
+    return this.arrivals.arrivalTimer;
   }
 
   /** All peasants in ascending id order. */
@@ -71,84 +63,90 @@ export class Population {
     return this.byId.values();
   }
 
-  /** Call for every object added to the world: counts its housing. */
+  /** Call for every object added to the world: counts its housing, opens its job, remembers a storage place. */
   public buildingAdded(object: MapObject): void {
-    const { housing } = OBJECT_KINDS[object.kind];
-    if (housing === 0) return;
-    this.homes.set(object.id, object);
-    this.totalHousing += housing;
+    this.arrivals.buildingAdded(object);
+    this.jobs.buildingAdded(object);
+    this.trips.buildingAdded(object);
   }
 
-  /** Call for every object removed from the world: drops its housing, and peasants leave until the rest fit. */
+  /**
+   * Call for every object removed from the world: the worker of a removed workplace goes idle where it stands
+   * (its load lost), and peasants leave until the rest are housed.
+   */
   public buildingRemoved(object: MapObject): void {
-    if (!this.homes.delete(object.id)) return;
-    this.totalHousing -= OBJECT_KINDS[object.kind].housing;
+    this.arrivals.buildingRemoved(object);
+    const worker = this.jobs.buildingRemoved(object);
+    if (worker) this.trips.stop(worker);
+    this.trips.buildingRemoved(object);
     this.leaveUntilHoused();
   }
 
-  /** Advances one tick: arrivals and leaving, then every peasant's walk in ascending id order. */
+  /** Advances one tick: arrivals and leaving, then job assignment, then every peasant's trip in ascending id order. */
   public tick(): void {
-    this.arrive();
+    const tile = this.arrivals.tick(this.byId.size);
+    if (tile) {
+      const peasant = new Peasant(this.nextId++, tile.tx, tile.ty);
+      this.byId.set(peasant.id, peasant);
+    }
     this.leaveUntilHoused();
-    for (const p of this.byId.values()) this.walker.tick(p);
+    this.assignJobs();
+    for (const p of this.byId.values()) this.trips.tick(p);
+  }
+
+  /** Whether the worker of building `buildingId` is at work there now. Production advances only then. */
+  public isWorking(buildingId: number): boolean {
+    return this.jobs.worker(buildingId)?.state === 'working';
+  }
+
+  /** Hands each finished batch to its building's worker, who carries it to storage. Call after production ticks. */
+  public collect(outputs: readonly ProductionOutput[]): void {
+    for (const { buildingId, resource, amount } of outputs) {
+      const worker = this.jobs.worker(buildingId);
+      if (worker) this.trips.carry(worker, { resource, amount });
+    }
+  }
+
+  /** `own` (a building's production state) with the status its job adds; null stays null. */
+  public withJobStatus(buildingId: number, own: ProductionState | null): ProductionState | null {
+    return own && { ...own, status: this.jobs.status(buildingId, own.status) };
+  }
+
+  /** Ticks the building `buildingId` is still skipped by job assignment after a failed search; 0 when not skipped. */
+  public jobSkipTicks(buildingId: number): number {
+    return this.jobs.skipTicks(buildingId);
   }
 
   /**
    * Sends `peasant` toward the nearest of `goals` along a found path, from the tile it stands on (or, mid-step, the
-   * tile it is stepping onto). Returns false, and leaves it without a walk, when no goal is reachable. Internal to the
-   * simulation: used by the job rules and by tests.
+   * tile it is stepping onto). Returns false, and leaves it without a walk, when no goal is reachable. For tests.
    */
   public walkTo(peasant: PeasantView, goals: readonly TileCoord[]): boolean {
     const p = this.byId.get(peasant.id);
     return p !== undefined && this.walker.walkTo(p, goals);
   }
 
-  /** Counts toward the next arrival while there is housing, food and a free tile at the Keep; resets otherwise. */
-  private arrive(): void {
-    const canArrive =
-      this.byId.size < this.totalHousing && this.economy.amount(ResourceKind.Food) >= POPULATION_CONFIG.arrivalFoodCost;
-    const tile = canArrive ? this.arrivalTile() : null;
-    if (!tile) {
-      this.timer = 0;
-      return;
+  /** Each idle peasant, in ascending id order, takes the lowest-id vacant job that is not skipped. */
+  private assignJobs(): void {
+    this.jobs.tick();
+    for (const p of this.byId.values()) {
+      if (p.state !== 'idle') continue;
+      const buildingId = this.jobs.vacant();
+      if (buildingId === null) return;
+      this.trips.startWork(p, buildingId);
     }
-    if (++this.timer < POPULATION_CONFIG.arrivalTicks) return;
-    this.economy.spend(ARRIVAL_COST);
-    const peasant = new Peasant(this.nextId++, tile.tx, tile.ty);
-    this.byId.set(peasant.id, peasant);
-    this.timer = 0;
-  }
-
-  /**
-   * The first access tile of the lowest-id Keep in the order: bottom edge left to right, right edge top to bottom,
-   * top edge left to right, left edge top to bottom; null without a Keep or a free tile around it.
-   */
-  private arrivalTile(): TileCoord | null {
-    let keep: MapObject | undefined;
-    for (const home of this.homes.values()) if (!keep && home.kind === ObjectKind.Keep) keep = home;
-    if (!keep) return null;
-    const { width, height } = OBJECT_KINDS[keep.kind];
-    const span = this.world.map.width + this.world.map.height;
-    let best: TileCoord | null = null;
-    let bestKey = Infinity;
-    for (const tile of this.world.accessTiles(keep.id)) {
-      let key: number;
-      if (tile.ty === keep.ty + height) key = tile.tx;
-      else if (tile.tx === keep.tx + width) key = span + tile.ty;
-      else if (tile.ty === keep.ty - 1) key = 2 * span + tile.tx;
-      else key = 3 * span + tile.ty;
-      if (key < bestKey) [best, bestKey] = [tile, key];
-    }
-    return best;
   }
 
   /** While there are more peasants than housing, removes idle ones by highest id first, then the rest likewise. */
   private leaveUntilHoused(): void {
-    const excess = this.byId.size - this.totalHousing;
+    const excess = this.byId.size - this.arrivals.housing;
     if (excess <= 0) return;
     const newestFirst = [...this.byId.values()].reverse();
     const idle = newestFirst.filter((p) => p.state === 'idle');
     const idleFirst = [...idle, ...newestFirst.filter((p) => p.state !== 'idle')];
-    for (const p of idleFirst.slice(0, excess)) this.byId.delete(p.id);
+    for (const p of idleFirst.slice(0, excess)) {
+      this.jobs.release(p, false);
+      this.byId.delete(p.id);
+    }
   }
 }

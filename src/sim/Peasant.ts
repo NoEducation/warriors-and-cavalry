@@ -33,7 +33,10 @@ export interface PeasantView {
   readonly workplaceId: number | null;
 }
 
-/** The mutable peasant record. Only `Population` changes it; everyone else sees it as a `PeasantView`. */
+/**
+ * The mutable peasant record. Only `Population` and its helpers (`Jobs`, `WorkerTrips`, `PeasantWalker`) change it;
+ * everyone else sees it as a `PeasantView`.
+ */
 export class Peasant implements PeasantView {
   public state: PeasantState = 'idle';
   public nextTx: number;
@@ -42,6 +45,10 @@ export class Peasant implements PeasantView {
   public stepTicks = 0;
   public load: Load | null = null;
   public workplaceId: number | null = null;
+  /** The storage place it carries its load to; null when not delivering or no storage place is in reach. */
+  public targetId: number | null = null;
+  /** Ticks left before a carrier with no storage place in reach searches again; 0 when not waiting. */
+  public waitTicks = 0;
   /** The tiles of the current walk; `path[pathIndex]` is the next one to step onto. */
   public path: readonly TileCoord[] = [];
   public pathIndex = 0;

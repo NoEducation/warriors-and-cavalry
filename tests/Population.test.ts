@@ -135,6 +135,18 @@ describe('World population: leaving', () => {
     expect([...world.peasants()].map((p) => p.id)).toEqual([1, 2, 3, 4]);
   });
 
+  it('frees the job of a working peasant who leaves', () => {
+    const world = new World(flatMap(), new Economy(resources(100, 40, 5)));
+    world.spawn(ObjectKind.Tree, 12, 2);
+    const keep = place(world, ObjectKind.Keep, 2, 2);
+    const hut = place(world, ObjectKind.WoodcutterHut, 10, 2);
+    ticks(world, 60);
+    expect([...world.peasants()][0]).toMatchObject({ state: 'toWork', workplaceId: hut.id });
+    world.apply({ type: 'demolish', objectId: keep.id });
+    expect(world.population.count).toBe(0);
+    expect(world.productionState(hut.id)?.status).toBe('noWorker');
+  });
+
   it('empties the camp when the only Keep is demolished, and nobody arrives after', () => {
     const world = new World(flatMap());
     const keep = place(world, ObjectKind.Keep, 2, 2);

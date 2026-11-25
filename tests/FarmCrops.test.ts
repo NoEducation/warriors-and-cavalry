@@ -48,14 +48,17 @@ describe('FarmCrops', () => {
 
   it('grows the crop over the cycle from green to gold and cuts it back when the cycle completes', () => {
     const world = flatWorld();
-    placeFarm(world, 1, 1);
+    const farm = placeFarm(world, 1, 1);
+    // A Keep right of the farm: its peasant works the farm and delivers to the Keep a step or two away.
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 6, ty: 1 });
     const crops = new FarmCrops(world);
     crops.update();
     const crop = crops.object.children[0];
     const stubble = heightOf(crop);
     const startColor = colorOf(crop).clone();
 
-    for (let i = 0; i < 199; i++) world.tick();
+    while (world.productionProgress(farm.id) === 0) world.tick(); // until the worker has started
+    for (let i = 1; i < 199; i++) world.tick();
     crops.update();
     const full = heightOf(crop);
     expect(full).toBeGreaterThan(stubble * 3);

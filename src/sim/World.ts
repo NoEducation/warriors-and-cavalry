@@ -24,8 +24,7 @@ export class World {
   /** Creates a world with no objects on `map`, holding `economyState` (by default the usual start amounts). */
   public constructor(public readonly map: GameMap, private readonly economyState: Economy = new Economy()) {
     this.index = new ObjectIndex(map);
-    const isTreeAt = (tx: number, ty: number): boolean => this.objectAt(tx, ty)?.kind === ObjectKind.Tree;
-    this.production = new Production(map, economyState, isTreeAt);
+    this.production = new Production(map, economyState, (tx, ty) => this.objectAt(tx, ty)?.kind === ObjectKind.Tree);
     this.populace = new Population(this, economyState);
   }
 
@@ -39,11 +38,11 @@ export class World {
     return this.ticks;
   }
 
-  /** Advances the world by one simulation tick. Called by the game loop as many times as the runner says. */
+  /** Advances the world by one simulation tick: peasants, then production, whose batches the workers pick up. */
   public tick(): void {
     this.ticks++;
     this.populace.tick();
-    this.production.tick();
+    this.populace.collect(this.production.tick((id) => this.populace.isWorking(id)));
   }
 
   /** All peasants in ascending id order. */
@@ -53,8 +52,7 @@ export class World {
 
   /** How many peasants there are, how many the buildings house and how many are idle. */
   public get population(): PopulationSummary {
-    const p = this.populace;
-    return { count: p.count, housing: p.housing, idle: p.idleCount };
+    return { count: this.populace.count, housing: this.populace.housing, idle: this.populace.idleCount };
   }
 
   /** Ticks counted toward the next peasant's arrival; 0 while nobody can arrive. */
@@ -62,9 +60,14 @@ export class World {
     return this.populace.arrivalTimer;
   }
 
-  /** What the production building `objectId` is doing; null for objects that do not produce or do not exist. */
+  /** What the production building `objectId` and its worker are doing; null for non-producers and unknown ids. */
   public productionState(objectId: number): ProductionState | null {
-    return this.production.state(objectId);
+    return this.populace.withJobStatus(objectId, this.production.state(objectId));
+  }
+
+  /** Ticks the production building `objectId` is still skipped by job assignment (its worker could not reach it). */
+  public jobSkipTicks(objectId: number): number {
+    return this.populace.jobSkipTicks(objectId);
   }
 
   /** Ticks done in the current cycle of production building `objectId`, else null. Allocation-free, for per-frame use. */
@@ -116,14 +119,11 @@ export class World {
       case 'placeBuilding': {
         const check = this.canPlace(command.kind, command.tx, command.ty);
         if (!check.ok) return check;
-        const paid = this.economyState.spend(OBJECT_KINDS[command.kind].cost);
-        if (!paid) return { ok: false, reason: 'NotEnoughResources' };
+        if (!this.economyState.spend(OBJECT_KINDS[command.kind].cost)) return { ok: false, reason: 'NotEnoughResources' };
         return { ok: true, object: this.add(command.kind, command.tx, command.ty) };
       }
-      case 'demolish':
-        return this.demolish(command.objectId);
-      default:
-        return { ok: false, reason: 'UnknownCommand' };
+      case 'demolish': return this.demolish(command.objectId);
+      default: return { ok: false, reason: 'UnknownCommand' };
     }
   }
 

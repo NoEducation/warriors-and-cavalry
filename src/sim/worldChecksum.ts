@@ -9,7 +9,8 @@ const FNV_PRIME = 0x01000193;
 /**
  * 32-bit FNV-1a over the bytes of the map's `heights` and `tiles`, then (as little-endian int32) the tick count,
  * each resource's amount and capacity in `RESOURCE_KINDS` order, each object's id, kind, tx and ty in id order,
- * each producing building's cycle progress in id order, the arrival timer, and per peasant in id order its id, state
+ * each producing building's cycle progress in id order, the id and remaining skip ticks of each building skipped by
+ * job assignment in id order, the arrival timer, and per peasant in id order its id, state
  * index, tx, ty, nextTx, nextTy, step progress, load resource (-1 for none) and amount, and workplace id (0 for none).
  * Use to compare worlds cheaply, e.g. between peers.
  */
@@ -31,6 +32,10 @@ export function worldChecksum(world: World): number {
   for (const object of world.objects()) {
     const production = world.productionState(object.id);
     if (production) hash = feedInt32(hash, production.progress);
+  }
+  for (const object of world.objects()) {
+    const skip = world.jobSkipTicks(object.id);
+    if (skip > 0) hash = feedInt32(feedInt32(hash, object.id), skip);
   }
   hash = feedInt32(hash, world.arrivalTimer);
   for (const p of world.peasants()) {
