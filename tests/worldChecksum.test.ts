@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GameMap } from '../src/sim/GameMap';
 import { MapGenerator } from '../src/sim/MapGenerator';
 import { ObjectKind } from '../src/sim/ObjectKind';
-import { ResourceKind } from '../src/sim/ResourceKind';
+import { Economy } from '../src/sim/Economy';
+import { ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
 import { worldChecksum } from '../src/sim/worldChecksum';
@@ -24,9 +25,10 @@ describe('worldChecksum', () => {
 
   it('keeps the seed 1 world of 512 x 512 tiles unchanged', () => {
     // Re-recorded when the checksum started covering the tick count (was 3842414936 before that), and again when it
-    // started covering resource amounts and capacities (was 541835208 before that).
+    // started covering resource amounts and capacities (was 541835208 before that), and again when it started
+    // covering the arrival timer and the peasants (was 1606265378 before that).
     // Tree looks are render-only, so changing them must not change this value.
-    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(1606265378);
+    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(3863915074);
   });
 
   it('differs for different seeds', () => {
@@ -84,5 +86,50 @@ describe('worldChecksum', () => {
     expect(early.productionState(2)?.progress).toBe(50);
     expect(late.productionState(2)?.progress).toBe(0);
     expect(worldChecksum(early)).not.toBe(worldChecksum(late));
+  });
+
+  it('is equal for worlds with the same peasants after the same ticks', () => {
+    const run = (): World => {
+      const world = new World(flatMap());
+      world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 1, ty: 1 });
+      for (let i = 0; i < 300; i++) world.tick();
+      return world;
+    };
+    const a = run();
+    expect(a.population.count).toBe(4);
+    expect(worldChecksum(a)).toBe(worldChecksum(run()));
+  });
+
+  it('covers the arrival timer and the peasants', () => {
+    // Keep placed one tick later in B. After 120 ticks both have 2 peasants and the same food; only the timer differs.
+    const keep = { type: 'placeBuilding', kind: ObjectKind.Keep, tx: 1, ty: 1 } as const;
+    const a = new World(flatMap());
+    a.apply(keep);
+    for (let i = 0; i < 120; i++) a.tick();
+    const b = new World(flatMap());
+    b.tick();
+    b.apply(keep);
+    for (let i = 0; i < 119; i++) b.tick();
+    expect([a.arrivalTimer, b.arrivalTimer]).toEqual([20, 19]);
+    expect(a.population.count).toBe(b.population.count);
+    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
+  });
+
+  it('covers the peasants, not only the food they cost', () => {
+    // Same objects, food, tick count and timer; A paid 5 of its 50 food for a peasant, B started too poor and is
+    // topped up to the same 45 afterwards.
+    const keep = { type: 'placeBuilding', kind: ObjectKind.Keep, tx: 1, ty: 1 } as const;
+    const a = new World(flatMap());
+    a.apply(keep);
+    for (let i = 0; i < 50; i++) a.tick();
+    const poor = new Economy(resources(100, 40, 4));
+    const b = new World(flatMap(), poor);
+    b.apply(keep);
+    for (let i = 0; i < 50; i++) b.tick();
+    poor.add(ResourceKind.Food, 41);
+    expect([a.population.count, b.population.count]).toEqual([1, 0]);
+    expect([a.economy.amount(ResourceKind.Food), b.economy.amount(ResourceKind.Food)]).toEqual([45, 45]);
+    expect([a.arrivalTimer, b.arrivalTimer]).toEqual([0, 0]);
+    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
   });
 });

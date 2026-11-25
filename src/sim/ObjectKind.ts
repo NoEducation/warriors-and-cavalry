@@ -1,4 +1,4 @@
-// Kinds of objects that stand on map tiles: footprints, costs, storage, placement rules and production.
+// Kinds of objects that stand on map tiles: footprints, costs, storage, housing, placement rules and production.
 import { NO_RESOURCES, type ResourceAmounts, ResourceKind, resources } from './ResourceKind';
 
 export const ObjectKind = {
@@ -37,11 +37,13 @@ export interface ObjectKindInfo {
   readonly grassOnly: boolean;
   /** True when a Rock tile must touch an edge of the footprint. */
   readonly needsRock: boolean;
+  /** Peasants this building houses while it stands. */
+  readonly housing: number;
   readonly production: ProductionInfo | null;
 }
 
 /** Shared values of the kinds that neither store, produce nor have extra placement rules. */
-const PLAIN = { storage: NO_RESOURCES, grassOnly: false, needsRock: false, production: null } as const;
+const PLAIN = { storage: NO_RESOURCES, grassOnly: false, needsRock: false, housing: 0, production: null } as const;
 
 /** Freezes alue and every object reachable from it, so no nested table entry can be changed at run time. */
 function deepFreeze<T extends object>(value: T): T {
@@ -54,8 +56,24 @@ function deepFreeze<T extends object>(value: T): T {
 /** Frozen all the way down (entries and their cost, storage and production); tune by editing the source. */
 export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   [ObjectKind.Tree]: { ...PLAIN, name: 'Tree', width: 1, height: 1, buildable: false, cost: NO_RESOURCES },
-  [ObjectKind.Keep]: { ...PLAIN, name: 'Keep', width: 4, height: 4, buildable: true, cost: resources(50, 40, 0) },
-  [ObjectKind.Hovel]: { ...PLAIN, name: 'Hovel', width: 2, height: 2, buildable: true, cost: resources(15, 0, 0) },
+  [ObjectKind.Keep]: {
+    ...PLAIN,
+    name: 'Keep',
+    width: 4,
+    height: 4,
+    buildable: true,
+    cost: resources(50, 40, 0),
+    housing: 4,
+  },
+  [ObjectKind.Hovel]: {
+    ...PLAIN,
+    name: 'Hovel',
+    width: 2,
+    height: 2,
+    buildable: true,
+    cost: resources(15, 0, 0),
+    housing: 4,
+  },
   [ObjectKind.WoodcutterHut]: {
     ...PLAIN,
     name: "Woodcutter's hut",

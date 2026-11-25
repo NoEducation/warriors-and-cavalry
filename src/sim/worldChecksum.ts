@@ -1,4 +1,5 @@
 // Cheap fingerprint of a whole world, for comparing worlds (e.g. between peers).
+import { PEASANT_STATES } from './Peasant';
 import { RESOURCE_KINDS } from './ResourceKind';
 import type { World } from './World';
 
@@ -8,7 +9,9 @@ const FNV_PRIME = 0x01000193;
 /**
  * 32-bit FNV-1a over the bytes of the map's `heights` and `tiles`, then (as little-endian int32) the tick count,
  * each resource's amount and capacity in `RESOURCE_KINDS` order, each object's id, kind, tx and ty in id order,
- * and each producing building's cycle progress in id order. Use to compare worlds cheaply, e.g. between peers.
+ * each producing building's cycle progress in id order, the arrival timer, and per peasant in id order its id, state
+ * index, tx, ty, nextTx, nextTy, step progress, load resource (-1 for none) and amount, and workplace id (0 for none).
+ * Use to compare worlds cheaply, e.g. between peers.
  */
 export function worldChecksum(world: World): number {
   const { heights, tiles } = world.map;
@@ -28,6 +31,15 @@ export function worldChecksum(world: World): number {
   for (const object of world.objects()) {
     const production = world.productionState(object.id);
     if (production) hash = feedInt32(hash, production.progress);
+  }
+  hash = feedInt32(hash, world.arrivalTimer);
+  for (const p of world.peasants()) {
+    for (const value of [p.id, PEASANT_STATES.indexOf(p.state), p.tx, p.ty, p.nextTx, p.nextTy, p.stepProgress]) {
+      hash = feedInt32(hash, value);
+    }
+    hash = feedInt32(hash, p.load ? p.load.resource : -1);
+    hash = feedInt32(hash, p.load ? p.load.amount : 0);
+    hash = feedInt32(hash, p.workplaceId ?? 0);
   }
   return hash >>> 0;
 }
