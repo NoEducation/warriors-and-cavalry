@@ -360,6 +360,38 @@ describe('World.spawn and listeners', () => {
   });
 });
 
+describe('World walkability', () => {
+  it('blocks water, buildings and the outside, but not trees or grass', () => {
+    const map = flatMap();
+    setTile(map, 1, 1, TileType.Water);
+    const world = new World(map);
+    world.spawn(ObjectKind.Hovel, 5, 5);
+    world.spawn(ObjectKind.Tree, 9, 9);
+    expect(world.isWalkable(1, 1)).toBe(false);
+    for (const [tx, ty] of [[5, 5], [6, 5], [5, 6], [6, 6]]) expect(world.isWalkable(tx, ty)).toBe(false);
+    expect(world.isWalkable(-1, 0)).toBe(false);
+    expect(world.isWalkable(0, SIZE)).toBe(false);
+    expect(world.isWalkable(9, 9)).toBe(true);
+    expect(world.isWalkable(2, 2)).toBe(true);
+  });
+
+  it('lists the walkable edge tiles of a building', () => {
+    const world = new World(flatMap());
+    const hovel = world.spawn(ObjectKind.Hovel, 5, 5);
+    expect(world.accessTiles(hovel.id)).toEqual([
+      { tx: 5, ty: 4 }, { tx: 6, ty: 4 },
+      { tx: 4, ty: 5 }, { tx: 7, ty: 5 },
+      { tx: 4, ty: 6 }, { tx: 7, ty: 6 },
+      { tx: 5, ty: 7 }, { tx: 6, ty: 7 },
+    ]);
+    world.spawn(ObjectKind.Hovel, 7, 6);
+    const tiles = world.accessTiles(hovel.id);
+    expect(tiles.length).toBe(7);
+    expect(tiles).not.toContainEqual({ tx: 7, ty: 6 });
+    expect(world.accessTiles(999)).toEqual([]);
+  });
+});
+
 describe('World.tick', () => {
   it('counts ticks from zero', () => {
     const world = new World(flatMap());

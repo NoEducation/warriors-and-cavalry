@@ -6,6 +6,8 @@ import type { MapObject } from './MapObject';
 import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import { checkPlacement } from './placementRules';
 import { Production, type ProductionState } from './Production';
+import type { TileCoord } from './TileCoord';
+import { TileType } from './tiles';
 import type { CommandResult, PlacementCheck, WorldChange, WorldCommand } from './WorldCommand';
 
 export class World {
@@ -64,6 +66,22 @@ export class World {
     if (!this.map.inBounds(tx, ty)) return undefined;
     const id = this.occupancy[ty * this.map.width + tx];
     return id === 0 ? undefined : this.byId.get(id);
+  }
+
+  /** Whether a walker may stand on tile (tx, ty): inside the map, not water, and free or a tree. */
+  public isWalkable(tx: number, ty: number): boolean {
+    const tile = this.map.tileAt(tx, ty);
+    if (tile === undefined || tile === TileType.Water) return false;
+    const object = this.objectAt(tx, ty);
+    return object === undefined || object.kind === ObjectKind.Tree;
+  }
+
+  /** The walkable tiles sharing an edge with object `objectId`, row by row; [] for an unknown id. */
+  public accessTiles(objectId: number): TileCoord[] {
+    const object = this.byId.get(objectId);
+    if (!object) return [];
+    const edge = Footprint.of(object.kind, object.tx, object.ty).edgeNeighbours();
+    return [...edge].filter((tile) => this.isWalkable(tile.tx, tile.ty));
   }
 
   /** All objects in ascending id order. Do not add or remove objects while iterating. */
