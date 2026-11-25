@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { GameMap } from '../src/sim/GameMap';
 import { MapGenerator } from '../src/sim/MapGenerator';
+import type { MapObject } from '../src/sim/MapObject';
 import { ObjectKind } from '../src/sim/ObjectKind';
 import { Economy } from '../src/sim/Economy';
-import { ResourceKind, resources } from '../src/sim/ResourceKind';
+import type { PeasantView } from '../src/sim/Peasant';
+import { RESOURCE_KINDS, ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
+import type { CommandResult } from '../src/sim/WorldCommand';
 import { worldChecksum } from '../src/sim/worldChecksum';
 
 const generator = new MapGenerator();
@@ -14,6 +17,84 @@ function flatMap(): GameMap {
   const size = 8;
   const tiles = new Uint8Array(size * size).fill(TileType.Grass);
   return new GameMap(size, size, 1, new Float32Array((size + 1) * (size + 1)), tiles);
+}
+
+/**
+ * A flat 48 x 16 world: a tree at (6, 0), a Keep far east at (40, 10) and a Woodcutter's hut at (4, 2); with
+ * `stockpile`, a Stockpile at (12, 3), which the worker reaches from the hut by walking straight east.
+ */
+function carrierCamp(economy: Economy, stockpile: boolean): { world: World; keep: MapObject } {
+  const tiles = new Uint8Array(48 * 16).fill(TileType.Grass);
+  const world = new World(new GameMap(48, 16, 1, new Float32Array(49 * 17), tiles), economy);
+  world.spawn(ObjectKind.Tree, 6, 0);
+  const keep = world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 40, ty: 10 });
+  world.apply({ type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 4, ty: 2 });
+  if (stockpile) world.apply({ type: 'placeBuilding', kind: ObjectKind.Stockpile, tx: 12, ty: 3 });
+  if (!keep.ok) throw new Error('placement failed');
+  return { world, keep: keep.object };
+}
+
+/**
+ * Both worlds of the rebuilt-Stockpile tests, `walked` ticks after the tick in which the carrier picked up its
+ * batch; B rebuilds the Stockpile then.
+ */
+function rebuiltStockpileWorlds(walked: number): [World, World] {
+  const rebuild = (world: World): void => {
+    const old = [...world.objects()].find((o) => o.kind === ObjectKind.Stockpile)!;
+    world.apply({ type: 'demolish', objectId: old.id });
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Stockpile, tx: old.tx, ty: old.ty });
+  };
+  const run = (early: boolean): World => {
+    const { world } = carrierCamp(new Economy(resources(100, 40, 5)), true);
+    if (early) rebuild(world);
+    tickWhile(world, () => peasantOf(world)?.state !== 'toStore');
+    for (let i = 0; i < walked; i++) world.tick();
+    if (!early) rebuild(world);
+    return world;
+  };
+  const a = run(true);
+  const b = run(false);
+  expect(a.tickCount).toBe(b.tickCount);
+  return [a, b];
+}
+
+/** Ticks `world` (and `also`, in step) while `going` holds; at most 2000 ticks. */
+function tickWhile(world: World, going: () => boolean, also?: World): void {
+  for (let n = 0; going(); n++) {
+    if (n >= 2000) throw new Error('condition not reached');
+    world.tick();
+    also?.tick();
+  }
+}
+
+function demolish(world: World, placed: CommandResult): void {
+  if (!placed.ok) throw new Error('placement failed');
+  world.apply({ type: 'demolish', objectId: placed.object.id });
+}
+
+const peasantOf = (world: World): PeasantView | undefined => [...world.peasants()][0];
+
+/** A peasant's fields with its path cut to the tiles still ahead. */
+function remaining(p: PeasantView): Record<string, unknown> {
+  return { ...p, path: p.path.slice(p.pathIndex) };
+}
+
+/**
+ * Asserts that `a` and `b` have the same tick count, economy, objects, arrival timer and one peasant each, alike in
+ * every field (its path compared by the tiles still ahead) except `field`.
+ */
+function expectOnlyPeasantFieldDiffers(a: World, b: World, field: keyof PeasantView): void {
+  expect(a.tickCount).toBe(b.tickCount);
+  expect(a.arrivalTimer).toBe(b.arrivalTimer);
+  for (const kind of RESOURCE_KINDS) {
+    expect(a.economy.amount(kind)).toBe(b.economy.amount(kind));
+    expect(a.economy.capacity(kind)).toBe(b.economy.capacity(kind));
+  }
+  expect([...a.objects()]).toEqual([...b.objects()]);
+  const [pa, pb] = [peasantOf(a)!, peasantOf(b)!];
+  expect([a.population.count, b.population.count]).toEqual([1, 1]);
+  expect(remaining(pa)[field], `${field} differs`).not.toEqual(remaining(pb)[field]);
+  expect({ ...remaining(pa), [field]: null }).toEqual({ ...remaining(pb), [field]: null });
 }
 
 describe('worldChecksum', () => {
@@ -143,6 +224,67 @@ describe('worldChecksum', () => {
     for (let i = 0; i < 119; i++) b.tick();
     expect([a.arrivalTimer, b.arrivalTimer]).toEqual([20, 19]);
     expect(a.population.count).toBe(b.population.count);
+    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
+  });
+
+  it('covers the ticks a carrier still waits before searching again', () => {
+    // No storage place after the Keep is demolished, so the carrier waits. B's hut paused 10 ticks (wood at capacity,
+    // spent back down after), so B's carrier started waiting 10 ticks later.
+    const run = (pause: boolean): World => {
+      const economy = new Economy(resources(100, 40, 5));
+      const { world, keep } = carrierCamp(economy, false);
+      world.apply({ type: 'placeBuilding', kind: ObjectKind.Hovel, tx: 30, ty: 2 }); // houses the peasant
+      tickWhile(world, () => peasantOf(world)?.state !== 'working');
+      world.apply({ type: 'demolish', objectId: keep.id });
+      const topUp = economy.capacity(ResourceKind.Wood) - economy.amount(ResourceKind.Wood);
+      if (pause) economy.add(ResourceKind.Wood, topUp);
+      for (let i = 0; i < 10; i++) world.tick();
+      if (pause) economy.spend(resources(topUp, 0, 0));
+      return world;
+    };
+    const a = run(false);
+    const b = run(true);
+    tickWhile(b, () => peasantOf(b)!.state !== 'toStore', a);
+    for (let i = 0; i < 5; i++) [a, b].forEach((world) => world.tick());
+    expectOnlyPeasantFieldDiffers(a, b, 'waitTicks');
+    expect([peasantOf(a)!.waitTicks, peasantOf(b)!.waitTicks]).toEqual([35, 45]);
+    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
+  });
+
+  it('covers the storage place a carrier delivers to', () => {
+    // Both worlds build the Stockpile, demolish it and build it again on the same spot; A before the batch is picked
+    // up, B right after, so B's carrier still targets the old Stockpile until its next tick.
+    const [a, b] = rebuiltStockpileWorlds(0);
+    expectOnlyPeasantFieldDiffers(a, b, 'targetId');
+    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
+  });
+
+  it('covers how far along its path a walker is', () => {
+    // As above, but B rebuilds one tick into the first step; on the next tick B's carrier searches again mid-step
+    // (its target is gone), so it walks the same remaining tiles from the start of a new path.
+    const [a, b] = rebuiltStockpileWorlds(1);
+    a.tick();
+    b.tick();
+    expectOnlyPeasantFieldDiffers(a, b, 'pathIndex');
+    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
+  });
+
+  it('covers the tiles left on a walker\'s path', () => {
+    // A Hovel stands in the carrier's way while B's carrier searches; A builds and demolishes it before that.
+    const hovel = { type: 'placeBuilding', kind: ObjectKind.Hovel, tx: 8, ty: 3 } as const;
+    const run = (late: boolean): World => {
+      const { world } = carrierCamp(new Economy(resources(100, 40, 5)), true);
+      if (!late) demolish(world, world.apply(hovel));
+      tickWhile(world, () => peasantOf(world)?.state !== 'working');
+      const temp = late ? world.apply(hovel) : null;
+      tickWhile(world, () => peasantOf(world)!.state !== 'toStore');
+      if (temp) demolish(world, temp);
+      return world;
+    };
+    const a = run(false);
+    const b = run(true);
+    expect(a.tickCount).toBe(b.tickCount);
+    expectOnlyPeasantFieldDiffers(a, b, 'path');
     expect(worldChecksum(a)).not.toBe(worldChecksum(b));
   });
 

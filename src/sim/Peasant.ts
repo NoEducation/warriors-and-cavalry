@@ -31,6 +31,15 @@ export interface PeasantView {
   readonly load: Load | null;
   /** Id of the building it works at; null when it has no job. */
   readonly workplaceId: number | null;
+  /** The storage place it carries its load to; null when not delivering or no storage place is in reach. */
+  readonly targetId: number | null;
+  /** Ticks left before a carrier with no storage place in reach searches again; 0 when not waiting. */
+  readonly waitTicks: number;
+  /** The tiles of the current walk; `path[pathIndex]` is the next one to step onto. */
+  readonly path: readonly TileCoord[];
+  readonly pathIndex: number;
+  /** Where the current walk leads, kept for searching again when the path is blocked. */
+  readonly goals: readonly TileCoord[];
 }
 
 /**

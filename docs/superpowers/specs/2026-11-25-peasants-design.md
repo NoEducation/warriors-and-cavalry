@@ -176,8 +176,9 @@ States: `idle`, `toWork`, `working`, `toStore`, `toWorkBack`.
   working. Production no longer adds yield itself; it hands the load to the
   worker.
 - Peasants have their own increasing ids, never reused.
-- `worldChecksum` also covers every peasant (id, state, tile, next tile, step
-  progress, load, workplace) and the arrival timer.
+- `worldChecksum` also covers the arrival timer and everything of every peasant
+  that a later tick reads (id, state, tile, next tile, step progress and length,
+  load, workplace, delivery target, wait ticks, path index and the path ahead).
 - The world changes only through `World.apply` and `World.tick`; render and
   UI only read it.
 
