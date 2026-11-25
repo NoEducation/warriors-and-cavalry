@@ -8,23 +8,12 @@ import { Footprint } from '../sim/Footprint';
 import type { GameMap } from '../sim/GameMap';
 import { OBJECT_KINDS } from '../sim/ObjectKind';
 import type { PlacementPreview } from '../sim/PlacementPreview';
-import type { ProductionStatus } from '../sim/Production';
 import type { TileCoord } from '../sim/TileCoord';
 import { TILE_NAMES } from '../sim/tiles';
 import type { World } from '../sim/World';
 import type { Hud } from '../ui/Hud';
+import { productionStatusText } from '../ui/statusText';
 import type { BuildController } from './BuildController';
-
-/** How the HUD names a production building's state. */
-const PRODUCTION_STATUS_TEXT: Record<ProductionStatus, string> = {
-  working: 'working',
-  noTrees: 'no trees nearby',
-  storageFull: 'storage full',
-  noWorker: 'no worker',
-  workerOnTheWay: 'worker on the way',
-  workerDelivering: 'worker delivering',
-  workerCannotReach: 'worker cannot reach',
-};
 
 export class TileHover {
   /** Uses the given pointer, picker, highlight, ghost, HUD and build controller; owns none of them. */
@@ -86,7 +75,7 @@ export class TileHover {
     const name = type === undefined ? '?' : TILE_NAMES[type];
     const objectName = object ? OBJECT_KINDS[object.kind].name : undefined;
     const production = object ? world.productionState(object.id) : null;
-    const objectState = production ? PRODUCTION_STATUS_TEXT[production.status] : undefined;
+    const objectState = production ? productionStatusText(production.status) : undefined;
     this.hud.setTile({ ...tile, name, height: map.tileHeight(tile.tx, tile.ty), objectName, objectState });
   }
 }

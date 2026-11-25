@@ -76,6 +76,17 @@ describe('SimulationRunner', () => {
     expect(runner.paused).toBe(true);
   });
 
+  it('reports the not-yet-run fraction of a tick, 0 while paused', () => {
+    const runner = new SimulationRunner(10);
+    expect(runner.tickFraction).toBe(0);
+    runner.ticksFor(0.05);
+    expect(runner.tickFraction).toBeCloseTo(0.5);
+    runner.ticksFor(0.17);
+    expect(runner.tickFraction).toBeCloseTo(0.2);
+    runner.togglePause();
+    expect(runner.tickFraction).toBe(0);
+  });
+
   it('gives no ticks for negative or NaN dt', () => {
     const runner = new SimulationRunner(10);
     expect(runner.ticksFor(-1)).toBe(0);

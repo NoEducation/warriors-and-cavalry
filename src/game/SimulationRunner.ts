@@ -24,6 +24,14 @@ export class SimulationRunner {
     return SIMULATION_SPEEDS[this.speedIndex];
   }
 
+  /**
+   * The not-yet-run fraction of a tick, in [0, 1); 0 while paused. Read after `ticksFor` to draw movement between
+   * the last tick and the next.
+   */
+  public get tickFraction(): number {
+    return this.isPaused ? 0 : this.pending;
+  }
+
   /** Pauses a running simulation or resumes a paused one. Call on the player's pause key. */
   public togglePause(): void {
     this.isPaused = !this.isPaused;

@@ -1,4 +1,4 @@
-// Per-frame refresh of the status widgets: the HUD clock, the resource bar and build bar affordability.
+// Per-frame refresh of the status widgets: the HUD clock, the resource and population bar and build bar affordability.
 import { gameTimeAt } from '../sim/gameTime';
 import type { World } from '../sim/World';
 import type { Hud } from '../ui/Hud';
@@ -20,11 +20,11 @@ export class StatusDisplay {
     private readonly runner: SimulationRunner,
   ) {}
 
-  /** Shows the clock, resources and affordable buildings of `world`. Call once per frame, after ticking. */
+  /** Shows the clock, resources, population and affordable buildings of `world`. Call once per frame, after ticking. */
   public update(world: World): void {
     this.updateClock(world.tickCount);
-    // Not skipped with the clock: placing or demolishing changes the economy without a tick, even while paused.
-    this.resourceBar.update(world.economy);
+    // Not skipped with the clock: placing or demolishing changes the economy and housing without a tick, even paused.
+    this.resourceBar.update(world.economy, world.population);
     this.buildInput.showAffordable(world.economy);
   }
 
