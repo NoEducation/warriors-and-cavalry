@@ -4,7 +4,7 @@ import { PEASANT_CAPACITY, PeasantLayer } from '../src/render/PeasantLayer';
 import { Economy } from '../src/sim/Economy';
 import { GameMap } from '../src/sim/GameMap';
 import { ObjectKind } from '../src/sim/ObjectKind';
-import type { PeasantView } from '../src/sim/Peasant';
+import type { PeasantView } from '../src/sim/PeasantView';
 import { ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';

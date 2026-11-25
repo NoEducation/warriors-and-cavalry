@@ -1,5 +1,5 @@
 // Cheap fingerprint of a whole world, for comparing worlds (e.g. between peers).
-import { PEASANT_STATES, type PeasantView } from './Peasant';
+import { PEASANT_STATES, type PeasantView } from './PeasantView';
 import { RESOURCE_KINDS } from './ResourceKind';
 import type { TileCoord } from './TileCoord';
 import type { World } from './World';

@@ -16,12 +16,14 @@ export class Jobs {
     if (OBJECT_KINDS[object.kind].production) this.workers.set(object.id, null);
   }
 
-  /** Call for every object removed from the world: forgets its job and returns its worker, if it had one. */
+  /**
+   * Call for every object removed from the world: forgets its job and returns its worker, if it had one. The worker
+   * still names the building as its workplace until it is made idle.
+   */
   public buildingRemoved(object: MapObject): Peasant | null {
     const worker = this.workers.get(object.id) ?? null;
     this.workers.delete(object.id);
     this.skipped.delete(object.id);
-    if (worker) worker.workplaceId = null;
     return worker;
   }
 
@@ -39,18 +41,19 @@ export class Jobs {
     return null;
   }
 
-  /** Gives the vacant job at `buildingId` to `peasant`. */
+  /** Gives the vacant job at `buildingId` to the idle `peasant`, who heads there (`toWork`). */
   public take(buildingId: number, peasant: Peasant): void {
     this.workers.set(buildingId, peasant);
-    peasant.workplaceId = buildingId;
+    peasant.takeJob(buildingId);
   }
 
-  /** Frees `peasant`'s job, if it has one; with `skip`, the building is skipped for `unreachableSkipTicks`. */
+  /**
+   * Frees the job of `peasant`'s workplace, if it has one that still stands; with `skip`, the building is skipped for
+   * `unreachableSkipTicks`. Leaves the peasant as it is: call before it goes idle (which forgets its workplace).
+   */
   public release(peasant: Peasant, skip: boolean): void {
     const id = peasant.workplaceId;
-    if (id === null) return;
-    peasant.workplaceId = null;
-    if (!this.workers.has(id)) return;
+    if (id === null || this.workers.get(id) !== peasant) return;
     this.workers.set(id, null);
     if (skip) this.skipped.set(id, POPULATION_CONFIG.unreachableSkipTicks);
   }

@@ -4,7 +4,7 @@ import { GameMap } from '../src/sim/GameMap';
 import { MapGenerator } from '../src/sim/MapGenerator';
 import type { MapObject } from '../src/sim/MapObject';
 import { ObjectKind } from '../src/sim/ObjectKind';
-import type { PeasantView } from '../src/sim/Peasant';
+import type { PeasantView } from '../src/sim/PeasantView';
 import { RESOURCE_KINDS, ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';

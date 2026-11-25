@@ -19,7 +19,7 @@ export class PeasantWalker {
    */
   public walkTo(p: Peasant, goals: readonly TileCoord[]): boolean {
     const path = this.pathFinder.find({ tx: p.nextTx, ty: p.nextTy }, goals, this.isWalkable);
-    p.setWalk(path ?? [], path ? goals : []);
+    p.startWalk(path ?? [], path ? goals : []);
     return path !== null;
   }
 
@@ -35,14 +35,11 @@ export class PeasantWalker {
    */
   private startStep(p: Peasant): boolean {
     if (p.pathIndex >= p.path.length) return false;
-    let next = p.path[p.pathIndex];
-    if (!this.isWalkable(next.tx, next.ty)) {
-      if (!this.walkTo(p, p.goals) || p.path.length === 0) return false;
-      next = p.path[0];
-    }
-    p.pathIndex++;
-    const diagonal = next.tx !== p.tx && next.ty !== p.ty;
-    p.startStep(next.tx, next.ty, diagonal ? POPULATION_CONFIG.diagonalStepTicks : POPULATION_CONFIG.straightStepTicks);
+    const next = p.path[p.pathIndex];
+    if (!this.isWalkable(next.tx, next.ty) && (!this.walkTo(p, p.goals) || p.path.length === 0)) return false;
+    const { tx, ty } = p.path[p.pathIndex];
+    const diagonal = tx !== p.tx && ty !== p.ty;
+    p.stepToNextTile(diagonal ? POPULATION_CONFIG.diagonalStepTicks : POPULATION_CONFIG.straightStepTicks);
     return true;
   }
 }

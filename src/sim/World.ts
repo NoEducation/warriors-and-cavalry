@@ -6,7 +6,7 @@ import type { MapObject } from './MapObject';
 import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import { Listeners } from './Listeners';
 import { ObjectIndex } from './ObjectIndex';
-import type { PeasantView } from './Peasant';
+import type { PeasantView } from './PeasantView';
 import { checkPlacement } from './placementRules';
 import { Population, type PopulationSummary } from './Population';
 import { Production, type ProductionState } from './Production';

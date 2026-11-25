@@ -1,7 +1,7 @@
 // Where each peasant stood at the last two simulation ticks, so it can be drawn one tick behind and move every frame.
 import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
-import type { PeasantView } from '../sim/Peasant';
+import type { PeasantView } from '../sim/PeasantView';
 import type { World } from '../sim/World';
 
 /** One peasant's positions at the previous and the latest tick, and the way it last walked. */

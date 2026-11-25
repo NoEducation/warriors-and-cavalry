@@ -1,6 +1,6 @@
 // Every peasant of a world, drawn each frame one tick behind the simulation, with a bundle on a carrier's back.
 import * as THREE from 'three';
-import type { PeasantView } from '../sim/Peasant';
+import type { PeasantView } from '../sim/PeasantView';
 import { ResourceKind } from '../sim/ResourceKind';
 import type { World } from '../sim/World';
 import { PeasantGeometryFactory } from './PeasantGeometryFactory';

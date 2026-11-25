@@ -4,7 +4,7 @@ import { MapGenerator } from '../src/sim/MapGenerator';
 import type { MapObject } from '../src/sim/MapObject';
 import { ObjectKind } from '../src/sim/ObjectKind';
 import { Economy } from '../src/sim/Economy';
-import type { PeasantView } from '../src/sim/Peasant';
+import type { PeasantView } from '../src/sim/PeasantView';
 import { RESOURCE_KINDS, ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
@@ -74,9 +74,11 @@ function demolish(world: World, placed: CommandResult): void {
 
 const peasantOf = (world: World): PeasantView | undefined => [...world.peasants()][0];
 
-/** A peasant's fields with its path cut to the tiles still ahead. */
-function remaining(p: PeasantView): Record<string, unknown> {
-  return { ...p, path: p.path.slice(p.pathIndex) };
+/** Every field of a peasant's view, its path cut to the tiles still ahead. */
+function remaining(p: PeasantView): Record<keyof PeasantView, unknown> {
+  const { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, waitTicks } = p;
+  const view = { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, waitTicks };
+  return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, goals: p.goals };
 }
 
 /**

@@ -4,7 +4,7 @@ import { Footprint } from '../src/sim/Footprint';
 import { GameMap } from '../src/sim/GameMap';
 import type { MapObject } from '../src/sim/MapObject';
 import { OBJECT_KINDS, ObjectKind } from '../src/sim/ObjectKind';
-import type { PeasantView } from '../src/sim/Peasant';
+import type { PeasantView } from '../src/sim/PeasantView';
 import { Population, type PopulationHost } from '../src/sim/Population';
 import { POPULATION_CONFIG } from '../src/sim/populationConfig';
 import { ResourceKind, resources } from '../src/sim/ResourceKind';
