@@ -6,8 +6,10 @@ export const POPULATION_CONFIG = Object.freeze({
   arrivalTicks: 50,
   /** Food paid for each arriving peasant. */
   arrivalFoodCost: 5,
-  /** Ticks a carrier with no storage place in reach waits before searching again. */
+  /** Ticks a peasant whose search failed (a carrier with no storage place in reach) waits before searching again. */
   retryTicks: 50,
+  /** Peasant `id` waits `id % retrySpread` ticks more, so peasants stranded together do not all search on one tick. */
+  retrySpread: 8,
   /** Ticks a workplace without a path is skipped by job assignment. */
   unreachableSkipTicks: 200,
   /** Ticks for one step to a straight neighbour. */

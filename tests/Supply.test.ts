@@ -14,13 +14,13 @@ import { worldChecksum } from '../src/sim/worldChecksum';
 const SIZE = 32;
 const WOOD = ResourceKind.Wood;
 
-/** A flat grass map; `water` tiles are Water. */
-function flatMap(water: (tx: number, ty: number) => boolean = () => false): GameMap {
-  const tiles = new Uint8Array(SIZE * SIZE).fill(TileType.Grass);
-  for (let ty = 0; ty < SIZE; ty++) {
-    for (let tx = 0; tx < SIZE; tx++) if (water(tx, ty)) tiles[ty * SIZE + tx] = TileType.Water;
+/** A flat grass map of `size` x `size` tiles; `water` tiles are Water. */
+function flatMap(water: (tx: number, ty: number) => boolean = () => false, size = SIZE): GameMap {
+  const tiles = new Uint8Array(size * size).fill(TileType.Grass);
+  for (let ty = 0; ty < size; ty++) {
+    for (let tx = 0; tx < size; tx++) if (water(tx, ty)) tiles[ty * size + tx] = TileType.Water;
   }
-  return new GameMap(SIZE, SIZE, 1, new Float32Array((SIZE + 1) * (SIZE + 1)), tiles);
+  return new GameMap(size, size, 1, new Float32Array((size + 1) * (size + 1)), tiles);
 }
 
 function place(world: World, kind: ObjectKind, tx: number, ty: number): MapObject {
@@ -242,6 +242,53 @@ describe('Jobs and the supply chain', () => {
     expect(peasant(world).workplaceId).toBe(far.id);
     expect(status(world, far.id)).toBe('workerOnTheWay');
     expect(status(world, near.id)).toBe('noWorker');
+  });
+
+  it('searches again when the next tile of its path is built over, and still reaches work', () => {
+    const { world, hut } = camp();
+    ticks(world, 52);
+    tickUntil(world, () => peasant(world).stepTicks === 0); // standing between two steps
+    const p = peasant(world);
+    const next = p.path[p.pathIndex];
+    place(world, ObjectKind.Hovel, next.tx, next.ty);
+    const entered: string[] = [];
+    tickUntil(world, () => {
+      entered.push(`${peasant(world).tx},${peasant(world).ty}`);
+      return peasant(world).state === 'working';
+    });
+    expect(entered).not.toContain(`${next.tx},${next.ty}`);
+    expect(onAccess(world, hut.id, peasant(world))).toBe(true);
+  });
+
+  it('shows workerCannotReach while its carrier waits for a storage place it cannot reach', () => {
+    const moat = (tx: number, ty: number): boolean => (tx === 26 && ty >= 26) || (ty === 26 && tx >= 26);
+    const world = new World(flatMap(moat), onePeasant());
+    world.spawn(ObjectKind.Tree, 25, 8);
+    const keep = place(world, ObjectKind.Keep, 2, 20);
+    const hut = place(world, ObjectKind.WoodcutterHut, 20, 4);
+    place(world, ObjectKind.Hovel, 8, 20); // keeps the peasant housed without the Keep
+    place(world, ObjectKind.Stockpile, 28, 28); // inside the moat
+    ticks(world, 50);
+    world.apply({ type: 'demolish', objectId: keep.id });
+    tickUntil(world, () => first(world)?.state === 'toStore', 2000);
+    expect(peasant(world).waitTicks).toBeGreaterThan(0);
+    expect(status(world, hut.id)).toBe('workerCannotReach');
+  });
+
+  it('staggers the searches of stranded carriers over several ticks', () => {
+    // Three carriers on their long way to the Keep, the only storage place, when it is demolished.
+    const world = new World(flatMap(() => false, 64), new Economy(resources(0, 0, 15)));
+    const keep = world.spawn(ObjectKind.Keep, 2, 2);
+    world.spawn(ObjectKind.Hovel, 10, 2); // houses the three without the Keep
+    world.spawn(ObjectKind.Tree, 53, 53);
+    for (const [tx, ty] of [[50, 50], [54, 50], [50, 54]]) world.spawn(ObjectKind.WoodcutterHut, tx, ty);
+    tickUntil(world, () => [...world.peasants()].filter((p) => p.state === 'toStore').length === 3, 3000);
+    world.apply({ type: 'demolish', objectId: keep.id });
+    world.tick(); // each finds its target gone and searches: no storage place left
+    const carriers = [...world.peasants()];
+    expect(carriers.every((p) => p.state === 'toStore' && p.waitTicks > 0)).toBe(true);
+    const nextSearches = new Set(carriers.map((p) => world.tickCount + p.waitTicks));
+    expect(nextSearches.size).toBeGreaterThanOrEqual(2);
   });
 
   it('walks off a tile a building was placed on and still reaches work', () => {

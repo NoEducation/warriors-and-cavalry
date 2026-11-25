@@ -78,7 +78,7 @@ const peasantOf = (world: World): PeasantView | undefined => [...world.peasants(
 function remaining(p: PeasantView): Record<keyof PeasantView, unknown> {
   const { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, waitTicks } = p;
   const view = { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, waitTicks };
-  return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, goals: p.goals };
+  return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, stand: p.stand };
 }
 
 /**
@@ -249,7 +249,7 @@ describe('worldChecksum', () => {
     tickWhile(b, () => peasantOf(b)!.state !== 'toStore', a);
     for (let i = 0; i < 5; i++) [a, b].forEach((world) => world.tick());
     expectOnlyPeasantFieldDiffers(a, b, 'waitTicks');
-    expect([peasantOf(a)!.waitTicks, peasantOf(b)!.waitTicks]).toEqual([35, 45]);
+    expect([peasantOf(a)!.waitTicks, peasantOf(b)!.waitTicks]).toEqual([36, 46]); // 50 + id 1 % 8, less 15 or 5
     expect(worldChecksum(a)).not.toBe(worldChecksum(b));
   });
 

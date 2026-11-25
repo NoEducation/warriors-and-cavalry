@@ -28,6 +28,12 @@ export class Arrivals {
     return this.timer;
   }
 
+  /** The lowest-id Keep, where peasants arrive and idle ones gather; null without one. */
+  public get keep(): MapObject | null {
+    for (const home of this.homes.values()) if (home.kind === ObjectKind.Keep) return home;
+    return null;
+  }
+
   /** Call for every object added to the world: counts its housing. */
   public buildingAdded(object: MapObject): void {
     const { housing } = OBJECT_KINDS[object.kind];
@@ -64,8 +70,7 @@ export class Arrivals {
    * top edge left to right, left edge top to bottom; null without a Keep or a free tile around it.
    */
   private arrivalTile(): TileCoord | null {
-    let keep: MapObject | undefined;
-    for (const home of this.homes.values()) if (!keep && home.kind === ObjectKind.Keep) keep = home;
+    const keep = this.keep;
     if (!keep) return null;
     const { width, height } = OBJECT_KINDS[keep.kind];
     const span = this.world.map.width + this.world.map.height;

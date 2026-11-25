@@ -38,6 +38,6 @@ export interface PeasantView {
   /** The tiles of the current walk; `path[pathIndex]` is the next one to step onto. */
   readonly path: readonly TileCoord[];
   readonly pathIndex: number;
-  /** Where the current walk leads, kept for searching again when the path is blocked. */
-  readonly goals: readonly TileCoord[];
+  /** The tile near the Keep an idle peasant stands on or heads for; null when it has none. */
+  readonly stand: TileCoord | null;
 }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { PEASANT_CAPACITY, PeasantLayer } from '../src/render/PeasantLayer';
+import { PEASANT_RENDER_CONFIG, PeasantLayer } from '../src/render/PeasantLayer';
 import { Economy } from '../src/sim/Economy';
 import { GameMap } from '../src/sim/GameMap';
 import { ObjectKind } from '../src/sim/ObjectKind';
@@ -138,7 +138,8 @@ describe('PeasantLayer', () => {
     layer.dispose();
   });
 
-  it(`grows past ${PEASANT_CAPACITY} peasants without throwing`, () => {
+  it(`grows past ${PEASANT_RENDER_CONFIG.initialCapacity} peasants without throwing`, () => {
+    expect(Object.isFrozen(PEASANT_RENDER_CONFIG)).toBe(true);
     const economy = new Economy(resources(100, 40, 50));
     const world = new World(flatMap(64), economy);
     world.spawn(ObjectKind.Keep, 2, 2);
@@ -149,7 +150,7 @@ describe('PeasantLayer', () => {
       world,
       () => {
         economy.add(ResourceKind.Food, 1);
-        return world.population.count > PEASANT_CAPACITY;
+        return world.population.count > PEASANT_RENDER_CONFIG.initialCapacity;
       },
       20000,
     );

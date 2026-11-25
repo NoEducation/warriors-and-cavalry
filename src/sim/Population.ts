@@ -1,6 +1,7 @@
-// The camp's peasants: arrivals and leaving, jobs at production buildings, and their trips.
+// The camp's peasants: arrivals and leaving, jobs at production buildings, their trips and where idle ones wait.
 import { Arrivals } from './Arrivals';
 import type { Economy } from './Economy';
+import { IdleStands } from './IdleStands';
 import { Jobs } from './Jobs';
 import type { MapObject } from './MapObject';
 import { Peasant } from './Peasant';
@@ -8,10 +9,8 @@ import type { PeasantView } from './PeasantView';
 import { PeasantWalker } from './PeasantWalker';
 import type { PopulationHost } from './PopulationHost';
 import type { ProductionOutput, ProductionState } from './Production';
-import type { TileCoord } from './TileCoord';
+import { StoragePlaces } from './StoragePlaces';
 import { WorkerTrips } from './WorkerTrips';
-
-export type { PopulationHost } from './PopulationHost';
 
 /** Population totals for the UI. */
 export interface PopulationSummary {
@@ -25,16 +24,19 @@ export class Population {
   private readonly byId = new Map<number, Peasant>();
   private readonly arrivals: Arrivals;
   private readonly jobs = new Jobs();
-  private readonly walker: PeasantWalker;
+  private readonly stores: StoragePlaces;
   private readonly trips: WorkerTrips;
+  private readonly stands: IdleStands;
   private nextId = 1;
 
   /** Peasants living in `world`, paying for arrivals from `economy` and delivering their work into it. */
   public constructor(world: PopulationHost, economy: Economy) {
     const isWalkable = (tx: number, ty: number): boolean => world.isWalkable(tx, ty);
-    this.walker = new PeasantWalker(world.map.width, world.map.height, isWalkable);
+    const walker = new PeasantWalker(world.map.width, world.map.height, isWalkable);
     this.arrivals = new Arrivals(world, economy);
-    this.trips = new WorkerTrips(world, economy, this.jobs, this.walker);
+    this.stores = new StoragePlaces(world);
+    this.trips = new WorkerTrips(world, this.stores, economy, this.jobs, walker);
+    this.stands = new IdleStands(world, walker, this.byId, () => this.arrivals.keep);
   }
 
   /** Number of peasants. */
@@ -47,11 +49,9 @@ export class Population {
     return this.arrivals.housing;
   }
 
-  /** Number of peasants without anything to do. */
+  /** Number of peasants without anything to do: every peasant without a job. */
   public get idleCount(): number {
-    let idle = 0;
-    for (const p of this.byId.values()) if (p.state === 'idle') idle++;
-    return idle;
+    return this.byId.size - this.jobs.filledCount;
   }
 
   /** Ticks counted toward the next arrival; 0 while nobody can arrive. */
@@ -68,7 +68,7 @@ export class Population {
   public buildingAdded(object: MapObject): void {
     this.arrivals.buildingAdded(object);
     this.jobs.buildingAdded(object);
-    this.trips.buildingAdded(object);
+    this.stores.buildingAdded(object);
   }
 
   /**
@@ -79,11 +79,14 @@ export class Population {
     this.arrivals.buildingRemoved(object);
     const worker = this.jobs.buildingRemoved(object);
     if (worker) this.trips.stop(worker);
-    this.trips.buildingRemoved(object);
+    this.stores.buildingRemoved(object);
     this.leaveUntilHoused();
   }
 
-  /** Advances one tick: arrivals and leaving, then job assignment, then every peasant's trip in ascending id order. */
+  /**
+   * Advances one tick: arrivals and leaving, then job assignment, then every peasant in ascending id order (idle
+   * ones at their stands, workers on their trips).
+   */
   public tick(): void {
     const tile = this.arrivals.tick(this.byId.size);
     if (tile) {
@@ -92,7 +95,10 @@ export class Population {
     }
     this.leaveUntilHoused();
     this.assignJobs();
-    for (const p of this.byId.values()) this.trips.tick(p);
+    for (const p of this.byId.values()) {
+      if (p.state === 'idle') this.stands.tick(p);
+      else this.trips.tick(p);
+    }
   }
 
   /** Whether the worker of building `buildingId` is at work there now. Production advances only then. */
@@ -108,23 +114,20 @@ export class Population {
     }
   }
 
-  /** `own` (a building's production state) with the status its job adds; null stays null. */
+  /**
+   * `own` (a building's production state) with the status its job adds; null stays null. A building whose carrier
+   * cannot reach any storage place for its load shows `workerCannotReach`.
+   */
   public withJobStatus(buildingId: number, own: ProductionState | null): ProductionState | null {
-    return own && { ...own, status: this.jobs.status(buildingId, own.status) };
+    if (!own) return null;
+    const worker = this.jobs.worker(buildingId);
+    if (worker && this.trips.isStranded(worker)) return { ...own, status: 'workerCannotReach' };
+    return { ...own, status: this.jobs.status(buildingId, own.status) };
   }
 
   /** Ticks the building `buildingId` is still skipped by job assignment after a failed search; 0 when not skipped. */
   public jobSkipTicks(buildingId: number): number {
     return this.jobs.skipTicks(buildingId);
-  }
-
-  /**
-   * Sends `peasant` toward the nearest of `goals` along a found path, from the tile it stands on (or, mid-step, the
-   * tile it is stepping onto). Returns false, and leaves it without a walk, when no goal is reachable. For tests.
-   */
-  public walkTo(peasant: PeasantView, goals: readonly TileCoord[]): boolean {
-    const p = this.byId.get(peasant.id);
-    return p !== undefined && this.walker.walkTo(p, goals);
   }
 
   /** Each idle peasant, in ascending id order, takes the lowest-id vacant job that is not skipped. */

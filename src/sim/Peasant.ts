@@ -1,4 +1,5 @@
 // One peasant: its state and every change to it, each a named transition.
+import { POPULATION_CONFIG } from './populationConfig';
 import type { TileCoord } from './TileCoord';
 import type { Load, PeasantState, PeasantView } from './PeasantView';
 
@@ -22,7 +23,7 @@ export class Peasant implements PeasantView {
   private _waitTicks = 0;
   private _path = NO_TILES;
   private _pathIndex = 0;
-  private _goals = NO_TILES;
+  private _stand: TileCoord | null = null;
 
   /** A new, idle peasant standing on tile (tx, ty). */
   public constructor(public readonly id: number, tx: number, ty: number) {
@@ -43,12 +44,19 @@ export class Peasant implements PeasantView {
   public get waitTicks(): number { return this._waitTicks; }
   public get path(): readonly TileCoord[] { return this._path; }
   public get pathIndex(): number { return this._pathIndex; }
-  public get goals(): readonly TileCoord[] { return this._goals; }
+  public get stand(): TileCoord | null { return this._stand; }
 
-  /** idle -> toWork: takes the job at building `buildingId` and heads there. */
+  /** idle -> toWork: takes the job at building `buildingId` and heads there, giving up its stand and any wait. */
   public takeJob(buildingId: number): void {
     this._workplaceId = buildingId;
     this._state = 'toWork';
+    this._stand = null;
+    this._waitTicks = 0;
+  }
+
+  /** While idle: makes `tile` the tile it stands on or heads for; null to give its stand up. */
+  public standOn(tile: TileCoord | null): void {
+    this._stand = tile;
   }
 
   /** toWork or toWorkBack -> working: stands at its workplace, so the building's production advances. */
@@ -76,19 +84,23 @@ export class Peasant implements PeasantView {
     return load;
   }
 
-  /** Any state -> idle: drops its job, load, target, wait and walk where it stands; a step under way is finished. */
+  /**
+   * Any state -> idle: drops its job, load, target, stand, wait and walk where it stands; a step under way is
+   * finished.
+   */
   public goIdle(): void {
     this._state = 'idle';
     this._workplaceId = null;
     this._load = null;
     this._targetId = null;
+    this._stand = null;
     this._waitTicks = 0;
-    this.startWalk(NO_TILES, NO_TILES);
+    this.startWalk(NO_TILES);
   }
 
-  /** Waits `ticks` ticks before searching again (after a failed search). */
-  public wait(ticks: number): void {
-    this._waitTicks = ticks;
+  /** After a failed search: waits `retryTicks` plus `id % retrySpread` ticks before searching again. */
+  public waitToRetry(): void {
+    this._waitTicks = POPULATION_CONFIG.retryTicks + (this.id % POPULATION_CONFIG.retrySpread);
   }
 
   /** Counts a wait down by one tick; true when the wait has just ended. Call only while waiting. */
@@ -96,11 +108,10 @@ export class Peasant implements PeasantView {
     return --this._waitTicks === 0;
   }
 
-  /** Replaces the current walk with `path` toward `goals` (both empty to stop after the current step). */
-  public startWalk(path: readonly TileCoord[], goals: readonly TileCoord[]): void {
+  /** Replaces the current walk with `path` (empty to stop after the current step). */
+  public startWalk(path: readonly TileCoord[]): void {
     this._path = path;
     this._pathIndex = 0;
-    this._goals = goals;
   }
 
   /** Starts the step onto the next tile of its walk, taking `ticks` ticks. Call only between steps, with tiles left. */

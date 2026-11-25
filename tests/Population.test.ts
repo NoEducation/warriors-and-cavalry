@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Economy } from '../src/sim/Economy';
-import { Footprint } from '../src/sim/Footprint';
 import { GameMap } from '../src/sim/GameMap';
 import type { MapObject } from '../src/sim/MapObject';
 import { OBJECT_KINDS, ObjectKind } from '../src/sim/ObjectKind';
-import type { PeasantView } from '../src/sim/PeasantView';
-import { Population, type PopulationHost } from '../src/sim/Population';
 import { POPULATION_CONFIG } from '../src/sim/populationConfig';
 import { ResourceKind, resources } from '../src/sim/ResourceKind';
-import type { TileCoord } from '../src/sim/TileCoord';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
 import type { CommandResult } from '../src/sim/WorldCommand';
+import { worldChecksum } from '../src/sim/worldChecksum';
 
 const SIZE = 16;
 
@@ -49,6 +46,7 @@ describe('POPULATION_CONFIG', () => {
       arrivalTicks: 50,
       arrivalFoodCost: 5,
       retryTicks: 50,
+      retrySpread: 8,
       unreachableSkipTicks: 200,
       straightStepTicks: 4,
       diagonalStepTicks: 6,
@@ -161,96 +159,42 @@ describe('World population: leaving', () => {
   });
 });
 
-/** A Population on an open 16 x 16 map with a Keep at (0, 0); `blocked` tiles (and the Keep) are not walkable. */
-function walkingSetup(): { population: Population; blocked: Set<number>; peasant: PeasantView } {
-  const map = flatMap();
-  const blocked = new Set<number>();
-  const keep: MapObject = { id: 1, kind: ObjectKind.Keep, tx: 0, ty: 0 };
-  for (const tile of Footprint.of(keep.kind, keep.tx, keep.ty).tiles()) blocked.add(tile.ty * SIZE + tile.tx);
-  const isWalkable = (tx: number, ty: number): boolean => map.inBounds(tx, ty) && !blocked.has(ty * SIZE + tx);
-  const host: PopulationHost = {
-    map,
-    isWalkable,
-    accessTiles: (id: number): TileCoord[] =>
-      id !== keep.id ? [] : [...Footprint.of(keep.kind, 0, 0).edgeNeighbours()].filter((t) => isWalkable(t.tx, t.ty)),
-    objectById: (id: number): MapObject | undefined => (id === keep.id ? keep : undefined),
-    objects: (): Iterable<MapObject> => [keep],
-  };
-  // Food for exactly one arrival, so no other peasant appears during the walks.
-  const population = new Population(host, new Economy(resources(0, 0, 5)));
-  population.buildingAdded(keep);
-  ticks(population, 50);
-  const [peasant] = [...population.peasants()];
-  expect(peasant).toMatchObject({ tx: 0, ty: 4 });
-  return { population, blocked, peasant };
+
+/** Where each peasant stands, as "tx,ty". */
+const tilesOf = (world: World): string[] => [...world.peasants()].map((p) => `${p.tx},${p.ty}`);
+
+/** A Keep at (2, 2) (its first ring: bottom row 6, right column 6, ...), a Hovel and six idle peasants, settled. */
+function idleCamp(): World {
+  const world = new World(flatMap(), new Economy(resources(100, 40, 30)));
+  place(world, ObjectKind.Keep, 2, 2);
+  place(world, ObjectKind.Hovel, 10, 10);
+  ticks(world, 6 * 50 + 40);
+  return world;
 }
 
-/** Ticks until the peasant stands on `goal` (at most 200 ticks); returns the ticks taken and every tile entered. */
-function walk(population: Population, goal: TileCoord): { ticksTaken: number; entered: TileCoord[] } {
-  const entered: TileCoord[] = [];
-  for (let n = 1; n <= 200; n++) {
-    const before = [...population.peasants()][0];
-    const from = { tx: before.tx, ty: before.ty };
-    population.tick();
-    const p = [...population.peasants()][0];
-    if (p.tx !== from.tx || p.ty !== from.ty) entered.push({ tx: p.tx, ty: p.ty });
-    if (p.tx === goal.tx && p.ty === goal.ty) {
-      expect(p).toMatchObject({ nextTx: goal.tx, nextTy: goal.ty, stepProgress: 0, stepTicks: 0 });
-      return { ticksTaken: n, entered };
-    }
-  }
-  throw new Error('walk did not end');
-}
-
-describe('Population walking', () => {
-  it('takes 4 ticks per straight step, counting stepProgress up within a step', () => {
-    const { population, peasant } = walkingSetup();
-    expect(population.walkTo(peasant, [{ tx: 3, ty: 4 }])).toBe(true);
-    population.tick();
-    expect([...population.peasants()][0]).toMatchObject({
-      tx: 0, ty: 4, nextTx: 1, nextTy: 4, stepProgress: 1, stepTicks: 4,
-    });
-    ticks(population, 2);
-    expect([...population.peasants()][0]).toMatchObject({ tx: 0, stepProgress: 3 });
-    population.tick();
-    expect([...population.peasants()][0]).toMatchObject({ tx: 1, ty: 4, stepProgress: 0 });
-    const { ticksTaken } = walk(population, { tx: 3, ty: 4 });
-    expect(4 + ticksTaken).toBe(12);
-    ticks(population, 10);
-    expect([...population.peasants()][0]).toMatchObject({ tx: 3, ty: 4, nextTx: 3, nextTy: 4, stepTicks: 0 });
+describe('World population: idle peasants', () => {
+  it('stands idle peasants on distinct tiles around the Keep, ring by ring in a fixed order', () => {
+    const world = idleCamp();
+    const peasants = [...world.peasants()];
+    expect(peasants).toHaveLength(6);
+    expect(peasants.every((p) => p.state === 'idle' && p.stepTicks === 0)).toBe(true);
+    // Bottom edge left to right, then the right edge from the top.
+    expect(tilesOf(world).sort()).toEqual(['2,6', '3,6', '4,6', '5,6', '6,2', '6,3'].sort());
+    ticks(world, 100);
+    expect(tilesOf(world).sort()).toEqual(['2,6', '3,6', '4,6', '5,6', '6,2', '6,3'].sort());
   });
 
-  it('takes 6 ticks per diagonal step', () => {
-    const { population, peasant } = walkingSetup();
-    population.walkTo(peasant, [{ tx: 2, ty: 6 }]);
-    population.tick();
-    expect([...population.peasants()][0]).toMatchObject({ nextTx: 1, nextTy: 5, stepTicks: 6 });
-    const { ticksTaken } = walk(population, { tx: 2, ty: 6 });
-    expect(1 + ticksTaken).toBe(12);
-  });
-
-  it('re-routes when the next tile of its path is built over, and still arrives', () => {
-    const { population, blocked, peasant } = walkingSetup();
-    population.walkTo(peasant, [{ tx: 6, ty: 4 }]);
-    population.tick(); // stepping onto (1, 4); (2, 4) is next
-    blocked.add(4 * SIZE + 2);
-    const { entered } = walk(population, { tx: 6, ty: 4 });
-    expect(entered).not.toContainEqual({ tx: 2, ty: 4 });
-    expect(entered.length).toBeGreaterThan(6); // the straight route enters 6 tiles
-  });
-
-  it('walks off a tile that became covered by a building', () => {
-    const { population, blocked, peasant } = walkingSetup();
-    blocked.add(4 * SIZE + 0);
-    expect(population.walkTo(peasant, [{ tx: 3, ty: 4 }])).toBe(true);
-    const { ticksTaken } = walk(population, { tx: 3, ty: 4 });
-    expect(ticksTaken).toBe(12);
-  });
-
-  it('reports false and stays put when no goal is reachable', () => {
-    const { population, peasant } = walkingSetup();
-    expect(population.walkTo(peasant, [{ tx: 1, ty: 1 }])).toBe(false);
-    population.tick();
-    expect([...population.peasants()][0]).toMatchObject({ tx: 0, ty: 4, stepTicks: 0 });
+  it('moves idle peasants off tiles a building is placed on, onto free tiles', () => {
+    const run = (): World => {
+      const world = idleCamp();
+      place(world, ObjectKind.Hovel, 3, 6); // covers (3, 6) and (4, 6), where two peasants stand
+      ticks(world, 20);
+      return world;
+    };
+    const world = run();
+    const peasants = [...world.peasants()];
+    expect(peasants.every((p) => p.stepTicks === 0 && world.isWalkable(p.tx, p.ty))).toBe(true);
+    expect(new Set(tilesOf(world)).size).toBe(6);
+    expect(worldChecksum(world)).toBe(worldChecksum(run()));
   });
 });

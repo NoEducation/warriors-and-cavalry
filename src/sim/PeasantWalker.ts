@@ -1,4 +1,4 @@
-// Moves peasants along found paths, one timed step at a time, searching again when the way is built over.
+// Moves peasants along found paths, one timed step at a time. Deciding when to search again is the caller's job.
 import type { Peasant } from './Peasant';
 import { type IsWalkable, PathFinder } from './PathFinder';
 import { POPULATION_CONFIG } from './populationConfig';
@@ -19,24 +19,29 @@ export class PeasantWalker {
    */
   public walkTo(p: Peasant, goals: readonly TileCoord[]): boolean {
     const path = this.pathFinder.find({ tx: p.nextTx, ty: p.nextTy }, goals, this.isWalkable);
-    p.startWalk(path ?? [], path ? goals : []);
+    p.startWalk(path ?? []);
     return path !== null;
   }
 
-  /** Advances `p`'s walk by one tick, starting its next step first when it is between steps. */
+  /**
+   * True when `p` is between steps and the next tile of its walk is no longer walkable (built over since the search),
+   * so it will not move until its walk is replaced. Check before `tick` to search again in time.
+   */
+  public isNextStepBlocked(p: Peasant): boolean {
+    if (p.stepTicks > 0 || p.pathIndex >= p.path.length) return false;
+    const next = p.path[p.pathIndex];
+    return !this.isWalkable(next.tx, next.ty);
+  }
+
+  /** Advances `p`'s walk by one tick, starting its next step first when it is between steps and the way is open. */
   public tick(p: Peasant): void {
     if (p.stepTicks === 0 && !this.startStep(p)) return;
     p.advanceStep();
   }
 
-  /**
-   * Starts the step onto the next tile of the walk; when that tile is no longer walkable, searches again from here
-   * toward the same goals first. False when there is no step to take.
-   */
+  /** Starts the step onto the next tile of the walk. False when there is none, or it is no longer walkable. */
   private startStep(p: Peasant): boolean {
-    if (p.pathIndex >= p.path.length) return false;
-    const next = p.path[p.pathIndex];
-    if (!this.isWalkable(next.tx, next.ty) && (!this.walkTo(p, p.goals) || p.path.length === 0)) return false;
+    if (p.pathIndex >= p.path.length || this.isNextStepBlocked(p)) return false;
     const { tx, ty } = p.path[p.pathIndex];
     const diagonal = tx !== p.tx && ty !== p.ty;
     p.stepToNextTile(diagonal ? POPULATION_CONFIG.diagonalStepTicks : POPULATION_CONFIG.straightStepTicks);

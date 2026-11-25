@@ -10,6 +10,13 @@ export class Jobs {
   private readonly workers = new Map<number, Peasant | null>();
   /** Ticks each skipped building stays skipped, by building id. */
   private readonly skipped = new Map<number, number>();
+  /** Jobs that have a worker. */
+  private filled = 0;
+
+  /** Number of jobs that have a worker; every other peasant is idle. */
+  public get filledCount(): number {
+    return this.filled;
+  }
 
   /** Call for every object added to the world: a producing building gets a vacant job. */
   public buildingAdded(object: MapObject): void {
@@ -24,6 +31,7 @@ export class Jobs {
     const worker = this.workers.get(object.id) ?? null;
     this.workers.delete(object.id);
     this.skipped.delete(object.id);
+    if (worker) this.filled--;
     return worker;
   }
 
@@ -44,6 +52,7 @@ export class Jobs {
   /** Gives the vacant job at `buildingId` to the idle `peasant`, who heads there (`toWork`). */
   public take(buildingId: number, peasant: Peasant): void {
     this.workers.set(buildingId, peasant);
+    this.filled++;
     peasant.takeJob(buildingId);
   }
 
@@ -55,6 +64,7 @@ export class Jobs {
     const id = peasant.workplaceId;
     if (id === null || this.workers.get(id) !== peasant) return;
     this.workers.set(id, null);
+    this.filled--;
     if (skip) this.skipped.set(id, POPULATION_CONFIG.unreachableSkipTicks);
   }
 

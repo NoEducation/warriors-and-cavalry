@@ -1,37 +1,26 @@
 // A worker's trips: walking to work, carrying each batch to the nearest storage place, and walking back.
 import type { Economy } from './Economy';
 import type { Jobs } from './Jobs';
-import type { MapObject } from './MapObject';
+
 import type { Peasant } from './Peasant';
 import type { PeasantWalker } from './PeasantWalker';
 import type { Load } from './PeasantView';
 import type { PopulationHost } from './PopulationHost';
-import { POPULATION_CONFIG } from './populationConfig';
-import { StoragePlaces } from './StoragePlaces';
+import type { StoragePlaces } from './StoragePlaces';
 import type { TileCoord } from './TileCoord';
 
 export class WorkerTrips {
-  private readonly stores: StoragePlaces;
-
-  /** Trips in `world`, delivering into `economy`; `jobs` is told when a worker gives its job up. */
+  /**
+   * Trips in `world` to the storage places `stores`, delivering into `economy`; `jobs` is told when a worker
+   * gives its job up. A carrier whose target storage place is removed re-targets on its next tick.
+   */
   public constructor(
     private readonly world: PopulationHost,
+    private readonly stores: StoragePlaces,
     private readonly economy: Economy,
     private readonly jobs: Jobs,
     private readonly walker: PeasantWalker,
-  ) {
-    this.stores = new StoragePlaces(world);
-  }
-
-  /** Call for every object added to the world: remembers storage places. */
-  public buildingAdded(object: MapObject): void {
-    this.stores.buildingAdded(object);
-  }
-
-  /** Call for every object removed from the world: forgets a storage place (its carriers re-target on their tick). */
-  public buildingRemoved(object: MapObject): void {
-    this.stores.buildingRemoved(object);
-  }
+  ) {}
 
   /** Gives the idle `p` the vacant job at `buildingId` and sends it there; with no path it gives the job up. */
   public startWork(p: Peasant, buildingId: number): void {
@@ -51,18 +40,27 @@ export class WorkerTrips {
     p.goIdle();
   }
 
-  /** Advances `p` by one tick of what its state has it do. Call once per tick per peasant, in ascending id order. */
+  /**
+   * True when `p` carries a load, waits after a failed search and a storage place for its load stands: one exists,
+   * but it cannot reach it.
+   */
+  public isStranded(p: Peasant): boolean {
+    return p.state === 'toStore' && p.waitTicks > 0 && p.load !== null && this.stores.anyFor(p.load.resource);
+  }
+
+  /**
+   * Advances the worker `p` by one tick of what its state has it do (idle peasants are `IdleStands`' business).
+   * Call once per tick per peasant, in ascending id order.
+   */
   public tick(p: Peasant): void {
     switch (p.state) {
-      case 'idle':
-        this.walker.tick(p); // only finishes a step under way
+      case 'idle': // see IdleStands
+      case 'working': // stands at work; production hands it each finished batch (see `carry`)
         break;
       case 'toWork':
       case 'toWorkBack':
         this.tickToWork(p);
         break;
-      case 'working':
-        break; // stands at work; production hands it each finished batch (see `carry`)
       case 'toStore':
         this.tickToStore(p);
         break;
@@ -110,10 +108,7 @@ export class WorkerTrips {
 
   /** True when `p`'s walk is no good any more: its delivery target is gone, or the next tile was built over. */
   private needsNewPath(p: Peasant): boolean {
-    if (p.state === 'toStore' && !this.stores.has(p.targetId)) return true;
-    if (p.stepTicks > 0 || p.pathIndex >= p.path.length) return false;
-    const next = p.path[p.pathIndex];
-    return !this.world.isWalkable(next.tx, next.ty);
+    return (p.state === 'toStore' && !this.stores.has(p.targetId)) || this.walker.isNextStepBlocked(p);
   }
 
   /** True when `p` stands at the end of its walk (no step under way, no tile left) and is not waiting to search. */
@@ -136,7 +131,7 @@ export class WorkerTrips {
     for (const candidate of candidates) goals.push(...candidate.tiles);
     p.setTarget(null);
     if (!this.walker.walkTo(p, goals)) {
-      p.wait(POPULATION_CONFIG.retryTicks);
+      p.waitToRetry();
       return;
     }
     const end = p.path.length > 0 ? p.path[p.path.length - 1] : { tx: p.nextTx, ty: p.nextTy };

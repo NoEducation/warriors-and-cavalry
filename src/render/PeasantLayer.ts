@@ -7,8 +7,11 @@ import { PeasantGeometryFactory } from './PeasantGeometryFactory';
 import { PeasantTracks } from './PeasantTracks';
 import type { WorldLayer } from './WorldLayer';
 
-/** Peasants the meshes have room for at first; the room doubles whenever more are needed. */
-export const PEASANT_CAPACITY = 256;
+/** Tunable values for drawing peasants; frozen, tune by editing the source. */
+export const PEASANT_RENDER_CONFIG = Object.freeze({
+  /** Peasants the meshes have room for at first; the room doubles whenever more are needed. */
+  initialCapacity: 256,
+});
 
 /** Bundle colour per carried resource. */
 const BUNDLE_COLORS: Record<ResourceKind, THREE.Color> = {
@@ -28,7 +31,7 @@ export class PeasantLayer implements WorldLayer {
   private readonly bundleMaterial = new THREE.MeshLambertMaterial({ flatShading: true });
   private bodies: THREE.InstancedMesh;
   private bundles: THREE.InstancedMesh;
-  private capacity = PEASANT_CAPACITY;
+  private capacity = PEASANT_RENDER_CONFIG.initialCapacity;
   /** Each peasant's positions at the last two ticks and the way it last walked. */
   private readonly tracks = new PeasantTracks();
   private readonly position = new THREE.Vector3();

@@ -158,7 +158,17 @@ States: `idle`, `toWork`, `working`, `toStore`, `toWorkBack`.
 - A peasant standing on a tile that became unwalkable may still search from
   it (the start tile is exempt from the walkable rule).
 - When no path exists, the peasant waits where it is and tries again every
-  50 ticks; its building shows `worker cannot reach`.
+  50 ticks; its building shows `worker cannot reach`. Peasant `id` waits
+  `id % 8` ticks more, so peasants stranded together do not all search on one
+  tick. *(Revised in the final review.)*
+- Only the trip decides when to search again (and always works the goal tiles
+  out again); the walker itself never searches.
+- **Idle peasants** stand on distinct tiles: each walks to the first free
+  walkable tile around the Keep (ring by ring around its footprint; per ring
+  the bottom side left to right, right side top to bottom, top side, left
+  side, then the corners) that no other idle peasant stands on or heads for,
+  and stays there. If that tile is built over, it moves to a new free one.
+  *(Added in the final review.)*
 - **Building access**: a building's **access tiles** are the walkable tiles
   sharing an edge with its footprint. A search for a building has all of them
   as goals, and a peasant standing on any of them has arrived. A building with
