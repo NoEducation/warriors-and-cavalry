@@ -138,9 +138,11 @@ States: `idle`, `toWork`, `working`, `toStore`, `toWorkBack`.
   walkable (no corner cutting).
 - **Walkable**: inside the map, not `Water`, and not covered by a building.
   Trees and empty `Rock`, `Sand` and `Grass` tiles are walkable.
-- The heuristic is the octile distance. Ties are broken by a fixed order (the
-  node with the lower `ty * width + tx` first) so the same inputs always give
-  the same path.
+- The heuristic is the octile distance. Ties in the open set are broken by a
+  fixed order — the node with the larger cost so far first, then the lower
+  `ty * width + tx` — so the same inputs always give the same path and a
+  diagonal search does not expand every equally cheap route. *(Builder call,
+  revised during Task 1.)*
 - **Search limit**: a search stops after expanding `PATH_CONFIG.maxExpanded`
   tiles (start value 65 536, a quarter of the map) and reports "no path". This
   bounds the worst case on the 512 × 512 map while still reaching buildings
