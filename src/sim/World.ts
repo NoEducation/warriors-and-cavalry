@@ -4,17 +4,14 @@ import { Footprint } from './Footprint';
 import type { GameMap } from './GameMap';
 import type { MapObject } from './MapObject';
 import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
+import { ObjectIndex } from './ObjectIndex';
 import { checkPlacement } from './placementRules';
 import { Production, type ProductionState } from './Production';
 import type { TileCoord } from './TileCoord';
-import { TileType } from './tiles';
 import type { CommandResult, PlacementCheck, WorldChange, WorldCommand } from './WorldCommand';
 
 export class World {
-  /** Object id per tile (index ty*width+tx); 0 means free. */
-  private readonly occupancy: Int32Array;
-  /** Ids only increase and are never reused, so insertion order is ascending id order. */
-  private readonly byId = new Map<number, MapObject>();
+  private readonly index: ObjectIndex;
   private readonly listeners = new Set<(change: WorldChange) => void>();
   private readonly production: Production;
   private nextId = 1;
@@ -22,7 +19,7 @@ export class World {
 
   /** Creates a world with no objects on `map`, holding `economyState` (by default the usual start amounts). */
   public constructor(public readonly map: GameMap, private readonly economyState: Economy = new Economy()) {
-    this.occupancy = new Int32Array(map.width * map.height);
+    this.index = new ObjectIndex(map);
     const isTreeAt = (tx: number, ty: number): boolean => this.objectAt(tx, ty)?.kind === ObjectKind.Tree;
     this.production = new Production(map, economyState, isTreeAt);
   }
@@ -58,35 +55,32 @@ export class World {
 
   /** Number of objects currently in the world. */
   public get objectCount(): number {
-    return this.byId.size;
+    return this.index.count;
+  }
+
+  /** The object with `id`, or undefined when there is none. */
+  public objectById(id: number): MapObject | undefined {
+    return this.index.objectById(id);
   }
 
   /** The object covering tile (tx, ty), or undefined when the tile is free or outside the map. */
   public objectAt(tx: number, ty: number): MapObject | undefined {
-    if (!this.map.inBounds(tx, ty)) return undefined;
-    const id = this.occupancy[ty * this.map.width + tx];
-    return id === 0 ? undefined : this.byId.get(id);
+    return this.index.objectAt(tx, ty);
   }
 
   /** Whether a walker may stand on tile (tx, ty): inside the map, not water, and free or a tree. */
   public isWalkable(tx: number, ty: number): boolean {
-    const tile = this.map.tileAt(tx, ty);
-    if (tile === undefined || tile === TileType.Water) return false;
-    const object = this.objectAt(tx, ty);
-    return object === undefined || object.kind === ObjectKind.Tree;
+    return this.index.isWalkable(tx, ty);
   }
 
   /** The walkable tiles sharing an edge with object `objectId`, row by row; [] for an unknown id. */
   public accessTiles(objectId: number): TileCoord[] {
-    const object = this.byId.get(objectId);
-    if (!object) return [];
-    const edge = Footprint.of(object.kind, object.tx, object.ty).edgeNeighbours();
-    return [...edge].filter((tile) => this.isWalkable(tile.tx, tile.ty));
+    return this.index.accessTiles(objectId);
   }
 
   /** All objects in ascending id order. Do not add or remove objects while iterating. */
   public objects(): Iterable<MapObject> {
-    return this.byId.values();
+    return this.index.objects();
   }
 
   /**
@@ -94,7 +88,7 @@ export class World {
    * (see `checkPlacement`). Does not look at resources. An unknown `kind` is reported as NotBuildable.
    */
   public canPlace(kind: ObjectKind, tx: number, ty: number): PlacementCheck {
-    return checkPlacement(this.map, kind, tx, ty, (footprint) => this.isFree(footprint));
+    return checkPlacement(this.map, kind, tx, ty, (footprint) => this.index.isFree(footprint));
   }
 
   /** Executes a player command. On failure, including a malformed command, nothing changes and no listener is called. */
@@ -121,7 +115,7 @@ export class World {
   public spawn(kind: ObjectKind, tx: number, ty: number): MapObject {
     const footprint = Footprint.of(kind, tx, ty);
     if (!footprint.inBounds(this.map)) throw new RangeError(`footprint at (${tx}, ${ty}) out of bounds`);
-    if (!this.isFree(footprint)) throw new RangeError(`footprint at (${tx}, ${ty}) occupied`);
+    if (!this.index.isFree(footprint)) throw new RangeError(`footprint at (${tx}, ${ty}) occupied`);
     return this.add(kind, tx, ty);
   }
 
@@ -136,13 +130,12 @@ export class World {
 
   /** Removes the object, then refunds part of its cost into the capacity that remains. */
   private demolish(objectId: number): CommandResult {
-    const object = this.byId.get(objectId);
+    const object = this.index.objectById(objectId);
     if (!object) return { ok: false, reason: 'UnknownObject' };
     const info = OBJECT_KINDS[object.kind];
     if (!info.buildable) return { ok: false, reason: 'NotDemolishable' };
     // Fixed order: occupancy -> capacity (and refund) -> production -> listeners, so listeners see the final state.
-    this.fill(Footprint.of(object.kind, object.tx, object.ty), 0);
-    this.byId.delete(objectId);
+    this.index.remove(object);
     this.economyState.removeCapacity(info.storage);
     this.economyState.refund(info.cost);
     this.production.removed(object);
@@ -154,25 +147,11 @@ export class World {
   private add(kind: ObjectKind, tx: number, ty: number): MapObject {
     const object: MapObject = Object.freeze({ id: this.nextId++, kind, tx, ty });
     // Fixed order: occupancy -> capacity -> production -> listeners, so listeners see the final state.
-    this.byId.set(object.id, object);
-    this.fill(Footprint.of(kind, tx, ty), object.id);
+    this.index.insert(object);
     this.economyState.addCapacity(OBJECT_KINDS[kind].storage);
     this.production.added(object);
     this.notify({ type: 'added', object });
     return object;
-  }
-
-  /** Assumes the footprint is in bounds. */
-  private isFree(footprint: Footprint): boolean {
-    for (const tile of footprint.tiles()) {
-      if (this.occupancy[tile.ty * this.map.width + tile.tx] !== 0) return false;
-    }
-    return true;
-  }
-
-  /** Writes `id` (0 frees) into every tile of an in-bounds footprint. */
-  private fill(footprint: Footprint, id: number): void {
-    for (const tile of footprint.tiles()) this.occupancy[tile.ty * this.map.width + tile.tx] = id;
   }
 
   private notify(change: WorldChange): void {
