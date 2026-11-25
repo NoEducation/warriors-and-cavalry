@@ -3,6 +3,7 @@ import { Economy } from '../src/sim/Economy';
 import { GameMap } from '../src/sim/GameMap';
 import type { MapObject } from '../src/sim/MapObject';
 import { OBJECT_KINDS, ObjectKind } from '../src/sim/ObjectKind';
+import type { PeasantView } from '../src/sim/PeasantView';
 import { POPULATION_CONFIG } from '../src/sim/populationConfig';
 import { ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
@@ -12,9 +13,9 @@ import { worldChecksum } from '../src/sim/worldChecksum';
 
 const SIZE = 16;
 
-function flatMap(): GameMap {
-  const tiles = new Uint8Array(SIZE * SIZE).fill(TileType.Grass);
-  return new GameMap(SIZE, SIZE, 1, new Float32Array((SIZE + 1) * (SIZE + 1)), tiles);
+function flatMap(size = SIZE): GameMap {
+  const tiles = new Uint8Array(size * size).fill(TileType.Grass);
+  return new GameMap(size, size, 1, new Float32Array((size + 1) * (size + 1)), tiles);
 }
 
 function ticks(target: { tick(): void }, n: number): void {
@@ -131,6 +132,32 @@ describe('World population: leaving', () => {
     world.apply({ type: 'demolish', objectId: hovel.id });
     expect(world.population).toEqual({ count: 4, housing: 4, idle: 4 });
     expect([...world.peasants()].map((p) => p.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('sends idle peasants away first, then workers, each by highest id; a leaving carrier loses its load', () => {
+    // Six huts for eight peasants: 1..6 work, 7 and 8 stay idle. No wood at the start, so no hut is at capacity.
+    const world = new World(flatMap(32), new Economy(resources(0, 0, 40)));
+    world.spawn(ObjectKind.Keep, 2, 2);
+    const hovel = world.spawn(ObjectKind.Hovel, 2, 10);
+    for (const tx of [6, 14, 22]) world.spawn(ObjectKind.Tree, tx, 24);
+    const huts = [4, 8, 12, 16, 20, 24].map((tx) => world.spawn(ObjectKind.WoodcutterHut, tx, 20));
+    const byId = (id: number): PeasantView | undefined => [...world.peasants()].find((p) => p.id === id);
+    for (let n = 0; !(world.population.count === 8 && byId(6)?.load); n++) {
+      if (n > 3000) throw new Error('peasant 6 never carried');
+      world.tick();
+    }
+    expect([...world.peasants()].map((p) => p.workplaceId !== null)).toEqual([...Array(6).fill(true), false, false]);
+    expect(world.population).toEqual({ count: 8, housing: 8, idle: 2 });
+    expect(byId(6)?.workplaceId).toBe(huts[5].id);
+    const wood = world.economy.amount(ResourceKind.Wood);
+    world.apply({ type: 'demolish', objectId: hovel.id }); // refunds 7 wood; 4 peasants must leave
+    expect([...world.peasants()].map((p) => p.id)).toEqual([1, 2, 3, 4]);
+    expect(world.population).toEqual({ count: 4, housing: 4, idle: 0 });
+    expect(world.economy.amount(ResourceKind.Wood)).toBe(wood + 7); // the refund only: the load is gone
+    for (const hut of huts.slice(4)) expect(world.productionState(hut.id)?.status).toBe('noWorker');
+    world.tick();
+    expect(world.economy.amount(ResourceKind.Wood)).toBe(wood + 7);
+    for (const hut of huts.slice(4)) expect(world.productionState(hut.id)?.status).toBe('noWorker');
   });
 
   it('frees the job of a working peasant who leaves', () => {

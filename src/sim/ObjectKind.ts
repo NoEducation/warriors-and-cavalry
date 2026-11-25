@@ -45,7 +45,7 @@ export interface ObjectKindInfo {
 /** Shared values of the kinds that neither store, produce nor have extra placement rules. */
 const PLAIN = { storage: NO_RESOURCES, grassOnly: false, needsRock: false, housing: 0, production: null } as const;
 
-/** Freezes alue and every object reachable from it, so no nested table entry can be changed at run time. */
+/** Freezes `value` and every object reachable from it, so no nested table entry can be changed at run time. */
 function deepFreeze<T extends object>(value: T): T {
   for (const child of Object.values(value)) {
     if (typeof child === 'object' && child !== null) deepFreeze(child);

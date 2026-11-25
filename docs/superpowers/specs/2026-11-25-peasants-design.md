@@ -129,8 +129,10 @@ States: `idle`, `toWork`, `working`, `toStore`, `toWorkBack`.
   step progress. A straight step takes 4 ticks, a diagonal step 6 ticks
   (whole-number ticks keep it deterministic; at 10 ticks per second that is
   2.5 tiles per second).
-- The game draws a peasant interpolated between its tile and the next one, and
-  between the last two ticks (smooth even at low tick counts per frame).
+- The game draws each peasant one tick behind the simulation: between where it
+  stood at the previous tick and where it stands at the latest one (its tile
+  centre moved along its step), by the fraction of the current tick, so it
+  moves every frame, also across step boundaries.
 
 ### Pathfinding
 

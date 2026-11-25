@@ -386,7 +386,6 @@ describe('Supply chain determinism and speed', () => {
   it('runs 3000 ticks with 40 peasants quickly', () => {
     const { world, ms } = run(campCommands(9));
     expect(world.population.count).toBe(40);
-    console.log(`supply chain: 3000 ticks with 40 peasants took ${ms.toFixed(1)} ms`);
-    expect(ms).toBeLessThan(500);
+    expect(ms, `supply chain: 3000 ticks with 40 peasants took ${ms.toFixed(1)} ms`).toBeLessThan(500);
   });
 });
