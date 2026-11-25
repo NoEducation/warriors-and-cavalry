@@ -1,7 +1,7 @@
 # Peasants Stage — Peasants, Pathfinding, Supply Chain
 
 Date: 2026-11-25
-Status: draft, waiting for review (builder check done 2026-11-25)
+Status: approved 2026-11-25 (builder check done)
 Builds on: `2026-11-12-economy-design.md` and `AGENTS.md` (all of their rules
 still apply unless this document changes them).
 
