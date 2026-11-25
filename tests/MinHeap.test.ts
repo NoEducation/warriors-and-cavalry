@@ -24,6 +24,17 @@ describe('MinHeap', () => {
     expect(drain(heap)).toEqual([8, 1, 3, 5, 7, 9]);
   });
 
+  it('orders equal keys by the smaller tie, then the smaller node', () => {
+    const heap = new MinHeap();
+    heap.push(1, 10, 5);
+    heap.push(2, 10, -3);
+    heap.push(3, 10, 0);
+    heap.push(0, 10, 0);
+    heap.push(9, 4, 100);
+    heap.push(7, 10, -3);
+    expect(drain(heap)).toEqual([9, 2, 7, 0, 3, 1]);
+  });
+
   it('returns -1 when empty', () => {
     expect(new MinHeap().pop()).toBe(-1);
   });

@@ -49,7 +49,8 @@ export class PathFinder {
   /**
    * The tiles to walk from `start` to the nearest reachable goal, excluding `start` and ending on that goal; `[]` when
    * `start` is a goal; null when `goals` is empty, no goal is reachable or the search exceeds `PATH_CONFIG.maxExpanded`
-   * expansions. The start tile need not be walkable. Ties are broken by the smaller tile index, so it is deterministic.
+   * expansions. The start tile need not be walkable. Among equal f the larger cost so far comes first, then the
+   * smaller tile index, so it is deterministic.
    */
   public find(start: TileCoord, goals: readonly TileCoord[], isWalkable: IsWalkable): TileCoord[] | null {
     this.expanded = 0;
@@ -99,7 +100,8 @@ export class PathFinder {
       this.seen[next] = gen;
       this.cost[next] = cost;
       this.parent[next] = index;
-      this.open.push(next, cost + this.heuristic(nx, ny));
+      // Equal f: the larger cost so far (deeper node) first, then the smaller tile index.
+      this.open.push(next, cost + this.heuristic(nx, ny), -cost);
     }
   }
 

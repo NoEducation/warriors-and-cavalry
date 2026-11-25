@@ -113,14 +113,34 @@ describe('PathFinder', () => {
     expect(elapsed).toBeLessThan(1000);
   });
 
-  it('finds a ~300-tile path on a generated 512 x 512 world quickly', () => {
-    const world = new MapGenerator().generate({ seed: 1, width: 512, height: 512 });
-    const isWalkable = (tx: number, ty: number): boolean => world.isWalkable(tx, ty);
-    const firstWalkable = (from: number, step: number, ty: number): TileCoord => {
-      let tx = from;
-      while (!isWalkable(tx, ty)) tx += step;
-      return t(tx, ty);
-    };
+});
+
+describe('PathFinder on a generated 512 x 512 world', () => {
+  const world = new MapGenerator().generate({ seed: 1, width: 512, height: 512 });
+  const isWalkable = (tx: number, ty: number): boolean => world.isWalkable(tx, ty);
+  /** The first walkable tile in row `ty`, starting at `from` and stepping by `step`. */
+  const firstWalkable = (from: number, step: number, ty: number): TileCoord => {
+    let tx = from;
+    while (!isWalkable(tx, ty)) tx += step;
+    return t(tx, ty);
+  };
+
+  it('expands few tiles beyond the path on a diagonal route', () => {
+    const start = firstWalkable(130, 1, 180);
+    const goal = firstWalkable(400, -1, 330);
+    const finder = new PathFinder(512, 512);
+    const started = performance.now();
+    const path = finder.find(start, [goal], isWalkable);
+    const elapsed = performance.now() - started;
+    expect(path).not.toBeNull();
+    expect(path!.length).toBeGreaterThan(250);
+    expectValidPath(start, path!, isWalkable);
+    expect(path![path!.length - 1]).toEqual(goal);
+    expect(finder.lastExpanded).toBeLessThanOrEqual(3 * path!.length);
+    expect(elapsed).toBeLessThan(200);
+  });
+
+  it('finds a ~300-tile straight path quickly', () => {
     const start = firstWalkable(106, 1, 256);
     const goal = firstWalkable(406, -1, 256);
     expect(goal.tx - start.tx).toBeGreaterThan(250);
