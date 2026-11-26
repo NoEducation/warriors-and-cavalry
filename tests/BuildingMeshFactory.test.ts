@@ -136,3 +136,17 @@ describe('BuildingMeshFactory', () => {
     expect(farm.z).toBeGreaterThan(granary.z);
   });
 });
+
+/** Fewest triangles each building must have, so none stays a handful of plain boxes. */
+const DETAIL_FLOOR: ReadonlyArray<readonly [ObjectKind, number]> = [
+  [ObjectKind.Hovel, 300],
+  [ObjectKind.WoodcutterHut, 300],
+];
+
+describe('building detail', () => {
+  for (const [kind, floor] of DETAIL_FLOOR) {
+    it(`gives the ${OBJECT_KINDS[kind].name} at least ${floor} triangles of detail`, () => {
+      expect(triangleCount(new BuildingMeshFactory().create(kind))).toBeGreaterThanOrEqual(floor);
+    });
+  }
+});
