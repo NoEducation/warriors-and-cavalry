@@ -3,9 +3,12 @@ import type { ResourceKind } from './ResourceKind';
 import type { TileCoord } from './TileCoord';
 
 /** Every peasant state, in checksum order (a state's index is what the checksum covers). */
-export const PEASANT_STATES = Object.freeze(['idle', 'toWork', 'working', 'toStore', 'toWorkBack'] as const);
+export const PEASANT_STATES = Object.freeze(['idle', 'toWork', 'working', 'toStore', 'toWorkBack', 'toTree', 'chopping'] as const);
 
-/** What a peasant is doing: nothing, walking to work, working, carrying to storage or walking back to work. */
+/**
+ * What a peasant is doing: nothing, walking to work, working, carrying to storage, walking back to work, or (a
+ * woodcutter) walking to its tree and chopping it.
+ */
 export type PeasantState = (typeof PEASANT_STATES)[number];
 
 /** Resources a peasant carries. */
@@ -33,6 +36,8 @@ export interface PeasantView {
   readonly workplaceId: number | null;
   /** The storage place it carries its load to; null when not delivering or no storage place is in reach. */
   readonly targetId: number | null;
+  /** The tree a woodcutter walks to or chops; null otherwise. */
+  readonly treeId: number | null;
   /** Ticks left before it searches again after a failed search; 0 when not waiting. */
   readonly waitTicks: number;
   /** The tiles of the current walk; `path[pathIndex]` is the next one to step onto. */

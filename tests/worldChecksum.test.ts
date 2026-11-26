@@ -20,15 +20,16 @@ function flatMap(): GameMap {
 }
 
 /**
- * A flat 48 x 16 world: a tree at (6, 0), a Keep far east at (40, 10) and a Woodcutter's hut at (4, 2); with
- * `stockpile`, a Stockpile at (12, 3), which the worker reaches from the hut by walking straight east.
+ * A flat 48 x 16 world with quarry ground under a Quarry at (4, 1), a Keep far east at (40, 10); with `stockpile`, a
+ * Stockpile at (12, 3), which the worker reaches from the Quarry by walking straight east. A quarry, not a woodcutter,
+ * so no tree is felled: a stump's new object id would make the two worlds of a test differ in more than one field.
  */
 function carrierCamp(economy: Economy, stockpile: boolean): { world: World; keep: MapObject } {
   const tiles = new Uint8Array(48 * 16).fill(TileType.Grass);
+  for (let ty = 1; ty <= 3; ty++) for (let tx = 4; tx <= 6; tx++) tiles[ty * 48 + tx] = TileType.Quarry;
   const world = new World(new GameMap(48, 16, 1, new Float32Array(49 * 17), tiles), economy);
-  world.spawn(ObjectKind.Tree, 6, 0);
   const keep = world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 40, ty: 10 });
-  world.apply({ type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 4, ty: 2 });
+  world.apply({ type: 'placeBuilding', kind: ObjectKind.Quarry, tx: 4, ty: 1 });
   if (stockpile) world.apply({ type: 'placeBuilding', kind: ObjectKind.Stockpile, tx: 12, ty: 3 });
   if (!keep.ok) throw new Error('placement failed');
   return { world, keep: keep.object };
@@ -76,8 +77,8 @@ const peasantOf = (world: World): PeasantView | undefined => [...world.peasants(
 
 /** Every field of a peasant's view, its path cut to the tiles still ahead. */
 function remaining(p: PeasantView): Record<keyof PeasantView, unknown> {
-  const { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, waitTicks } = p;
-  const view = { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, waitTicks };
+  const { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, treeId, waitTicks } = p;
+  const view = { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, treeId, waitTicks };
   return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, stand: p.stand };
 }
 
@@ -232,18 +233,18 @@ describe('worldChecksum', () => {
   });
 
   it('covers the ticks a carrier still waits before searching again', () => {
-    // No storage place after the Keep is demolished, so the carrier waits. B's hut paused 10 ticks (wood at capacity,
-    // spent back down after), so B's carrier started waiting 10 ticks later.
+    // No storage place after the Keep is demolished, so the carrier waits. B's quarry paused 10 ticks (stone at
+    // capacity, spent back down after), so B's carrier started waiting 10 ticks later.
     const run = (pause: boolean): World => {
       const economy = new Economy(resources(100, 40, 5));
       const { world, keep } = carrierCamp(economy, false);
       world.apply({ type: 'placeBuilding', kind: ObjectKind.Hovel, tx: 30, ty: 2 }); // houses the peasant
       tickWhile(world, () => peasantOf(world)?.state !== 'working');
       world.apply({ type: 'demolish', objectId: keep.id });
-      const topUp = economy.capacity(ResourceKind.Wood) - economy.amount(ResourceKind.Wood);
-      if (pause) economy.add(ResourceKind.Wood, topUp);
+      const topUp = economy.capacity(ResourceKind.Stone) - economy.amount(ResourceKind.Stone);
+      if (pause) economy.add(ResourceKind.Stone, topUp);
       for (let i = 0; i < 10; i++) world.tick();
-      if (pause) economy.spend(resources(topUp, 0, 0));
+      if (pause) economy.spend(resources(0, topUp, 0));
       return world;
     };
     const a = run(false);
@@ -277,7 +278,9 @@ describe('worldChecksum', () => {
     // A Hovel stands in the carrier's way while B's carrier searches; A builds and demolishes it before that.
     const hovel = { type: 'placeBuilding', kind: ObjectKind.Hovel, tx: 8, ty: 3 } as const;
     const run = (late: boolean): World => {
-      const { world } = carrierCamp(new Economy(resources(100, 40, 5)), true);
+      const economy = new Economy(resources(100, 40, 5));
+      const { world } = carrierCamp(economy, true);
+      economy.add(ResourceKind.Wood, 20); // the Quarry left too little for the Hovel
       if (!late) demolish(world, world.apply(hovel));
       tickWhile(world, () => peasantOf(world)?.state !== 'working');
       const temp = late ? world.apply(hovel) : null;

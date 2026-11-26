@@ -48,11 +48,16 @@ export class PathFinder {
 
   /**
    * The tiles to walk from `start` to the nearest reachable goal, excluding `start` and ending on that goal; `[]` when
-   * `start` is a goal; null when `goals` is empty, no goal is reachable or the search exceeds `PATH_CONFIG.maxExpanded`
-   * expansions. The start tile need not be walkable. Among equal f the larger cost so far comes first, then the
-   * smaller tile index, so it is deterministic.
+   * `start` is a goal; null when `goals` is empty, no goal is reachable or the search exceeds `maxExpanded` expansions.
+   * Repeated goals count once. The start tile need not be walkable. Among equal f the larger cost so far comes first,
+   * then the smaller tile index, so it is deterministic.
    */
-  public find(start: TileCoord, goals: readonly TileCoord[], isWalkable: IsWalkable): TileCoord[] | null {
+  public find(
+    start: TileCoord,
+    goals: readonly TileCoord[],
+    isWalkable: IsWalkable,
+    maxExpanded: number = PATH_CONFIG.maxExpanded,
+  ): TileCoord[] | null {
     this.expanded = 0;
     if (!this.inGrid(start.tx, start.ty) || !this.markGoals(goals)) return null;
     const gen = this.generation;
@@ -65,7 +70,7 @@ export class PathFinder {
     for (let index = this.open.pop(); index !== -1; index = this.open.pop()) {
       if (this.closed[index] === gen) continue;
       if (this.goal[index] === gen) return this.pathTo(index);
-      if (this.expanded >= PATH_CONFIG.maxExpanded) return null;
+      if (this.expanded >= maxExpanded) return null;
       this.expanded++;
       this.closed[index] = gen;
       this.expand(index, isWalkable);
@@ -105,7 +110,7 @@ export class PathFinder {
     }
   }
 
-  /** Starts a new generation and marks the in-grid goals; false when there are none. */
+  /** Starts a new generation and marks the in-grid goals, each once; false when there are none. */
   private markGoals(goals: readonly TileCoord[]): boolean {
     this.generation++;
     if (goals.length > this.goalX.length) {
@@ -114,7 +119,7 @@ export class PathFinder {
     }
     this.goalCount = 0;
     for (const { tx, ty } of goals) {
-      if (!this.inGrid(tx, ty)) continue;
+      if (!this.inGrid(tx, ty) || this.goal[ty * this.width + tx] === this.generation) continue;
       this.goal[ty * this.width + tx] = this.generation;
       this.goalX[this.goalCount] = tx;
       this.goalY[this.goalCount] = ty;

@@ -96,9 +96,10 @@ describe('Jobs and the supply chain', () => {
     ticks(world, 50);
     expect(peasant(world)).toMatchObject({ state: 'toWork', workplaceId: hut.id, load: null });
     expect(status(world, hut.id)).toBe('workerOnTheWay');
-    tickUntil(world, () => first(world)?.state === 'working');
+    tickUntil(world, () => first(world)?.state === 'toTree');
     expect(onAccess(world, hut.id, peasant(world))).toBe(true);
-    // Production runs after the peasants in a tick, so the tick it arrives in is its first working tick.
+    tickUntil(world, () => first(world)?.state === 'chopping');
+    // Production runs after the peasants in a tick, so the tick it reaches its tree in is its first working tick.
     expect(world.productionState(hut.id)).toEqual({ status: 'working', progress: 1, cycleTicks: 100 });
     const before = wood(world);
     ticks(world, 98);
@@ -112,9 +113,10 @@ describe('Jobs and the supply chain', () => {
     expect(onAccess(world, stockpile.id, peasant(world))).toBe(true);
     expect(peasant(world)).toMatchObject({ state: 'toWorkBack', load: null });
     expect(status(world, hut.id)).toBe('workerDelivering');
+    // The camp's only tree is felled, so back at the hut the worker waits for one.
     tickUntil(world, () => first(world)?.state === 'working');
     expect(onAccess(world, hut.id, peasant(world))).toBe(true);
-    expect(status(world, hut.id)).toBe('working');
+    expect(status(world, hut.id)).toBe('noTrees');
   });
 
   it('delivers to the Keep when there is no Stockpile', () => {
@@ -280,7 +282,7 @@ describe('Jobs and the supply chain', () => {
     const world = new World(flatMap(() => false, 64), new Economy(resources(0, 0, 15)));
     const keep = world.spawn(ObjectKind.Keep, 2, 2);
     world.spawn(ObjectKind.Hovel, 10, 2); // houses the three without the Keep
-    world.spawn(ObjectKind.Tree, 53, 53);
+    for (const [tx, ty] of [[52, 52], [53, 53], [52, 53]]) world.spawn(ObjectKind.Tree, tx, ty); // one per woodcutter
     for (const [tx, ty] of [[50, 50], [54, 50], [50, 54]]) world.spawn(ObjectKind.WoodcutterHut, tx, ty);
     tickUntil(world, () => [...world.peasants()].filter((p) => p.state === 'toStore').length === 3, 3000);
     world.apply({ type: 'demolish', objectId: keep.id });
@@ -382,6 +384,26 @@ describe('Supply chain determinism and speed', () => {
     const workers = [...a.peasants()].filter((p) => p.workplaceId !== null);
     expect(workers).toHaveLength(3);
   });
+
+  it('stays in step over 5000 ticks of woodcutting: equal checksums every 500 ticks, trees felled into stumps', () => {
+    const commands = campCommands(2);
+    const [a, b] = [seedOneWorld(richEconomy()), seedOneWorld(richEconomy())];
+    const trees = (world: World): number => [...world.objects()].filter((o) => o.kind === ObjectKind.Tree).length;
+    const treesAtStart = trees(a);
+    let stumpsSeen = 0;
+    a.onChange((change) => {
+      if (change.type === 'added' && change.object.kind === ObjectKind.Stump) stumpsSeen++;
+    });
+    for (let tick = 0; tick < 5000; tick++) {
+      for (const world of [a, b]) {
+        if (tick % 5 === 0 && tick / 5 < commands.length) world.apply(commands[tick / 5]);
+        world.tick();
+      }
+      if ((tick + 1) % 500 === 0) expect(worldChecksum(a), `tick ${tick + 1}`).toBe(worldChecksum(b));
+    }
+    expect(stumpsSeen).toBeGreaterThan(0);
+    expect(trees(a)).toBeLessThan(treesAtStart);
+  }, 20000);
 
   it('runs 3000 ticks with 40 peasants quickly', () => {
     const { world, ms } = run(campCommands(9));

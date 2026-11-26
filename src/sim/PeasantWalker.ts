@@ -1,6 +1,7 @@
 // Moves peasants along found paths, one timed step at a time. Deciding when to search again is the caller's job.
 import type { Peasant } from './Peasant';
 import { type IsWalkable, PathFinder } from './PathFinder';
+import { PATH_CONFIG } from './pathConfig';
 import { POPULATION_CONFIG } from './populationConfig';
 import type { TileCoord } from './TileCoord';
 
@@ -15,10 +16,10 @@ export class PeasantWalker {
 
   /**
    * Gives `p` a walk toward the nearest of `goals`, from the tile it stands on (or, mid-step, the tile it is stepping
-   * onto). Returns false, and leaves it without a walk, when no goal is reachable.
+   * onto). Returns false, and leaves it without a walk, when no goal is reachable within `maxExpanded` tiles searched.
    */
-  public walkTo(p: Peasant, goals: readonly TileCoord[]): boolean {
-    const path = this.pathFinder.find({ tx: p.nextTx, ty: p.nextTy }, goals, this.isWalkable);
+  public walkTo(p: Peasant, goals: readonly TileCoord[], maxExpanded: number = PATH_CONFIG.maxExpanded): boolean {
+    const path = this.pathFinder.find({ tx: p.nextTx, ty: p.nextTy }, goals, this.isWalkable, maxExpanded);
     p.startWalk(path ?? []);
     return path !== null;
   }

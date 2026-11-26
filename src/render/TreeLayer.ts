@@ -1,10 +1,15 @@
 // Every tree of a world: one instanced mesh per species and square region, so three.js can skip regions out of view.
+// A felled tree tips over and is hidden; trees are never added after the world is generated.
 import * as THREE from 'three';
+import { TICKS_PER_SECOND } from '../sim/gameTime';
 import { ObjectKind } from '../sim/ObjectKind';
 import type { World } from '../sim/World';
+import { FallingTrees } from './FallingTrees';
+import type { TreeSlot } from './TreeShadowLayer';
 import { treeAppearance, type TreeAppearance } from './treeAppearance';
 import { TreeGeometryFactory } from './TreeGeometryFactory';
 import { ALL_TREE_SPECIES, type TreeSpecies } from './TreeSpecies';
+import { WorldChangeQueue } from './WorldChangeQueue';
 import type { WorldLayer } from './WorldLayer';
 
 /** Tree drawing tuning. */
@@ -18,6 +23,7 @@ export const TREE_LAYER_CONFIG = Object.freeze({
 /** The trees of one species in one region, as instance matrices and tints. */
 interface TreeBatch {
   readonly species: TreeSpecies;
+  readonly ids: number[];
   readonly matrices: THREE.Matrix4[];
   readonly tints: number[];
 }
@@ -29,9 +35,18 @@ export class TreeLayer implements WorldLayer {
   // Vertex colours carry trunk and crown colours; three.js multiplies them by the per-instance tint (setColorAt).
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   private readonly meshes: THREE.InstancedMesh[] = [];
+  /** Where each tree is drawn, by tree id. */
+  private readonly slots = new Map<number, TreeSlot>();
+  private readonly falling = new FallingTrees();
+  private readonly changes: WorldChangeQueue;
+  private readonly chopper = new THREE.Vector3();
 
-  /** Builds the meshes for every tree currently in `world`. Reads the world only; call again for a new world. */
+  /**
+   * Builds the meshes for every tree currently in `world` and follows its felled trees from then on. Reads the world
+   * only; call again for a new world.
+   */
   public constructor(world: World) {
+    this.changes = new WorldChangeQueue(world);
     const batches = this.collectBatches(world);
     if (batches.length === 0) return;
     const factory = new TreeGeometryFactory();
@@ -42,11 +57,28 @@ export class TreeLayer implements WorldLayer {
     this.object.add(...this.meshes);
   }
 
-  /** Nothing changes per frame: the trees are built once per world. Part of WorldLayer. */
-  public update(): void {}
+  /**
+   * Starts the fall of each tree removed from `world` since the last call (away from the nearest peasant, its
+   * woodcutter) and poses the falling ones for the current game time. Call once per frame.
+   */
+  public update(world: World, tickFraction: number): void {
+    const time = (world.tickCount + tickFraction) / TICKS_PER_SECOND;
+    this.changes.drain((change) => {
+      const slot = change.type === 'removed' ? this.slots.get(change.object.id) : undefined;
+      if (!slot) return;
+      this.slots.delete(change.object.id);
+      const base = new THREE.Matrix4();
+      slot.mesh.getMatrixAt(slot.index, base);
+      this.falling.start(slot.mesh, slot.index, base, this.nearestPeasant(world, change.object.tx, change.object.ty), time);
+    });
+    this.falling.update(time);
+  }
 
-  /** Removes the meshes and frees the shared geometries, the material and the instance buffers. Call once. */
+  /** Stops following the world, removes the meshes and frees the geometries, the material and the buffers. Once. */
   public dispose(): void {
+    this.changes.dispose();
+    this.falling.clear();
+    this.slots.clear();
     this.object.clear();
     for (const mesh of this.meshes) mesh.dispose();
     for (const geometry of this.geometries.values()) geometry.dispose();
@@ -68,10 +100,11 @@ export class TreeLayer implements WorldLayer {
       const key = region * ALL_TREE_SPECIES.length + look.species;
       let batch = batches.get(key);
       if (!batch) {
-        batch = { species: look.species, matrices: [], tints: [] };
+        batch = { species: look.species, ids: [], matrices: [], tints: [] };
         batches.set(key, batch);
       }
       const ground = map.tileHeight(object.tx, object.ty) - TREE_LAYER_CONFIG.sink;
+      batch.ids.push(object.id);
       batch.matrices.push(this.treeMatrix(look, object.tx + 0.5, ground, object.ty + 0.5));
       batch.tints.push(look.tint);
     }
@@ -90,6 +123,7 @@ export class TreeLayer implements WorldLayer {
     const mesh = new THREE.InstancedMesh(this.geometries.get(batch.species)!, this.material, batch.matrices.length);
     const tint = new THREE.Color();
     batch.matrices.forEach((matrix, i) => {
+      this.slots.set(batch.ids[i], { mesh, index: i });
       mesh.setMatrixAt(i, matrix);
       mesh.setColorAt(i, tint.setScalar(batch.tints[i]));
     });
@@ -98,5 +132,19 @@ export class TreeLayer implements WorldLayer {
     // Culling uses the sphere around this mesh's instances only; it must be computed after the matrices are set.
     mesh.computeBoundingSphere();
     return mesh;
+  }
+
+  /** Where the peasant nearest tile (tx, ty) stands (its woodcutter); the tile centre when there is none. */
+  private nearestPeasant(world: World, tx: number, ty: number): THREE.Vector3 {
+    let best = Infinity;
+    this.chopper.set(tx + 0.5, 0, ty + 0.5);
+    for (const p of world.peasants()) {
+      const d = (p.tx - tx) ** 2 + (p.ty - ty) ** 2;
+      if (d < best) {
+        best = d;
+        this.chopper.set(p.tx + 0.5, 0, p.ty + 0.5);
+      }
+    }
+    return this.chopper;
   }
 }

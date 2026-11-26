@@ -1,18 +1,20 @@
-// A worker's trips: walking to work, carrying each batch to the nearest storage place, and walking back.
+// A worker's trips: walking to work, carrying each batch to the nearest storage place, and walking back; a
+// woodcutter's walks to its trees are `WoodcutterTrips`' part.
 import type { Economy } from './Economy';
 import type { Jobs } from './Jobs';
-
 import type { Peasant } from './Peasant';
 import type { PeasantWalker } from './PeasantWalker';
 import type { Load } from './PeasantView';
 import type { PopulationHost } from './PopulationHost';
+import { targetAtWalkEnd, targetTiles } from './pathTargets';
 import type { StoragePlaces } from './StoragePlaces';
-import type { TileCoord } from './TileCoord';
+import type { WoodcutterTrips } from './WoodcutterTrips';
 
 export class WorkerTrips {
   /**
    * Trips in `world` to the storage places `stores`, delivering into `economy`; `jobs` is told when a worker
-   * gives its job up. A carrier whose target storage place is removed re-targets on its next tick.
+   * gives its job up, and `woodcutters` takes the woodcutters' walks to their trees. A carrier whose target storage
+   * place is removed re-targets on its next tick.
    */
   public constructor(
     private readonly world: PopulationHost,
@@ -20,6 +22,7 @@ export class WorkerTrips {
     private readonly economy: Economy,
     private readonly jobs: Jobs,
     private readonly walker: PeasantWalker,
+    private readonly woodcutters: WoodcutterTrips,
   ) {}
 
   /** Gives the idle `p` the vacant job at `buildingId` and sends it there; with no path it gives the job up. */
@@ -28,14 +31,21 @@ export class WorkerTrips {
     if (!this.planWorkWalk(p)) this.giveUpJob(p);
   }
 
-  /** Hands the working `p` its building's finished batch and sends it to the nearest storage place for it. */
-  public carry(p: Peasant, load: Load): void {
+  /**
+   * Hands the working `p` its building's finished batch and sends it to the nearest storage place for it. Returns
+   * the tree a chopping woodcutter has just felled (for the caller to remove), else null.
+   */
+  public carry(p: Peasant, load: Load): number | null {
+    const felled = p.state === 'chopping' ? p.treeId : null;
+    this.woodcutters.release(p);
     p.pickUp(load);
     this.planDelivery(p);
+    return felled;
   }
 
   /** Makes `p` idle where it stands, dropping its load and freeing its job; fine when its workplace is already gone. */
   public stop(p: Peasant): void {
+    this.woodcutters.release(p);
     this.jobs.release(p, false);
     p.goIdle();
   }
@@ -55,7 +65,11 @@ export class WorkerTrips {
   public tick(p: Peasant): void {
     switch (p.state) {
       case 'idle': // see IdleStands
-      case 'working': // stands at work; production hands it each finished batch (see `carry`)
+      case 'chopping': // production hands it the wood when the tree falls (see `carry`)
+        break;
+      case 'working': // stands at work (production hands it each batch), or a woodcutter waits for a free tree
+      case 'toTree':
+        if (!this.woodcutters.tick(p)) this.giveUpJob(p);
         break;
       case 'toWork':
       case 'toWorkBack':
@@ -75,8 +89,8 @@ export class WorkerTrips {
     }
     this.walker.tick(p);
     if (!this.isWalkDone(p)) return;
-    if (this.isAt(p, p.workplaceId)) p.startWorking();
-    else if (!this.planWorkWalk(p)) this.giveUpJob(p);
+    const arrived = this.isAt(p, p.workplaceId);
+    if (!(arrived ? this.woodcutters.arriveAtWork(p) : this.planWorkWalk(p))) this.giveUpJob(p);
   }
 
   /** Carrying a load: waits out a failed search, re-routes when needed, delivers on arrival. */
@@ -102,6 +116,7 @@ export class WorkerTrips {
 
   /** Frees `p`'s job, skipping its building for a while, and makes it idle where it stands. */
   private giveUpJob(p: Peasant): void {
+    this.woodcutters.release(p);
     this.jobs.release(p, true);
     p.goIdle();
   }
@@ -127,16 +142,9 @@ export class WorkerTrips {
    */
   private planDelivery(p: Peasant): void {
     const candidates = p.load ? this.stores.candidatesFor(p.load.resource) : [];
-    const goals: TileCoord[] = [];
-    for (const candidate of candidates) goals.push(...candidate.tiles);
     p.setTarget(null);
-    if (!this.walker.walkTo(p, goals)) {
-      p.waitToRetry();
-      return;
-    }
-    const end = p.path.length > 0 ? p.path[p.path.length - 1] : { tx: p.nextTx, ty: p.nextTy };
-    const target = candidates.find(({ tiles }) => tiles.some((t) => t.tx === end.tx && t.ty === end.ty));
-    p.setTarget(target ? target.id : null);
+    if (this.walker.walkTo(p, targetTiles(candidates))) p.setTarget(targetAtWalkEnd(p, candidates)?.id ?? null);
+    else p.waitToRetry();
   }
 
   /** True when `p` stands on an access tile of the building `objectId`. */

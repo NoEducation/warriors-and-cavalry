@@ -51,6 +51,7 @@ describe('POPULATION_CONFIG', () => {
       unreachableSkipTicks: 200,
       straightStepTicks: 4,
       diagonalStepTicks: 6,
+      stumpTicks: 600,
     });
     expect(Object.isFrozen(POPULATION_CONFIG)).toBe(true);
   });
@@ -139,7 +140,7 @@ describe('World population: leaving', () => {
     const world = new World(flatMap(32), new Economy(resources(0, 0, 40)));
     world.spawn(ObjectKind.Keep, 2, 2);
     const hovel = world.spawn(ObjectKind.Hovel, 2, 10);
-    for (const tx of [6, 14, 22]) world.spawn(ObjectKind.Tree, tx, 24);
+    for (const tx of [6, 10, 14, 18, 22, 26]) world.spawn(ObjectKind.Tree, tx, 24); // one per woodcutter
     const huts = [4, 8, 12, 16, 20, 24].map((tx) => world.spawn(ObjectKind.WoodcutterHut, tx, 20));
     const byId = (id: number): PeasantView | undefined => [...world.peasants()].find((p) => p.id === id);
     for (let n = 0; !(world.population.count === 8 && byId(6)?.load); n++) {
