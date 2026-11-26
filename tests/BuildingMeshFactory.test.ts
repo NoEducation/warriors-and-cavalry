@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { BuildingMeshFactory } from '../src/render/BuildingMeshFactory';
+import { StockpileShape } from '../src/render/buildings/StockpileShape';
 import { OBJECT_KINDS, ObjectKind } from '../src/sim/ObjectKind';
 
 /** Float32 rounding slack for shapes that fill their footprint exactly (walls and gates). */
@@ -141,6 +142,8 @@ describe('BuildingMeshFactory', () => {
 const DETAIL_FLOOR: ReadonlyArray<readonly [ObjectKind, number]> = [
   [ObjectKind.Hovel, 300],
   [ObjectKind.WoodcutterHut, 300],
+  [ObjectKind.Granary, 300],
+  [ObjectKind.Stockpile, 150],
 ];
 
 describe('building detail', () => {
@@ -149,4 +152,11 @@ describe('building detail', () => {
       expect(triangleCount(new BuildingMeshFactory().create(kind))).toBeGreaterThanOrEqual(floor);
     });
   }
+
+  it('keeps the Stockpile deck flat at its stated top for the stacks', () => {
+    const mesh = new BuildingMeshFactory().create(ObjectKind.Stockpile);
+    mesh.updateMatrixWorld();
+    const hit = new THREE.Raycaster(new THREE.Vector3(1.5, 5, 1.5), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)[0];
+    expect(hit.point.y).toBeCloseTo(StockpileShape.deckTop);
+  });
 });
