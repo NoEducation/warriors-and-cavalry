@@ -257,7 +257,11 @@ describe('walls and peasants', () => {
 
 describe('wall determinism', () => {
   it('gives equal checksums for two worlds given the same wall lines on the same ticks', () => {
-    const lines: Record<number, WorldCommand> = { 0: line(7, 7, 16, 9), 120: line(5, 20, 18, 3), 300: line(30, 30, -5, 18) };
+    const lines: Record<number, WorldCommand> = {
+      0: line(7, 7, 16, 9),
+      120: line(5, 20, 18, 3),
+      300: line(30, 30, -5, 18),
+    };
     const run = (): number => {
       const world = new World(flatMap(), new Economy(resources(100, 100, 10)));
       world.spawn(ObjectKind.Keep, 10, 10);
@@ -266,7 +270,8 @@ describe('wall determinism', () => {
       for (let t = 0; t < 500; t++) {
         if (lines[t]) {
           const result = world.apply(lines[t]);
-          expect(result.ok && 'placed' in result ? result.placed : 0, `line on tick ${t}`).toBeGreaterThan(0);
+          const placed = result.ok && 'placed' in result ? result.placed : 0;
+          expect(placed, `line on tick ${t}`).toBeGreaterThan(0);
         }
         world.tick();
       }

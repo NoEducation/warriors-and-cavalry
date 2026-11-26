@@ -56,7 +56,7 @@ export class IdleStands {
     return taken;
   }
 
-  /** The first walkable tile, not a gate and not in `taken`, on the rings around `keep`'s footprint, nearest ring first; else null. */
+  /** The first walkable tile, not a gate nor in `taken`, on the rings around `keep`, nearest ring first; else null. */
   private firstFreeTile(keep: MapObject, taken: Set<number>): TileCoord | null {
     const { width, height } = OBJECT_KINDS[keep.kind];
     const { map } = this.world;

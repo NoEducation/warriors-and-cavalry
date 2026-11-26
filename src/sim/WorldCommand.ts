@@ -18,6 +18,9 @@ export type WorldCommand =
       readonly toTy: number;
     };
 
+/** The command that builds a line of wall pieces. */
+export type PlaceWallLineCommand = Extract<WorldCommand, { type: 'placeWallLine' }>;
+
 /** The commands that add or remove exactly one object. */
 export type ObjectCommand = Extract<WorldCommand, { type: 'placeBuilding' | 'demolish' }>;
 
@@ -62,7 +65,7 @@ export interface WorldChange {
 }
 
 /** Whether all four tile coordinates of a `placeWallLine` command are safe integers (not NaN, missing or huge). */
-export function hasWholeTileCoordinates(command: Extract<WorldCommand, { type: 'placeWallLine' }>): boolean {
+export function hasWholeTileCoordinates(command: PlaceWallLineCommand): boolean {
   const { fromTx, fromTy, toTx, toTy } = command;
   return [fromTx, fromTy, toTx, toTy].every((n) => Number.isSafeInteger(n));
 }

@@ -8,7 +8,7 @@ import { type BoxSpec, FOUNDATION_LIFT, SHAPE_COLORS } from './shapeParts';
 /** Which way walkers pass through a gate: along z (north–south) or along x (east–west). */
 export type GatePassage = 'northSouth' | 'eastWest';
 
-/** Thickness of the earth floor laid through the opening; its top stays clear of the foundation's to avoid z-fighting. */
+/** Thickness of the earth floor through the opening; its top stays 0.04 above the foundation's, against z-fighting. */
 const FLOOR_THICKNESS = 0.04;
 
 /** `spec` mirrored across the tile's diagonal (x and z swapped), turning an east–west part north–south. */

@@ -219,8 +219,9 @@ describe('BuildController wall drags', () => {
   it('builds nothing after a cancel', () => {
     const { world, controller, messages } = stoneSetup();
     controller.startWallDrag(START);
-    controller.cancelWallDrag();
+    expect(controller.cancelWallDrag()).toBe(true);
     expect(controller.isWallDragging).toBe(false);
+    expect(controller.cancelWallDrag()).toBe(false);
     expect(controller.finishWallDrag(world, END)).toBeNull();
     expect(world.objectCount).toBe(0);
     expect(messages).toEqual([]);

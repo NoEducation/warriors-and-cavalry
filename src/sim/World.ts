@@ -1,20 +1,18 @@
 // The simulation state: a map, the objects standing on it and the camp's economy, changed only through commands.
 import { Economy, type EconomyView } from './Economy';
-import { Footprint } from './Footprint';
 import type { GameMap } from './GameMap';
 import type { MapObject } from './MapObject';
-import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
+import { ObjectKind } from './ObjectKind';
 import { Listeners } from './Listeners';
 import { ObjectIndex } from './ObjectIndex';
+import { ObjectLifecycle } from './ObjectLifecycle';
 import type { PeasantView } from './PeasantView';
-import { checkPlacement } from './placementRules';
 import { Population, type PopulationSummary } from './Population';
 import { Production, type ProductionState } from './Production';
 import type { TileCoord } from './TileCoord';
 import { WallBuilder, type WallLinePreview } from './WallBuilder';
 import {
   type CommandResult,
-  hasWholeTileCoordinates,
   type ObjectCommand,
   type ObjectCommandResult,
   type PlacementCheck,
@@ -27,8 +25,8 @@ export class World {
   private readonly listeners = new Listeners<WorldChange>();
   private readonly production: Production;
   private readonly populace: Population;
+  private readonly lifecycle: ObjectLifecycle;
   private readonly walls: WallBuilder;
-  private nextId = 1;
   private ticks = 0;
 
   /** Creates a world with no objects on `map`, holding `economyState` (by default the usual start amounts). */
@@ -36,8 +34,9 @@ export class World {
     this.index = new ObjectIndex(map);
     this.production = new Production(map, economyState, (tx, ty) => this.objectAt(tx, ty)?.kind === ObjectKind.Tree);
     this.populace = new Population(this, economyState);
-    const site = { canPlace: this.canPlace.bind(this), add: this.add.bind(this) };
-    this.walls = new WallBuilder(site, economyState);
+    const { index, production, populace: population, listeners } = this;
+    this.lifecycle = new ObjectLifecycle(map, { index, economy: economyState, production, population, listeners });
+    this.walls = new WallBuilder(this.lifecycle, economyState);
   }
 
   /** Read-only view of `economyState`: resource amounts and capacities, changed only through `apply` and `tick`. */
@@ -122,7 +121,7 @@ export class World {
    * (see `checkPlacement`). Does not look at resources. An unknown `kind` is reported as NotBuildable.
    */
   public canPlace(kind: ObjectKind, tx: number, ty: number): PlacementCheck {
-    return checkPlacement(this.map, kind, tx, ty, (footprint) => this.index.isFree(footprint));
+    return this.lifecycle.canPlace(kind, tx, ty);
   }
 
   /**
@@ -138,16 +137,9 @@ export class World {
   public apply(command: WorldCommand): CommandResult;
   public apply(command: WorldCommand): CommandResult {
     switch (command.type) {
-      case 'placeBuilding': {
-        const check = this.canPlace(command.kind, command.tx, command.ty);
-        if (!check.ok) return check;
-        if (!this.economyState.spend(OBJECT_KINDS[command.kind].cost)) return { ok: false, reason: 'NotEnoughResources' };
-        return { ok: true, object: this.add(command.kind, command.tx, command.ty) };
-      }
-      case 'demolish': return this.demolish(command.objectId);
-      case 'placeWallLine':
-        if (!hasWholeTileCoordinates(command)) return { ok: false, reason: 'UnknownCommand' };
-        return this.walls.build({ tx: command.fromTx, ty: command.fromTy }, { tx: command.toTx, ty: command.toTy });
+      case 'placeBuilding': return this.lifecycle.placeBuilding(command.kind, command.tx, command.ty);
+      case 'demolish': return this.lifecycle.demolish(command.objectId);
+      case 'placeWallLine': return this.walls.build(command);
       default: return { ok: false, reason: 'UnknownCommand' };
     }
   }
@@ -157,42 +149,11 @@ export class World {
    * throws a RangeError when the kind is unknown or the footprint is outside the map or occupied.
    */
   public spawn(kind: ObjectKind, tx: number, ty: number): MapObject {
-    const footprint = Footprint.of(kind, tx, ty);
-    if (!footprint.inBounds(this.map)) throw new RangeError(`footprint at (${tx}, ${ty}) out of bounds`);
-    if (!this.index.isFree(footprint)) throw new RangeError(`footprint at (${tx}, ${ty}) occupied`);
-    return this.add(kind, tx, ty);
+    return this.lifecycle.spawn(kind, tx, ty);
   }
 
   /** Calls `listener` for every object added or removed from now on. Returns a function that unsubscribes it. */
   public onChange(listener: (change: WorldChange) => void): () => void {
     return this.listeners.add(listener);
-  }
-
-  /** Removes the object, then refunds part of its cost into the capacity that remains. */
-  private demolish(objectId: number): ObjectCommandResult {
-    const object = this.index.objectById(objectId);
-    if (!object) return { ok: false, reason: 'UnknownObject' };
-    const info = OBJECT_KINDS[object.kind];
-    if (!info.buildable) return { ok: false, reason: 'NotDemolishable' };
-    // Fixed order: occupancy -> capacity (and refund) -> production -> population -> listeners (who see the end state).
-    this.index.remove(object);
-    this.economyState.removeCapacity(info.storage);
-    this.economyState.refund(info.cost);
-    this.production.removed(object);
-    this.populace.buildingRemoved(object);
-    this.listeners.notify({ type: 'removed', object });
-    return { ok: true, object };
-  }
-
-  /** Adds the object, its storage capacity, production and housing, then tells the listeners. */
-  private add(kind: ObjectKind, tx: number, ty: number): MapObject {
-    const object: MapObject = Object.freeze({ id: this.nextId++, kind, tx, ty });
-    // Fixed order: occupancy -> capacity -> production -> population -> listeners (who see the end state).
-    this.index.insert(object);
-    this.economyState.addCapacity(OBJECT_KINDS[kind].storage);
-    this.production.added(object);
-    this.populace.buildingAdded(object);
-    this.listeners.notify({ type: 'added', object });
-    return object;
   }
 }

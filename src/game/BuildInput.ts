@@ -19,12 +19,10 @@ export interface MapClickTarget {
 
 export class BuildInput {
   private readonly bar: BuildBar;
-  /** True when the latest right press cancelled a wall drag, so its click does not also deselect the tool. */
-  private rightPressCancelledDrag = false;
 
   /**
-   * Builds the bar in `barRoot` and listens for keys on `keyTarget` (usually `window`) and presses, releases and
-   * clicks on `pointer`; `clickTarget` returns the world and tile under the cursor. Create once at setup.
+   * Builds the bar in `barRoot` and listens for keys on `keyTarget` (usually `window`) and presses, releases, clicks
+   * and cancels on `pointer`; `clickTarget` returns the world and tile under the cursor. Create once at setup.
    */
   public constructor(
     private readonly builder: BuildController,
@@ -61,19 +59,15 @@ export class BuildInput {
   private readonly onKeyDown = (e: Event): void => {
     const { code, repeat, ctrlKey, metaKey, altKey } = e as KeyboardEvent;
     if (repeat || ctrlKey || metaKey || altKey) return;
-    if (code === 'Escape') {
-      if (this.builder.isWallDragging) this.builder.cancelWallDrag();
-      else this.select(null);
-    }
+    if (code === 'Escape' && !this.builder.cancelWallDrag()) this.select(null);
     const entry = BUILD_TOOLS.find((t) => t.key === code);
     if (entry) this.select(entry.tool);
   };
 
-  /** A left press starts a wall drag with the Wall tool; a right press cancels one. */
+  /** A left press starts a wall drag with the Wall tool; a right press cancels one, or else deselects the tool. */
   private readonly onPress = (button: number): void => {
     if (button === RIGHT_BUTTON) {
-      this.rightPressCancelledDrag = this.builder.isWallDragging;
-      this.builder.cancelWallDrag();
+      if (!this.builder.cancelWallDrag()) this.select(null);
     } else if (button === LEFT_BUTTON) {
       this.builder.startWallDrag(this.clickTarget().tile);
     }
@@ -86,13 +80,10 @@ export class BuildInput {
     this.builder.finishWallDrag(world, tile);
   };
 
-  /** Left click applies the tool to the tile under the cursor; right click deselects it unless it ended a drag. */
+  /** A left click applies the tool to the tile under the cursor. */
   private readonly onClick = (button: number): void => {
-    if (button === RIGHT_BUTTON) {
-      if (!this.rightPressCancelledDrag) this.select(null);
-    } else if (button === LEFT_BUTTON) {
-      const { world, tile } = this.clickTarget();
-      this.builder.click(world, tile);
-    }
+    if (button !== LEFT_BUTTON) return;
+    const { world, tile } = this.clickTarget();
+    this.builder.click(world, tile);
   };
 }

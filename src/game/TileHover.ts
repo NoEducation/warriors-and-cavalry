@@ -45,18 +45,25 @@ export class TileHover {
    */
   public update(camera: THREE.Camera, world: World): void {
     const tile = this.tileUnderCursor(camera, world.map);
-    const wallLine = this.builder.wallDragPreview(world, tile);
-    const preview = wallLine ? null : this.builder.preview(world, tile);
-    this.updateGhosts(world, preview, wallLine);
-    this.updateHighlight(world, tile, preview);
+    if (this.builder.isWallDragging) this.updateWallDrag(world, tile);
+    else this.updatePlacement(world, tile);
     this.updateHudLine(world, tile);
   }
 
-  /** Shows the wall line being dragged, else the building about to be placed; hides the ghosts not needed. */
-  private updateGhosts(world: World, preview: PlacementPreview | null, wallLine: WallLinePreview | null): void {
+  /** While a wall is dragged: its line ghost and cost; no building ghost, and the hovered tile or object outlined. */
+  private updateWallDrag(world: World, tile: TileCoord | null): void {
+    this.ghost.hide();
+    this.showWallLine(world, this.builder.wallDragPreview(world, tile));
+    this.updateHighlight(world, tile, null);
+  }
+
+  /** Otherwise: the ghost of the building about to be placed, if any, and its footprint outlined. */
+  private updatePlacement(world: World, tile: TileCoord | null): void {
+    const preview = this.builder.preview(world, tile);
     if (preview) this.ghost.show(world, preview);
     else this.ghost.hide();
-    this.showWallLine(world, wallLine);
+    this.showWallLine(world, null);
+    this.updateHighlight(world, tile, preview);
   }
 
   /** Draws the wall line's ghost and cost, or hides them for null; skipped while the preview is the one shown. */

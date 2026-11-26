@@ -53,7 +53,8 @@ class FakeCanvas extends EventTarget {
 }
 
 function pointerEvent(type: string, button: number, buttons: number, x = 50): Event {
-  return Object.assign(new Event(type, { cancelable: true }), { button, buttons, clientX: x, clientY: 50, pointerId: 1 });
+  const fields = { button, buttons, clientX: x, clientY: 50, pointerId: 1 };
+  return Object.assign(new Event(type, { cancelable: true }), fields);
 }
 
 interface Setup {

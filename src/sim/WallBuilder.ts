@@ -5,7 +5,14 @@ import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import { RESOURCE_KINDS, type ResourceAmounts, ResourceKind, resources } from './ResourceKind';
 import type { TileCoord } from './TileCoord';
 import { wallLineTiles } from './wallLine';
-import type { CommandFailure, PlacementCheck, PlacementFailure, WallLineSuccess } from './WorldCommand';
+import {
+  type CommandFailure,
+  hasWholeTileCoordinates,
+  type PlaceWallLineCommand,
+  type PlacementCheck,
+  type PlacementFailure,
+  type WallLineSuccess,
+} from './WorldCommand';
 
 /** What a wall line from one tile to another would build right now, without building it. */
 export interface WallLinePreview {
@@ -27,11 +34,14 @@ interface WallLinePlan extends WallLinePreview {
   readonly firstFailure: PlacementFailure | null;
 }
 
-/** Callbacks into the world the builder works on. */
+/** The world the builder works on; `ObjectLifecycle` is one. */
 export interface WallSite {
   /** Whether a building of `kind` may stand at (tx, ty), as `World.canPlace`. */
   canPlace(kind: ObjectKind, tx: number, ty: number): PlacementCheck;
-  /** Adds an object whose placement was checked and paid for, telling the listeners. */
+  /**
+   * Adds an object and tells the listeners. Skips the building rules and the cost on purpose: `plan()` already
+   * checked every piece with `canPlace`, and `build` pays for each piece itself.
+   */
   add(kind: ObjectKind, tx: number, ty: number): MapObject;
 }
 
@@ -49,11 +59,13 @@ export class WallBuilder {
 
   /**
    * Builds and pays for the pieces `preview` marks placeable, one `added` change each in tile order. When none is
-   * placeable, fails with `NotEnoughResources` if a tile was valid, else with the first tile's rule failure, and
-   * changes nothing. Call from `World.apply` for a `placeWallLine` command.
+   * placeable, fails with `NotEnoughResources` if a tile was valid, else with the first tile's rule failure; a command
+   * whose coordinates are not safe integers fails with `UnknownCommand`. A failure changes nothing. Call from
+   * `World.apply` for a `placeWallLine` command.
    */
-  public build(from: TileCoord, to: TileCoord): WallLineSuccess | CommandFailure {
-    const plan = this.plan(from, to);
+  public build(command: PlaceWallLineCommand): WallLineSuccess | CommandFailure {
+    if (!hasWholeTileCoordinates(command)) return { ok: false, reason: 'UnknownCommand' };
+    const plan = this.plan({ tx: command.fromTx, ty: command.fromTy }, { tx: command.toTx, ty: command.toTy });
     if (plan.placedCount === 0) {
       return { ok: false, reason: plan.unpaid > 0 ? 'NotEnoughResources' : (plan.firstFailure ?? 'NotBuildable') };
     }
@@ -77,15 +89,26 @@ export class WallBuilder {
     let placedCount = 0;
     let skipped = 0;
     let unpaid = 0;
+    // True from the first valid tile the stone does not cover: no piece is placed after it.
+    let stopped = false;
     let firstFailure: PlacementFailure | null = null;
     for (const tile of tiles) {
       const check = this.site.canPlace(ObjectKind.Wall, tile.tx, tile.ty);
-      if (!check.ok && placeable.length === 0) firstFailure = check.reason;
-      const paid = check.ok && unpaid === 0 && placedCount < affordable;
-      placeable.push(paid);
-      if (paid) placedCount++;
-      else if (check.ok) unpaid++;
-      else if (unpaid === 0) skipped++;
+      if (!check.ok) {
+        // Skip: the tile fails a rule. Skipped tiles are counted only up to where placing stopped.
+        if (placeable.length === 0) firstFailure = check.reason;
+        if (!stopped) skipped++;
+        placeable.push(false);
+      } else if (!stopped && placedCount < affordable) {
+        // Place: valid and paid for.
+        placedCount++;
+        placeable.push(true);
+      } else {
+        // Stop: valid but the stone has run out; this and every later valid tile is unpaid.
+        stopped = true;
+        unpaid++;
+        placeable.push(false);
+      }
     }
     return { tiles, placeable, placedCount, cost: times(WALL_COST, placedCount), skipped, unpaid, firstFailure };
   }

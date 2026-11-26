@@ -82,9 +82,14 @@ export class BuildController {
     return result;
   }
 
-  /** Drops the wall drag in progress without building. Call on Escape or a right click during a drag. */
-  public cancelWallDrag(): void {
+  /**
+   * Drops the wall drag in progress without building; returns whether there was one. Call on Escape, a right press or
+   * a lost press; Escape and a right press deselect the tool instead when it returns false.
+   */
+  public cancelWallDrag(): boolean {
+    const cancelled = this.wallDrag !== null;
     this.wallDrag = null;
+    return cancelled;
   }
 
   /**
