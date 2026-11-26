@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ProductionStatus } from '../src/sim/Production';
-import { populationText, productionStatusText } from '../src/ui/statusText';
+import { peasantCountText, productionStatusText } from '../src/ui/statusText';
 
-describe('populationText', () => {
-  it('shows count, housing and idle peasants', () => {
-    expect(populationText({ count: 3, housing: 8, idle: 2 })).toBe('Peasants 3/8 (2 idle)');
-  });
-
-  it('leaves out the idle part when nobody is idle', () => {
-    expect(populationText({ count: 0, housing: 0, idle: 0 })).toBe('Peasants 0/0');
-    expect(populationText({ count: 4, housing: 4, idle: 0 })).toBe('Peasants 4/4');
+describe('peasantCountText', () => {
+  it('shows peasants over housing, and the idle ones when any', () => {
+    expect(peasantCountText({ count: 3, housing: 8, idle: 2 })).toBe('3/8 (2 idle)');
+    expect(peasantCountText({ count: 0, housing: 0, idle: 0 })).toBe('0/0');
+    expect(peasantCountText({ count: 4, housing: 4, idle: 0 })).toBe('4/4');
   });
 });
 
