@@ -60,10 +60,15 @@ export function sandColor(map: GameMap, cx: number, cy: number, out: THREE.Color
  * tiles sharing a corner mix it alike and the beach edge has no seam. Pure; call once per sand or grass vertex.
  */
 export function beachGrassBlend(map: GameMap, cx: number, cy: number): number {
-  const n = (salt: number, scale: number): number => fbm2((map.seed ^ salt) | 0, cx * scale, cy * scale, 2);
   const mid = MAPGEN_CONFIG.seaLevel + MAPGEN_CONFIG.sandBand;
+  // Beyond the noise's reach the answer is fixed: skip the noise for the inland grass and the waterline.
+  const reach = c.grassBlendHalfWidth + c.edgeJitter + c.tuftJitter;
+  const h = map.heightAt(cx, cy);
+  if (h >= mid + reach) return 1;
+  if (h <= mid - reach) return 0;
+  const n = (salt: number, scale: number): number => fbm2((map.seed ^ salt) | 0, cx * scale, cy * scale, 2);
   const jitter = c.edgeJitter * 2 * (n(SALT.edge, c.edgeScale) - 0.5) + c.tuftJitter * 2 * (n(SALT.tuft, c.tuftScale) - 0.5);
-  return smooth(mid - c.grassBlendHalfWidth, mid + c.grassBlendHalfWidth, map.heightAt(cx, cy) + jitter);
+  return smooth(mid - c.grassBlendHalfWidth, mid + c.grassBlendHalfWidth, h + jitter);
 }
 
 /** Writes into `out` the colour of seabed corner (cx, cy) and returns it. Pure; call once per underwater vertex. */
