@@ -144,6 +144,7 @@ const DETAIL_FLOOR: ReadonlyArray<readonly [ObjectKind, number]> = [
   [ObjectKind.WoodcutterHut, 300],
   [ObjectKind.Granary, 300],
   [ObjectKind.Stockpile, 150],
+  [ObjectKind.Keep, 600],
 ];
 
 describe('building detail', () => {
