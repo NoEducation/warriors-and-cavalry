@@ -64,18 +64,22 @@ describe('treeAppearance', () => {
   });
 
   it('keeps scale, rotation, lean and tint inside their ranges', () => {
+    // Checked with plain comparisons and asserted once: an expect per value over every tree of three 512 x 512 maps
+    // made this test hit the 5 s limit when the whole suite runs.
+    const inRange = (look: TreeAppearance): boolean =>
+      look.heightScale >= 0.7 &&
+      look.heightScale <= 1.3 &&
+      look.widthScale >= 0.8 &&
+      look.widthScale <= 1.2 &&
+      look.rotation >= 0 &&
+      look.rotation < 2 * Math.PI &&
+      Math.hypot(look.leanX, look.leanZ) <= MAX_LEAN &&
+      look.tint >= 0.85 &&
+      look.tint <= 1.15;
     for (const seed of SEEDS) {
-      for (const { look } of samples.get(seed)!) {
-        expect(look.heightScale).toBeGreaterThanOrEqual(0.7);
-        expect(look.heightScale).toBeLessThanOrEqual(1.3);
-        expect(look.widthScale).toBeGreaterThanOrEqual(0.8);
-        expect(look.widthScale).toBeLessThanOrEqual(1.2);
-        expect(look.rotation).toBeGreaterThanOrEqual(0);
-        expect(look.rotation).toBeLessThan(2 * Math.PI);
-        expect(Math.hypot(look.leanX, look.leanZ)).toBeLessThanOrEqual(MAX_LEAN);
-        expect(look.tint).toBeGreaterThanOrEqual(0.85);
-        expect(look.tint).toBeLessThanOrEqual(1.15);
-      }
+      const trees = samples.get(seed)!;
+      expect(trees.length).toBeGreaterThan(0);
+      expect(trees.filter((t) => !inRange(t.look)).map((t) => ({ seed, ...t.look }))).toEqual([]);
     }
   });
 
