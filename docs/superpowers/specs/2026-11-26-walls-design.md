@@ -1,7 +1,7 @@
 # Walls Stage — Walls, Gates, Towers
 
 Date: 2026-11-26
-Status: draft, waiting for review (builder check done 2026-11-26)
+Status: approved 2026-11-26 (builder check done)
 Builds on: `2026-11-25-peasants-design.md` and `AGENTS.md` (all of their rules
 still apply unless this document changes them).
 
