@@ -8,6 +8,7 @@ import { PeasantWalker } from '../src/sim/PeasantWalker';
 import { ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { WalkClass, WalkMode } from '../src/sim/walkRules';
+import type { PeasantView } from '../src/sim/PeasantView';
 import { World } from '../src/sim/World';
 
 function flatWorld(size = 32, economy = new Economy()): World {
@@ -94,5 +95,76 @@ describe('the wall walk', () => {
     }
     expect(world.economy.amount(ResourceKind.Wood)).toBe(wood + 2);
     expect(throughGate).toBe(true);
+  });
+});
+
+/** Ticks `world` until `done` holds (at most `max` ticks); throws when it never does. */
+function tickUntil(world: World, done: () => boolean, max = 3000): void {
+  for (let n = 0; n < max; n++) {
+    world.tick();
+    if (done()) return;
+  }
+  throw new Error('condition not reached');
+}
+
+/** A flat camp with a Keep at (2, 2), food for one arrival and a wall along x = 12 from y = 4 to 10; with `stairs`, a stair at (11, 7). */
+function lookoutCamp(stairs: boolean): World {
+  const world = flatWorld(32, new Economy(resources(200, 80, 5)));
+  for (let ty = 4; ty <= 10; ty++) world.spawn(ObjectKind.Wall, 12, ty);
+  if (stairs) world.spawn(ObjectKind.Stairs, 11, 7);
+  place(world, ObjectKind.Keep, 2, 2);
+  return world;
+}
+
+const only = (world: World): PeasantView => [...world.peasants()][0];
+/** True once the one peasant has arrived, has a stand and stands on it. */
+const settled = (world: World): boolean => {
+  const p = [...world.peasants()][0];
+  return p !== undefined && p.stand !== null && p.tx === p.stand.tx && p.ty === p.stand.ty && p.stepTicks === 0;
+};
+
+describe('lookouts', () => {
+  it('an idle peasant climbs the stairs and keeps watch on the wall', () => {
+    const world = lookoutCamp(true);
+    tickUntil(world, () => settled(world));
+    expect(world.walkClass(only(world).tx, only(world).ty)).toBe(WalkClass.Top);
+  });
+
+  it('without stairs an idle peasant waits on the ground', () => {
+    const world = lookoutCamp(false);
+    tickUntil(world, () => settled(world));
+    expect(world.walkClass(only(world).tx, only(world).ty)).toBe(WalkClass.Ground);
+  });
+
+  it('climbs once stairs are built after it settled', () => {
+    const world = lookoutCamp(false);
+    tickUntil(world, () => settled(world));
+    place(world, ObjectKind.Stairs, 11, 7);
+    tickUntil(world, () => settled(world) && world.walkClass(only(world).tx, only(world).ty) === WalkClass.Top);
+  });
+
+  it('comes down the stairs and reaches work when given a job', () => {
+    const world = lookoutCamp(true);
+    tickUntil(world, () => settled(world));
+    place(world, ObjectKind.WheatFarm, 20, 20);
+    tickUntil(world, () => only(world).state === 'working');
+  });
+
+  it('climbs down on the spot when its only stair is demolished, and still reaches work', () => {
+    const world = lookoutCamp(true);
+    tickUntil(world, () => settled(world));
+    const stair = world.objectAt(11, 7)!;
+    expect(world.apply({ type: 'demolish', objectId: stair.id }).ok).toBe(true);
+    place(world, ObjectKind.WheatFarm, 20, 20);
+    tickUntil(world, () => only(world).state === 'working');
+  });
+
+  it('steps down to the ground when the wall under it is demolished', () => {
+    const world = lookoutCamp(true);
+    tickUntil(world, () => settled(world));
+    const wall = world.objectAt(only(world).tx, only(world).ty)!;
+    expect(world.apply({ type: 'demolish', objectId: wall.id }).ok).toBe(true);
+    tickUntil(world, () => settled(world));
+    expect(world.walkClass(only(world).tx, only(world).ty)).not.toBe(WalkClass.Blocked);
   });
 });

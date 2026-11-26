@@ -1,10 +1,14 @@
-// Where idle peasants wait: each on its own free tile around the Keep, found ring by ring in a fixed order.
+// Where idle peasants wait: on the wall walk as lookouts when stairs lead up to it, else each on its own free tile
+// around the Keep, found ring by ring in a fixed order.
 import type { MapObject } from './MapObject';
 import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import type { Peasant } from './Peasant';
 import type { PeasantWalker } from './PeasantWalker';
 import type { PopulationHost } from './PopulationHost';
 import type { TileCoord } from './TileCoord';
+import { WalkClass } from './walkRules';
+import type { WallLookouts } from './WallLookouts';
+import { Footprint } from './Footprint';
 
 export class IdleStands {
   /**
@@ -16,11 +20,13 @@ export class IdleStands {
     private readonly walker: PeasantWalker,
     private readonly peasants: ReadonlyMap<number, Peasant>,
     private readonly keep: () => MapObject | null,
+    private readonly lookouts: WallLookouts,
   ) {}
 
   /**
-   * Advances the idle `p` by one tick: one without a stand, whose stand was built over or whose way there was, takes
-   * the first free tile around the Keep and heads there; then it walks. With no Keep it stays where it is; with no
+   * Advances the idle `p` by one tick: one without a stand, whose stand was built over or whose way there was, climbs
+   * to the nearest free wall-walk tile it can reach, else takes the first free tile around the Keep, and heads there;
+   * then it walks. With no Keep it stays where it is; with no
    * free tile in reach it waits and tries again later. Call once per tick per idle peasant, in ascending id order.
    */
   public tick(p: Peasant): void {
@@ -29,11 +35,29 @@ export class IdleStands {
     this.walker.tick(p);
   }
 
-  /** True when `p` has no stand (and is not waiting), its stand is no longer walkable, or its way there is blocked. */
+  /**
+   * Call when a wall, tower or stairs is added or removed: idle peasants standing on the ground look for a stand
+   * again while stairs stand (a way up may have opened), and so do those whose stand was on a piece just removed.
+   */
+  public castleChanged(removed: MapObject | null): void {
+    const gone = removed ? Footprint.of(removed.kind, removed.tx, removed.ty) : null;
+    for (const p of this.peasants.values()) {
+      const { stand } = p;
+      if (p.state !== 'idle' || !stand) continue;
+      const onGround = this.world.walkClass(stand.tx, stand.ty) === WalkClass.Ground;
+      if ((onGround && this.lookouts.anyStairs) || gone?.covers(stand.tx, stand.ty)) p.standOn(null);
+    }
+  }
+
+  /**
+   * True when `p` has no stand (and is not waiting), its stand is no longer ground or a wall-walk top, or its way
+   * there is blocked.
+   */
   private needsNewStand(p: Peasant): boolean {
     const { stand } = p;
     if (!stand) return p.waitTicks === 0;
-    return !this.world.isWalkable(stand.tx, stand.ty) || this.walker.isNextStepBlocked(p);
+    const at = this.world.walkClass(stand.tx, stand.ty);
+    return (at !== WalkClass.Ground && at !== WalkClass.Top) || this.walker.isNextStepBlocked(p);
   }
 
   /** Gives `p` the first free tile around the Keep that it can reach and sends it there. */
@@ -42,7 +66,13 @@ export class IdleStands {
     p.startWalk([]);
     const keep = this.keep();
     if (!keep) return;
-    const tile = this.firstFreeTile(keep, this.takenStands());
+    const taken = this.takenStands();
+    const lookout = this.lookouts.headUp(p, taken);
+    if (lookout) {
+      p.standOn(lookout);
+      return;
+    }
+    const tile = this.firstFreeTile(keep, taken);
     if (tile && this.walker.walkTo(p, [tile])) p.standOn(tile);
     else p.waitToRetry();
   }
@@ -56,13 +86,13 @@ export class IdleStands {
     return taken;
   }
 
-  /** The first walkable tile, not a gate nor in `taken`, on the rings around `keep`, nearest ring first; else null. */
+  /** The first ground tile, not a gate nor in `taken`, on the rings around `keep`, nearest ring first; else null. */
   private firstFreeTile(keep: MapObject, taken: Set<number>): TileCoord | null {
     const { width, height } = OBJECT_KINDS[keep.kind];
     const { map } = this.world;
-    // A gate is walkable but is the way through a wall, so nobody waits in it.
+    // A gate is the way through a wall and stairs the way up it, so nobody waits in either.
     const isFree = (tx: number, ty: number): boolean =>
-      this.world.isWalkable(tx, ty) &&
+      this.world.walkClass(tx, ty) === WalkClass.Ground &&
       this.world.objectAt(tx, ty)?.kind !== ObjectKind.Gate &&
       !taken.has(ty * map.width + tx);
     for (let r = 1; r <= Math.max(map.width, map.height); r++) {
