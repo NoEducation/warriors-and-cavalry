@@ -14,6 +14,7 @@ export const ObjectKind = {
   Gate: 10,
   Tower: 11,
   Stump: 12,
+  Stairs: 13,
 } as const;
 export type ObjectKind = (typeof ObjectKind)[keyof typeof ObjectKind];
 
@@ -43,6 +44,8 @@ export interface ObjectKindInfo {
   readonly quarryOnly: boolean;
   /** True when footprint tiles may also be Rock (walls, gates and towers, so castles can stand on hills). */
   readonly rockAllowed: boolean;
+  /** True when one of its tiles' edge neighbours must be a Wall or Tower (stairs lean on one). */
+  readonly needsWall: boolean;
   /** Peasants this building houses while it stands. */
   readonly housing: number;
   readonly production: ProductionInfo | null;
@@ -54,6 +57,7 @@ const PLAIN = {
   grassOnly: false,
   quarryOnly: false,
   rockAllowed: false,
+  needsWall: false,
   housing: 0,
   production: null,
 } as const;
@@ -141,4 +145,5 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   [ObjectKind.Gate]: { ...CASTLE, name: 'Gate', width: 1, height: 1, cost: resources(0, 6, 0) },
   [ObjectKind.Tower]: { ...CASTLE, name: 'Tower', width: 2, height: 2, cost: resources(0, 20, 0) },
   [ObjectKind.Stump]: { ...PLAIN, name: 'Stump', width: 1, height: 1, buildable: false, cost: NO_RESOURCES },
+  [ObjectKind.Stairs]: { ...CASTLE, name: 'Stairs', width: 1, height: 1, cost: resources(0, 3, 0), needsWall: true },
 });

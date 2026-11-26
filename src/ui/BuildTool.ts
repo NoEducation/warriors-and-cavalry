@@ -109,6 +109,13 @@ export const BUILD_TOOLS: readonly BuildToolEntry[] = Object.freeze([
     tool: { type: 'build', kind: ObjectKind.Tower },
     category: BuildCategory.Castle,
   },
+  {
+    label: 'Stairs',
+    icon: 'stairs',
+    key: 'KeyT',
+    tool: { type: 'build', kind: ObjectKind.Stairs },
+    category: BuildCategory.Castle,
+  },
   { label: 'Demolish', icon: 'demolish', key: 'KeyX', tool: { type: 'demolish' } },
 ]);
 

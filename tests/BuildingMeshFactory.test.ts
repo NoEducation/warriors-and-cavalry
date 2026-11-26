@@ -47,8 +47,8 @@ function hits(mesh: THREE.Mesh, origin: THREE.Vector3, direction: THREE.Vector3)
 describe('BuildingMeshFactory', () => {
   const factory = new BuildingMeshFactory();
 
-  it('has ten buildable kinds', () => {
-    expect(BUILDABLE_KINDS).toHaveLength(10);
+  it('has eleven buildable kinds', () => {
+    expect(BUILDABLE_KINDS).toHaveLength(11);
   });
 
   it('creates a non-empty group within its triangle budget and within the footprint for every buildable kind', () => {
@@ -151,6 +151,7 @@ const DETAIL_FLOOR: ReadonlyArray<readonly [ObjectKind, number]> = [
   [ObjectKind.Tower, 400],
   [ObjectKind.Quarry, 300],
   [ObjectKind.WheatFarm, 200],
+  [ObjectKind.Stairs, 100],
 ];
 
 describe('building detail', () => {

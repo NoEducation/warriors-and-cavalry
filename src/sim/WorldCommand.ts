@@ -3,7 +3,7 @@ import type { MapObject } from './MapObject';
 import type { ObjectKind } from './ObjectKind';
 
 /** Why an object cannot be placed at a position. */
-export type PlacementFailure = 'NotBuildable' | 'OutOfBounds' | 'BadTerrain' | 'Occupied' | 'TooSteep' | 'NeedsQuarryGround';
+export type PlacementFailure = 'NotBuildable' | 'OutOfBounds' | 'BadTerrain' | 'Occupied' | 'TooSteep' | 'NeedsQuarryGround' | 'NeedsWall';
 
 export type PlacementCheck = { readonly ok: true } | { readonly ok: false; readonly reason: PlacementFailure };
 

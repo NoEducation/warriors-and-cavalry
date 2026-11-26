@@ -49,6 +49,7 @@ describe('OBJECT_KINDS', () => {
       ['Gate', 1, 1, true],
       ['Tower', 2, 2, true],
       ['Stump', 1, 1, false],
+      ['Stairs', 1, 1, true],
     ]);
   });
 
@@ -72,6 +73,7 @@ describe('OBJECT_KINDS', () => {
       [[0, 6, 0], [0, 0, 0], false, false, true, 0, null],
       [[0, 20, 0], [0, 0, 0], false, false, true, 0, null],
       [[0, 0, 0], [0, 0, 0], false, false, false, 0, null],
+      [[0, 3, 0], [0, 0, 0], false, false, true, 0, null],
     ]);
   });
 });
@@ -135,6 +137,19 @@ describe('World.canPlace', () => {
         reason: 'TooSteep',
       });
     }
+  });
+
+  it('places Stairs only beside a Wall or Tower, for 3 stone', () => {
+    const world = new World(flatMap());
+    expect(world.canPlace(ObjectKind.Stairs, 5, 5)).toEqual({ ok: false, reason: 'NeedsWall' });
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Wall, tx: 6, ty: 6 });
+    expect(world.canPlace(ObjectKind.Stairs, 5, 5)).toEqual({ ok: false, reason: 'NeedsWall' }); // only diagonal
+    expect(world.canPlace(ObjectKind.Stairs, 6, 5).ok).toBe(true);
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Tower, tx: 1, ty: 1 });
+    expect(world.canPlace(ObjectKind.Stairs, 3, 2).ok).toBe(true);
+    const stone = world.economy.amount(ResourceKind.Stone);
+    expect(world.apply({ type: 'placeBuilding', kind: ObjectKind.Stairs, tx: 6, ty: 7 }).ok).toBe(true);
+    expect(world.economy.amount(ResourceKind.Stone)).toBe(stone - 3);
   });
 
   it('places a Quarry only with every footprint tile on quarry ground', () => {

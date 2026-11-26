@@ -35,7 +35,8 @@ export class ObjectLifecycle implements WallSite {
 
   /** Whether a building of `kind` may stand at (tx, ty); see `World.canPlace`. Does not look at resources. */
   public canPlace(kind: ObjectKind, tx: number, ty: number): PlacementCheck {
-    return checkPlacement(this.map, kind, tx, ty, (footprint) => this.parts.index.isFree(footprint));
+    const { index } = this.parts;
+    return checkPlacement(this.map, kind, tx, ty, (footprint) => index.isFree(footprint), (x, y) => index.objectAt(x, y)?.kind);
   }
 
   /** Checks the building rules, pays the cost and adds the building. Call for a `placeBuilding` command. */

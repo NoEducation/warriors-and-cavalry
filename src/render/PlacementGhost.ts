@@ -3,10 +3,11 @@ import * as THREE from 'three';
 import { ObjectKind } from '../sim/ObjectKind';
 import type { PlacementPreview } from '../sim/PlacementPreview';
 import type { World } from '../sim/World';
-import type { BuildingMeshFactory, GatePassage } from './BuildingMeshFactory';
+import type { BuildingMeshFactory, GatePassage, StairsFacing } from './BuildingMeshFactory';
 import { floorHeight } from './floorHeight';
 import { GHOST_CONFIG } from './ghostConfig';
 import { gatePassage } from './gatePassage';
+import { stairsFacing } from './stairsFacing';
 
 export class PlacementGhost {
   /** Add this to the scene once; holds the ghost building while one is shown. */
@@ -23,8 +24,8 @@ export class PlacementGhost {
   });
   private model: THREE.Mesh | null = null;
   private modelKind: ObjectKind | null = null;
-  /** The passage the model was made with; null for kinds other than Gate. */
-  private modelPassage: GatePassage | null = null;
+  /** The gate passage or stairs facing the model was made with; null for other kinds. */
+  private modelDirection: GatePassage | StairsFacing | null = null;
   private tintedOk: boolean | null = null;
 
   /** Builds ghost meshes with `factory`; starts hidden. */
@@ -33,12 +34,14 @@ export class PlacementGhost {
   }
 
   /**
-   * Shows the ghost for `preview` on `world`'s terrain, green when it fits, red otherwise; a Gate is turned the way it
-   * would be built there. Call per frame: the mesh is rebuilt only when the kind or the gate's passage changes.
+   * Shows the ghost for `preview` on `world`'s terrain, green when it fits, red otherwise; a Gate or Stairs is turned
+   * the way it would be built there. Call per frame: the mesh is rebuilt only when the kind or that direction changes.
    */
   public show(world: World, preview: PlacementPreview): void {
-    const passage = preview.kind === ObjectKind.Gate ? gatePassage(world, preview.tx, preview.ty) : null;
-    if (this.modelKind !== preview.kind || this.modelPassage !== passage) this.rebuild(preview.kind, passage);
+    const { kind, tx, ty } = preview;
+    const direction =
+      kind === ObjectKind.Gate ? gatePassage(world, tx, ty) : kind === ObjectKind.Stairs ? stairsFacing(world, tx, ty) : null;
+    if (this.modelKind !== kind || this.modelDirection !== direction) this.rebuild(kind, direction);
     if (this.tintedOk !== preview.ok) {
       this.material.color.setHex(preview.ok ? GHOST_CONFIG.okColor : GHOST_CONFIG.blockedColor);
       this.tintedOk = preview.ok;
@@ -52,13 +55,15 @@ export class PlacementGhost {
     this.object.visible = false;
   }
 
-  /** Replaces the model with a fresh mesh of `kind` (a Gate turned to `passage`) drawn with the ghost's material. */
-  private rebuild(kind: ObjectKind, passage: GatePassage | null): void {
+  /** Replaces the model with a fresh mesh of `kind` (turned to `direction`) drawn with the ghost's material. */
+  private rebuild(kind: ObjectKind, direction: GatePassage | StairsFacing | null): void {
     if (this.model) {
       this.object.remove(this.model);
       this.model.geometry.dispose(); // the material is the ghost's own and stays
     }
-    const model = this.factory.create(kind, passage ?? undefined);
+    const passage = kind === ObjectKind.Gate ? (direction as GatePassage | null) : null;
+    const facing = kind === ObjectKind.Stairs ? (direction as StairsFacing | null) : null;
+    const model = this.factory.create(kind, passage ?? undefined, facing ?? undefined);
     (model.material as THREE.Material).dispose();
     model.material = this.material;
     // Draw after other translucent meshes (the water plane), which would otherwise be blended over the ghost.
@@ -66,6 +71,6 @@ export class PlacementGhost {
     this.object.add(model);
     this.model = model;
     this.modelKind = kind;
-    this.modelPassage = passage;
+    this.modelDirection = direction;
   }
 }

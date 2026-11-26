@@ -13,7 +13,7 @@ describe('BUILD_CATEGORIES', () => {
   });
 
   it('puts each building in its category', () => {
-    expect(labelsIn(BuildCategory.Castle)).toEqual(['Keep', 'Wall', 'Gate', 'Tower']);
+    expect(labelsIn(BuildCategory.Castle)).toEqual(['Keep', 'Wall', 'Gate', 'Tower', 'Stairs']);
     expect(labelsIn(BuildCategory.Industry)).toEqual(['Woodcutter', 'Stockpile', 'Quarry']);
     expect(labelsIn(BuildCategory.Food)).toEqual(['Granary', 'Farm']);
     expect(labelsIn(BuildCategory.Town)).toEqual(['Hovel']);
