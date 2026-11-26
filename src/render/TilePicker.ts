@@ -1,6 +1,5 @@
 // Finds the map tile under a screen position by casting the camera ray against the map's heightfield.
 import * as THREE from 'three';
-import type { NdcPoint } from '../input/Pointer';
 import type { GameMap } from '../sim/GameMap';
 import type { TileCoord } from '../sim/TileCoord';
 import { raycastHeightfield } from './heightfieldRaycast';
@@ -12,8 +11,11 @@ export class TilePicker {
   private readonly raycaster = new THREE.Raycaster();
   private readonly ndcVector = new THREE.Vector2();
 
-  /** The tile under `ndc` as seen from `camera`, or null when the ray misses the map. Call per frame as needed. */
-  public pick(ndc: NdcPoint, camera: THREE.Camera, map: GameMap): TileCoord | null {
+  /**
+   * The tile under `ndc` (normalized device coordinates, each in [-1, 1]) as seen from `camera`, or null when the ray
+   * misses the map. Call per frame as needed.
+   */
+  public pick(ndc: THREE.Vector2Like, camera: THREE.Camera, map: GameMap): TileCoord | null {
     this.ndcVector.set(ndc.x, ndc.y);
     this.raycaster.setFromCamera(this.ndcVector, camera);
     const { origin, direction } = this.raycaster.ray;
