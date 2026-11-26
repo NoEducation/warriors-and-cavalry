@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_TICKS_PER_FRAME, SIMULATION_SPEEDS, SimulationRunner } from '../src/game/SimulationRunner';
+import { GAME_CONFIG } from '../src/game/GameConfig';
+import { SimulationRunner } from '../src/game/SimulationRunner';
 
 describe('SimulationRunner', () => {
   it('has the agreed speeds and frame cap', () => {
-    expect(SIMULATION_SPEEDS).toEqual([1, 2, 4]);
-    expect(MAX_TICKS_PER_FRAME).toBe(10);
+    expect(GAME_CONFIG.simulationSpeeds).toEqual([1, 2, 4]);
+    expect(GAME_CONFIG.maxTicksPerFrame).toBe(10);
   });
 
   it('gives one tick for 0.1 s at 1x', () => {
@@ -44,7 +45,7 @@ describe('SimulationRunner', () => {
     expect(runner.ticksFor(1)).toBe(10);
   });
 
-  it('caps a long frame at MAX_TICKS_PER_FRAME and drops the backlog', () => {
+  it('caps a long frame at GAME_CONFIG.maxTicksPerFrame and drops the backlog', () => {
     const runner = new SimulationRunner(10);
     expect(runner.ticksFor(5)).toBe(10);
     expect(runner.ticksFor(0.05)).toBe(0); // the backlog was dropped

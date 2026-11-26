@@ -7,10 +7,13 @@ import { TreeGeometryFactory } from './TreeGeometryFactory';
 import { ALL_TREE_SPECIES, type TreeSpecies } from './TreeSpecies';
 import type { WorldLayer } from './WorldLayer';
 
-/** Tiles per region side. Each region gets its own meshes and bounding spheres for frustum culling. */
-export const TREE_REGION_SIZE = 64;
-/** Trees are sunk into the ground so trunks do not float on slopes. */
-const TREE_SINK = 0.05;
+/** Tree drawing tuning. */
+export const TREE_LAYER_CONFIG = Object.freeze({
+  /** Tiles per region side. Each region gets its own meshes and bounding spheres for frustum culling. */
+  regionSize: 64,
+  /** Trees are sunk into the ground so trunks do not float on slopes. */
+  sink: 0.05,
+});
 
 /** The trees of one species in one region, as instance matrices and tints. */
 interface TreeBatch {
@@ -55,20 +58,20 @@ export class TreeLayer implements WorldLayer {
   /** Groups the trees by region and species, in row-major region order. */
   private collectBatches(world: World): TreeBatch[] {
     const { map } = world;
-    const regionsPerRow = Math.ceil(map.width / TREE_REGION_SIZE);
+    const regionsPerRow = Math.ceil(map.width / TREE_LAYER_CONFIG.regionSize);
     const batches = new Map<number, TreeBatch>();
     for (const object of world.objects()) {
       if (object.kind !== ObjectKind.Tree) continue;
       const look = treeAppearance(map, object.tx, object.ty);
       const region =
-        Math.floor(object.ty / TREE_REGION_SIZE) * regionsPerRow + Math.floor(object.tx / TREE_REGION_SIZE);
+        Math.floor(object.ty / TREE_LAYER_CONFIG.regionSize) * regionsPerRow + Math.floor(object.tx / TREE_LAYER_CONFIG.regionSize);
       const key = region * ALL_TREE_SPECIES.length + look.species;
       let batch = batches.get(key);
       if (!batch) {
         batch = { species: look.species, matrices: [], tints: [] };
         batches.set(key, batch);
       }
-      const ground = map.tileHeight(object.tx, object.ty) - TREE_SINK;
+      const ground = map.tileHeight(object.tx, object.ty) - TREE_LAYER_CONFIG.sink;
       batch.matrices.push(this.treeMatrix(look, object.tx + 0.5, ground, object.ty + 0.5));
       batch.tints.push(look.tint);
     }

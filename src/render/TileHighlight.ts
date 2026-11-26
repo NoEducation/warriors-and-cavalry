@@ -3,7 +3,11 @@ import * as THREE from 'three';
 import type { Footprint } from '../sim/Footprint';
 import type { GameMap } from '../sim/GameMap';
 
-const LIFT = 0.05;
+/** Outline tuning. */
+export const TILE_HIGHLIGHT_CONFIG = Object.freeze({
+  /** Height of the outline above the ground, so it does not flicker into the terrain. */
+  lift: 0.05,
+});
 /** Most outline points supported: the perimeter corners of a footprint up to 16 tiles per side. */
 const MAX_POINTS = 64;
 
@@ -39,7 +43,7 @@ export class TileHighlight {
     for (const [cx, cy] of perimeter) {
       if (count >= MAX_POINTS) break;
       if (cx < 0 || cy < 0 || cx > map.width || cy > map.height) continue;
-      this.positions.setXYZ(count++, cx, map.heightAt(cx, cy) + LIFT, cy);
+      this.positions.setXYZ(count++, cx, map.heightAt(cx, cy) + TILE_HIGHLIGHT_CONFIG.lift, cy);
     }
     this.object.geometry.setDrawRange(0, count);
     this.positions.needsUpdate = true;

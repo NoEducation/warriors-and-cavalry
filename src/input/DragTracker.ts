@@ -1,4 +1,5 @@
 // Decides whether a mouse press is a click or a drag, and turns drag movement into per-event deltas. No DOM needed.
+import { INPUT_CONFIG } from './inputConfig';
 
 /** Movement of the pointer, in CSS pixels since the previous reported drag, while `button` is held. */
 export interface PointerDrag {
@@ -12,9 +13,6 @@ export interface PressRelease {
   readonly button: number;
   readonly wasDrag: boolean;
 }
-
-/** A press that moves more than this many CSS pixels away from where it started is a drag, not a click. */
-export const DRAG_THRESHOLD_PX = 4;
 
 export class DragTracker {
   /** Button currently held, or null. Only one press is tracked at a time. */
@@ -34,7 +32,7 @@ export class DragTracker {
 
   /**
    * Feeds a pointer position. Returns the movement since the last reported drag once the press has moved more than
-   * DRAG_THRESHOLD_PX from where it started (the first report covers the whole movement since the press); returns null
+   * `INPUT_CONFIG.dragThresholdPx` from where it started (the first report covers the whole movement since the press); returns null
    * before that, without a press, or for non-finite positions. Call on pointermove.
    */
   public move(x: number, y: number): PointerDrag | null {
@@ -42,7 +40,7 @@ export class DragTracker {
     const dx = x - this.lastX;
     const dy = y - this.lastY;
     if (!this.dragging) {
-      if (Math.hypot(dx, dy) <= DRAG_THRESHOLD_PX) return null;
+      if (Math.hypot(dx, dy) <= INPUT_CONFIG.dragThresholdPx) return null;
       this.dragging = true;
     }
     this.lastX = x;

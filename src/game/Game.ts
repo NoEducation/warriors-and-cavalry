@@ -132,7 +132,7 @@ export class Game {
     this.rig.update(dt, this.input.keyboard);
     this.rig.followGround((x, z) => groundHeightAt(this.world.map, x, z), dt);
     this.input.tileHover.update(this.rig.camera, this.world);
-    this.worldView.update(this.runner.tickFraction);
+    this.worldView.update(this.world, this.runner.tickFraction);
     this.widgets.status.update(this.world);
     this.widgets.fpsDisplay.addFrame(dt, time);
     this.pixelRenderer.render(this.worldView.scene, this.rig.camera);

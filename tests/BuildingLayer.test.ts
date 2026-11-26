@@ -23,16 +23,20 @@ describe('BuildingLayer', () => {
     expect(layer.buildingCount).toBe(0);
 
     const placed = world.apply({ type: 'placeBuilding', kind: ObjectKind.Hovel, tx: 4, ty: 4 });
+    expect(layer.buildingCount).toBe(0); // shown at the next update
+    layer.update(world);
     expect(layer.buildingCount).toBe(1);
     expect(layer.object.children).toHaveLength(1);
 
     if (!placed.ok) throw new Error('placement failed');
     world.apply({ type: 'demolish', objectId: placed.object.id });
+    layer.update(world);
     expect(layer.buildingCount).toBe(0);
     expect(layer.object.children).toHaveLength(0);
 
     layer.dispose();
     world.apply({ type: 'placeBuilding', kind: ObjectKind.Hovel, tx: 8, ty: 8 });
+    layer.update(world);
     expect(layer.buildingCount).toBe(0);
   });
 
@@ -55,6 +59,7 @@ describe('BuildingLayer', () => {
     world.apply({ type: 'placeBuilding', kind: ObjectKind.Wall, tx: 6, ty: 5 });
     const layer = new BuildingLayer(world, new BuildingMeshFactory());
     world.apply({ type: 'placeBuilding', kind: ObjectKind.Gate, tx: 5, ty: 5 });
+    layer.update(world);
     const gate = layer.object.children[2] as THREE.Mesh;
     gate.updateMatrixWorld();
     const along = (origin: THREE.Vector3, direction: THREE.Vector3): number =>
@@ -68,6 +73,7 @@ describe('BuildingLayer', () => {
     const world = flatWorld();
     const layer = new BuildingLayer(world, new BuildingMeshFactory());
     world.apply({ type: 'placeBuilding', kind: ObjectKind.Gate, tx: 5, ty: 5 });
+    layer.update(world);
     const gate = layer.object.children[0] as THREE.Mesh;
     gate.updateMatrixWorld();
     const ray = new THREE.Raycaster(new THREE.Vector3(4, 0.5, 5.5), new THREE.Vector3(1, 0, 0));

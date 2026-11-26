@@ -15,8 +15,11 @@ export const CAMERA_CONFIG = {
   maxDt: 0.1,
   /** How fast the focus height follows the ground, per second; higher snaps sooner. */
   groundFollowRate: 6,
+  /** Farthest tile pick distance in world units. */
+  maxPickDistance: 1000,
 } as const;
 
+/** `v` limited to [lo, hi]. */
 export function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
@@ -25,6 +28,12 @@ export function clamp(v: number, lo: number, hi: number): number {
 export function clampDt(dt: number): number {
   if (Number.isNaN(dt)) return 0;
   return clamp(dt, 0, CAMERA_CONFIG.maxDt);
+}
+
+/** A camera move on the ground plane, in world units. */
+export interface PanDelta {
+  readonly dx: number;
+  readonly dz: number;
 }
 
 /**
@@ -37,7 +46,7 @@ export function panDelta(
   yawRad: number,
   speed: number,
   dt: number,
-): { dx: number; dz: number } {
+): PanDelta {
   const len = Math.hypot(forward, right);
   if (len === 0) return { dx: 0, dz: 0 };
   const s = Math.sin(yawRad);
@@ -87,12 +96,19 @@ export function dragRotation(dxPixels: number, dyPixels: number): DragRotation {
   return { yawDelta: dxPixels * k, pitchDelta: dyPixels * k };
 }
 
+/** The camera's position relative to its focus point, in world units. */
+export interface OrbitOffset {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
 /** Camera position relative to the focus point; at yaw 0 it sits above the +z side. */
 export function orbitOffset(
   yawRad: number,
   pitchRad: number,
   distance: number,
-): { x: number; y: number; z: number } {
+): OrbitOffset {
   const horizontal = distance * Math.cos(pitchRad);
   return {
     x: horizontal * Math.sin(yawRad),

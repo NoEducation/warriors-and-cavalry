@@ -7,9 +7,9 @@ const SRC_DIR = join(__dirname, '..', 'src');
 /** Layers (top-level folders of `src`) that each layer must not import from; see the layer table in AGENTS.md. */
 const FORBIDDEN: Readonly<Record<string, readonly string[]>> = {
   sim: ['render', 'game', 'ui', 'input'],
-  render: ['game'],
-  ui: ['game', 'render'],
-  input: ['game', 'render'],
+  render: ['game', 'ui', 'input'],
+  ui: ['game', 'render', 'input'],
+  input: ['game', 'render', 'ui', 'sim'],
 };
 
 /** Every `.ts` file under `dir`, recursively. */
@@ -46,7 +46,7 @@ describe('layer boundaries', () => {
     expect(sourceFiles(SRC_DIR).length).toBeGreaterThan(40);
   });
 
-  it('keeps sim on its own, and render, ui and input independent of game (ui and input also of render)', () => {
+  it('keeps sim and input on their own, render on sim only, and ui on sim only', () => {
     expect(violations()).toEqual([]);
   });
 });

@@ -7,11 +7,13 @@ import { TileType } from '../sim/tiles';
 import { terrainCornerColor } from './terrainCornerColor';
 import { terrainTileShade } from './terrainTileShade';
 
-/** Tiles per chunk side. Chunks let three.js skip the parts of the map outside the view. */
-export const TERRAIN_CHUNK_SIZE = 32;
-
-/** Brightness swing of the per-triangle speckle that gives the flat-shaded ground its pixel texture. */
-const SPECKLE = 0.07;
+/** Terrain mesh tuning. */
+export const TERRAIN_MESH_CONFIG = Object.freeze({
+  /** Tiles per chunk side. Chunks let three.js skip the parts of the map outside the view. */
+  chunkSize: 32,
+  /** Brightness swing of the per-triangle speckle that gives the flat-shaded ground its pixel texture. */
+  speckle: 0.07,
+});
 
 const VERTS_PER_TILE = 6;
 
@@ -25,20 +27,20 @@ interface TileRect {
 
 export class TerrainMeshBuilder {
   /**
-   * Builds one mesh per TERRAIN_CHUNK_SIZE x TERRAIN_CHUNK_SIZE block of tiles (edge chunks may be smaller), all sharing
+   * Builds one mesh per TERRAIN_MESH_CONFIG.chunkSize x TERRAIN_MESH_CONFIG.chunkSize block of tiles (edge chunks may be smaller), all sharing
    * one material, with vertices in world coordinates. Call once per map; the caller owns the group and disposes it.
    * Does not mutate the map.
    */
   public build(map: GameMap): THREE.Group {
     const group = new THREE.Group();
     const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    for (let y0 = 0; y0 < map.height; y0 += TERRAIN_CHUNK_SIZE) {
-      for (let x0 = 0; x0 < map.width; x0 += TERRAIN_CHUNK_SIZE) {
+    for (let y0 = 0; y0 < map.height; y0 += TERRAIN_MESH_CONFIG.chunkSize) {
+      for (let x0 = 0; x0 < map.width; x0 += TERRAIN_MESH_CONFIG.chunkSize) {
         const rect: TileRect = {
           x0,
           y0,
-          width: Math.min(TERRAIN_CHUNK_SIZE, map.width - x0),
-          height: Math.min(TERRAIN_CHUNK_SIZE, map.height - y0),
+          width: Math.min(TERRAIN_MESH_CONFIG.chunkSize, map.width - x0),
+          height: Math.min(TERRAIN_MESH_CONFIG.chunkSize, map.height - y0),
         };
         group.add(new THREE.Mesh(this.buildChunkGeometry(map, rect), material));
       }
@@ -64,7 +66,7 @@ export class TerrainMeshBuilder {
         for (let k = 0; k < 4; k++) terrainCornerColor(map, type, cx[k], cy[k], corner[k], scratch).multiplyScalar(shade);
         // Corners a, b, c, d; split along the b-c diagonal, which heightfieldRaycast tests too.
         for (const [n, k] of [0, 2, 1, 1, 2, 3].entries()) {
-          const speckle = 1 + SPECKLE * 2 * (hash2(map.seed, tx * 2 + (n < 3 ? 0 : 1), ty) - 0.5);
+          const speckle = 1 + TERRAIN_MESH_CONFIG.speckle * 2 * (hash2(map.seed, tx * 2 + (n < 3 ? 0 : 1), ty) - 0.5);
           positions[i * 3] = cx[k];
           positions[i * 3 + 1] = map.heightAt(cx[k], cy[k]);
           positions[i * 3 + 2] = cy[k];

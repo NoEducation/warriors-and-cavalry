@@ -20,7 +20,7 @@ A browser strategy game in the spirit of Stronghold: TypeScript (strict), Vite, 
 | `src/sim/` | Deterministic game state and rules: `GameMap`, `MapGenerator`, `World`, commands, `Footprint`, trees, game time, `Economy`, `Production`, peasants (`Population`, `Jobs`, `WorkerTrips`), `PathFinder`, walls (`WallBuilder`), `ObjectLifecycle` | nothing outside `src/sim/` |
 | `src/render/` | three.js drawing: terrain, water, trees, buildings, peasants, ghost, highlight, camera | `src/sim/` |
 | `src/input/` | Keyboard and pointer state, click-versus-drag | — |
-| `src/ui/` | HTML widgets: `Hud`, `BuildBar`, `ResourceBar`; the build tool table (`BuildTool`) | `src/sim/` types |
+| `src/ui/` | HTML widgets: `Hud`, `BuildBar`, `ResourceBar`; the build tool table (`BuildTool`) | `src/sim/` types and read-only data |
 | `src/game/` | The frame loop and the wiring between the layers: `Game`, `SimulationRunner`, `BuildController`, `TileHover` | all of the above |
 
 - **Simulation purity.** Nothing under `src/sim/` may import `three`, touch `document`/`window`, use `Date`, `performance`, `crypto`, or any `Math` member other than `floor`, `sqrt`, `abs`, `min`, `max`, `imul`. `tests/simPurity.test.ts` enforces this, and `tests/layers.test.ts` enforces the layer table. Randomness comes only from the seed (`rng.ts`, `noise.ts`).

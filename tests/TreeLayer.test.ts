@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { TREE_REGION_SIZE, TreeLayer } from '../src/render/TreeLayer';
+import { TREE_LAYER_CONFIG, TreeLayer } from '../src/render/TreeLayer';
 import { GameMap } from '../src/sim/GameMap';
 import { MapGenerator } from '../src/sim/MapGenerator';
 import { ObjectKind } from '../src/sim/ObjectKind';
@@ -35,14 +35,14 @@ function regionsOf(mesh: THREE.InstancedMesh): Set<string> {
   for (let i = 0; i < mesh.count; i++) {
     mesh.getMatrixAt(i, matrix);
     position.setFromMatrixPosition(matrix);
-    keys.add(`${Math.floor(position.x / TREE_REGION_SIZE)},${Math.floor(position.z / TREE_REGION_SIZE)}`);
+    keys.add(`${Math.floor(position.x / TREE_LAYER_CONFIG.regionSize)},${Math.floor(position.z / TREE_LAYER_CONFIG.regionSize)}`);
   }
   return keys;
 }
 
 describe('TreeLayer', () => {
   it('uses 64-tile regions', () => {
-    expect(TREE_REGION_SIZE).toBe(64);
+    expect(TREE_LAYER_CONFIG.regionSize).toBe(64);
   });
 
   it('draws one instance per tree', () => {

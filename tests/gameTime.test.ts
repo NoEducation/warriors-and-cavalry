@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatGameTime, gameTimeAt, TICKS_PER_DAY, TICKS_PER_SECOND, START_HOUR } from '../src/sim/gameTime';
+import { formatGameTime, GAME_TIME_CONFIG, gameTimeAt, TICKS_PER_SECOND } from '../src/sim/gameTime';
 
 describe('gameTime', () => {
   it('has the agreed rates', () => {
     expect(TICKS_PER_SECOND).toBe(10);
-    expect(TICKS_PER_DAY).toBe(2400);
-    expect(START_HOUR).toBe(6);
+    expect(GAME_TIME_CONFIG.ticksPerDay).toBe(2400);
+    expect(GAME_TIME_CONFIG.startHour).toBe(6);
+    expect(GAME_TIME_CONFIG.minuteStep).toBe(10);
   });
 
   it.each([

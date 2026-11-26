@@ -1,5 +1,6 @@
 // Every peasant of a world, drawn each frame one tick behind the simulation, with a bundle on a carrier's back.
 import * as THREE from 'three';
+import type { GameMap } from '../sim/GameMap';
 import type { PeasantView } from '../sim/PeasantView';
 import { ResourceKind } from '../sim/ResourceKind';
 import type { World } from '../sim/World';
@@ -38,8 +39,8 @@ export class PeasantLayer implements WorldLayer {
   private readonly turn = new THREE.Quaternion();
   private readonly matrix = new THREE.Matrix4();
 
-  /** Draws the peasants of `world` from the first `update` on. Reads the world only; create one per world. */
-  public constructor(private readonly world: World) {
+  /** Draws the peasants of the world passed to `update`, from the first `update` on. Create one per world. */
+  public constructor() {
     const factory = new PeasantGeometryFactory();
     this.bodyGeometry = factory.create();
     this.bundleGeometry = factory.createBundle();
@@ -48,19 +49,19 @@ export class PeasantLayer implements WorldLayer {
   }
 
   /**
-   * Places every peasant one tick behind the simulation, `tickFraction` of the way from where it stood at the
+   * Places every peasant of `world` (reading it only) one tick behind the simulation, `tickFraction` of the way from where it stood at the
    * previous tick to where it stands at the last one (so it moves every frame), and a bundle on each carrier.
    * Call once per frame, after ticking. Allocates only when the peasants outgrow the meshes or new ones arrive.
    */
-  public update(tickFraction: number): void {
-    this.tracks.refresh(this.world);
+  public update(world: World, tickFraction: number): void {
+    this.tracks.refresh(world);
     let count = 0;
-    for (const _ of this.world.peasants()) count++;
+    for (const _ of world.peasants()) count++;
     if (count > this.capacity) this.grow(count);
     let bodyCount = 0;
     let bundleCount = 0;
-    for (const peasant of this.world.peasants()) {
-      this.place(peasant, tickFraction);
+    for (const peasant of world.peasants()) {
+      this.place(world.map, peasant, tickFraction);
       this.bodies.setMatrixAt(bodyCount++, this.matrix);
       if (!peasant.load) continue;
       this.bundles.setMatrixAt(bundleCount, this.matrix);
@@ -83,8 +84,8 @@ export class PeasantLayer implements WorldLayer {
   }
 
   /** Sets `matrix` to where `peasant` is drawn this frame, turned the way it walks. */
-  private place(peasant: PeasantView, tickFraction: number): void {
-    const heading = this.tracks.place(this.world.map, peasant, tickFraction, this.position);
+  private place(map: GameMap, peasant: PeasantView, tickFraction: number): void {
+    const heading = this.tracks.place(map, peasant, tickFraction, this.position);
     this.turn.setFromAxisAngle(UP, heading);
     this.matrix.compose(this.position, this.turn, ONE);
   }

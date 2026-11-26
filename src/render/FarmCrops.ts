@@ -3,15 +3,19 @@ import * as THREE from 'three';
 import type { MapObject } from '../sim/MapObject';
 import { OBJECT_KINDS, ObjectKind } from '../sim/ObjectKind';
 import type { World } from '../sim/World';
-import type { WorldChange } from '../sim/WorldCommand';
 import { SHAPE_COLORS } from './buildings/shapeParts';
 import { WheatFarmShape } from './buildings/WheatFarmShape';
 import { floorHeight } from './floorHeight';
+import { WorldChangeQueue } from './WorldChangeQueue';
 import type { WorldLayer } from './WorldLayer';
 
-/** Crop height right after a harvest and at the end of a cycle. */
-const STUBBLE_HEIGHT = 0.05;
-const FULL_HEIGHT = 0.6;
+/** Crop growth tuning. */
+export const FARM_CROP_CONFIG = Object.freeze({
+  /** Crop height right after a harvest. */
+  stubbleHeight: 0.05,
+  /** Crop height at the end of a cycle. */
+  fullHeight: 0.6,
+});
 const CROP_GREEN = new THREE.Color(SHAPE_COLORS.cropGreen);
 const CROP_GOLD = new THREE.Color(SHAPE_COLORS.cropGold);
 
@@ -30,22 +34,29 @@ export class FarmCrops implements WorldLayer {
   private readonly crops = new Map<number, Crop>();
   /** Length of a wheat farm's production cycle; a crop is ripe at the end of it. */
   private readonly cycleTicks = OBJECT_KINDS[ObjectKind.WheatFarm].production?.cycleTicks ?? 1;
-  private readonly unsubscribe: () => void;
+  private readonly changes: WorldChangeQueue;
 
-  /** Shows a crop on every wheat farm of `world` and follows farms placed and demolished until `dispose`. */
-  public constructor(private readonly world: World) {
+  /** Shows a crop on every wheat farm of `world` and follows the farms placed and demolished until `dispose`. */
+  public constructor(world: World) {
     const { width, height } = OBJECT_KINDS[ObjectKind.WheatFarm];
     const inset = WheatFarmShape.fieldInset;
     this.geometry = new THREE.BoxGeometry(width - 2 * inset, 1, height - 2 * inset);
     this.geometry.translate(width / 2 - inset, 0.5, height / 2 - inset);
-    for (const object of world.objects()) this.add(object);
-    this.unsubscribe = world.onChange(this.onChange);
+    for (const object of world.objects()) this.add(world, object);
+    this.changes = new WorldChangeQueue(world);
   }
 
-  /** Sets each crop's height and colour from its farm's cycle progress. Call once per frame; skips unchanged crops. */
-  public update(): void {
+  /**
+   * Adds and removes crops for the farms placed in or demolished from `world` since the last call, then sets each
+   * crop's height and colour from its farm's cycle progress. Call once per frame; skips unchanged crops.
+   */
+  public update(world: World): void {
+    this.changes.drain((change) => {
+      if (change.type === 'added') this.add(world, change.object);
+      else this.remove(change.object.id);
+    });
     for (const [id, crop] of this.crops) {
-      const progress = this.world.productionProgress(id);
+      const progress = world.productionProgress(id);
       if (progress === null || progress === crop.shownProgress) continue;
       this.show(crop, progress / this.cycleTicks);
       crop.shownProgress = progress;
@@ -54,23 +65,18 @@ export class FarmCrops implements WorldLayer {
 
   /** Stops following the world and frees the crops' materials and shared geometry. Call after removing `object`. */
   public dispose(): void {
-    this.unsubscribe();
+    this.changes.dispose();
     for (const id of [...this.crops.keys()]) this.remove(id);
     this.geometry.dispose();
   }
 
-  private readonly onChange = (change: WorldChange): void => {
-    if (change.type === 'added') this.add(change.object);
-    else this.remove(change.object.id);
-  };
-
   /** Ignores objects that are not wheat farms. A new crop starts as stubble. */
-  private add(object: MapObject): void {
+  private add(world: World, object: MapObject): void {
     if (object.kind !== ObjectKind.WheatFarm) return;
     const material = new THREE.MeshLambertMaterial({ flatShading: true });
     const mesh = new THREE.Mesh(this.geometry, material);
     const inset = WheatFarmShape.fieldInset;
-    const y = floorHeight(this.world.map, object.kind, object.tx, object.ty) + WheatFarmShape.soilTop;
+    const y = floorHeight(world.map, object.kind, object.tx, object.ty) + WheatFarmShape.soilTop;
     mesh.position.set(object.tx + inset, y, object.ty + inset);
     const crop: Crop = { mesh, material, shownProgress: 0 };
     this.show(crop, 0);
@@ -88,7 +94,8 @@ export class FarmCrops implements WorldLayer {
 
   /** Shows `growth` (0 = just cut, 1 = ripe) as height and colour. */
   private show(crop: Crop, growth: number): void {
-    crop.mesh.scale.y = STUBBLE_HEIGHT + (FULL_HEIGHT - STUBBLE_HEIGHT) * growth;
+    const { stubbleHeight, fullHeight } = FARM_CROP_CONFIG;
+    crop.mesh.scale.y = stubbleHeight + (fullHeight - stubbleHeight) * growth;
     crop.material.color.lerpColors(CROP_GREEN, CROP_GOLD, growth);
   }
 }

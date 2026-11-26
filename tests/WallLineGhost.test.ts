@@ -6,7 +6,7 @@ import { GameMap } from '../src/sim/GameMap';
 import { resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import type { WallLinePreview } from '../src/sim/WallBuilder';
-import { WALL_LINE_MAX_TILES } from '../src/sim/wallLine';
+import { WALL_LINE_CONFIG } from '../src/sim/wallLine';
 import { World } from '../src/sim/World';
 
 const SIZE = 16;
@@ -52,7 +52,7 @@ describe('WallLineGhost', () => {
     expect(green.count).toBe(3);
     expect(red.count).toBe(2);
     for (const mesh of [green, red]) {
-      expect(mesh.instanceMatrix.count).toBe(WALL_LINE_MAX_TILES);
+      expect(mesh.instanceMatrix.count).toBe(WALL_LINE_CONFIG.maxTiles);
       const material = mesh.material as THREE.Material;
       expect(material.transparent).toBe(true);
       expect(material.opacity).toBeLessThan(1);

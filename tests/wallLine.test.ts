@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TileCoord } from '../src/sim/TileCoord';
-import { WALL_LINE_MAX_TILES, wallLineTiles } from '../src/sim/wallLine';
+import { WALL_LINE_CONFIG, wallLineTiles } from '../src/sim/wallLine';
 
 const at = (tx: number, ty: number): TileCoord => ({ tx, ty });
 
@@ -36,8 +36,8 @@ describe('wallLineTiles', () => {
     expect(wallLineTiles(at(2, 2), at(2, 2))).toEqual([at(2, 2)]);
   });
 
-  it(`cuts a long line to its first ${WALL_LINE_MAX_TILES} tiles from the start`, () => {
-    expect(WALL_LINE_MAX_TILES).toBe(64);
+  it(`cuts a long line to its first ${WALL_LINE_CONFIG.maxTiles} tiles from the start`, () => {
+    expect(WALL_LINE_CONFIG.maxTiles).toBe(64);
     const tiles = wallLineTiles(at(0, 0), at(100, 0));
     expect(tiles).toHaveLength(64);
     expect(tiles[0]).toEqual(at(0, 0));

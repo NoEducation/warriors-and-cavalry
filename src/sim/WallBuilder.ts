@@ -16,7 +16,7 @@ import {
 
 /** What a wall line from one tile to another would build right now, without building it. */
 export interface WallLinePreview {
-  /** The line's tiles in order from its start, cut to `WALL_LINE_MAX_TILES`. */
+  /** The line's tiles in order from its start, cut to `WALL_LINE_CONFIG.maxTiles`. */
   readonly tiles: readonly TileCoord[];
   /** Per tile of `tiles`: true only when the command would place a piece there now. */
   readonly placeable: readonly boolean[];
