@@ -162,12 +162,12 @@ describe('BuildController', () => {
     expect(messages).toEqual(['Cannot build: not enough stone']);
   });
 
-  it('rejects a Quarry away from rock', () => {
+  it('rejects a Quarry off quarry ground', () => {
     const { world, controller, messages } = setup();
     controller.selectTool(QUARRY);
     expect(controller.preview(world, { tx: 2, ty: 2 })?.ok).toBe(false);
-    expect(controller.click(world, { tx: 2, ty: 2 })).toEqual({ ok: false, reason: 'NeedsRock' });
-    expect(messages).toEqual(['Cannot build: needs rock nearby']);
+    expect(controller.click(world, { tx: 2, ty: 2 })).toEqual({ ok: false, reason: 'NeedsQuarryGround' });
+    expect(messages).toEqual(['Cannot build: needs quarry ground']);
   });
 
   it('places and pays when the cost can be covered', () => {

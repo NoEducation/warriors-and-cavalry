@@ -38,8 +38,8 @@ export interface ObjectKindInfo {
   readonly storage: ResourceAmounts;
   /** True when every footprint tile must be Grass (otherwise Grass or Sand). */
   readonly grassOnly: boolean;
-  /** True when a Rock tile must touch an edge of the footprint. */
-  readonly needsRock: boolean;
+  /** True when every footprint tile must be quarry ground (which no other kind may use). */
+  readonly quarryOnly: boolean;
   /** True when footprint tiles may also be Rock (walls, gates and towers, so castles can stand on hills). */
   readonly rockAllowed: boolean;
   /** Peasants this building houses while it stands. */
@@ -51,7 +51,7 @@ export interface ObjectKindInfo {
 const PLAIN = {
   storage: NO_RESOURCES,
   grassOnly: false,
-  needsRock: false,
+  quarryOnly: false,
   rockAllowed: false,
   housing: 0,
   production: null,
@@ -123,7 +123,7 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
     height: 3,
     buildable: true,
     cost: resources(30, 0, 0),
-    needsRock: true,
+    quarryOnly: true,
     production: { resource: ResourceKind.Stone, cycleTicks: 150, yield: 2, treeRadius: null },
   },
   [ObjectKind.WheatFarm]: {

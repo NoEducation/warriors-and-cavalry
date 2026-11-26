@@ -39,7 +39,7 @@ describe('MapGenerator', () => {
   for (const seed of [1, 2, 3, 4, 5]) {
     it(`seed ${seed} at 512 x 512: water border, 40-55 % land, at most 15 % rock`, () => {
       const { map } = generator.generate({ seed, width: 512, height: 512 });
-      const counts = [0, 0, 0, 0];
+      const counts = [0, 0, 0, 0, 0];
       let borderLand = 0;
       for (let ty = 0; ty < map.height; ty++) {
         for (let tx = 0; tx < map.width; tx++) {

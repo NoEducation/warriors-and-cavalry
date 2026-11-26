@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
 import { hash2 } from '../sim/rng';
 import { TileType } from '../sim/tiles';
-import { terrainVertexColor } from './terrainColor';
+import { terrainCornerColor } from './terrainCornerColor';
+import { terrainTileShade } from './terrainTileShade';
 
 /** Tiles per chunk side. Chunks let three.js skip the parts of the map outside the view. */
 export const TERRAIN_CHUNK_SIZE = 32;
@@ -51,6 +52,7 @@ export class TerrainMeshBuilder {
     const positions = new Float32Array(tileCount * VERTS_PER_TILE * 3);
     const colors = new Float32Array(tileCount * VERTS_PER_TILE * 3);
     const corner = [new THREE.Color(), new THREE.Color(), new THREE.Color(), new THREE.Color()];
+    const scratch = new THREE.Color();
     let i = 0;
 
     for (let ty = rect.y0; ty < rect.y0 + rect.height; ty++) {
@@ -58,7 +60,8 @@ export class TerrainMeshBuilder {
         const type = map.tileAt(tx, ty) ?? TileType.Water;
         const cx = [tx, tx + 1, tx, tx + 1];
         const cy = [ty, ty, ty + 1, ty + 1];
-        for (let k = 0; k < 4; k++) terrainVertexColor(map, type, cx[k], cy[k], corner[k]);
+        const shade = terrainTileShade(map, type, tx, ty);
+        for (let k = 0; k < 4; k++) terrainCornerColor(map, type, cx[k], cy[k], corner[k], scratch).multiplyScalar(shade);
         // Corners a, b, c, d; split along the b-c diagonal, which heightfieldRaycast tests too.
         for (const [n, k] of [0, 2, 1, 1, 2, 3].entries()) {
           const speckle = 1 + SPECKLE * 2 * (hash2(map.seed, tx * 2 + (n < 3 ? 0 : 1), ty) - 0.5);

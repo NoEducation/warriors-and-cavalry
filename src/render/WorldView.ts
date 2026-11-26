@@ -1,6 +1,5 @@
 // The 3D scene for a world: background, lights, terrain, water, trees, buildings, stockpile stacks, crops and peasants.
 import * as THREE from 'three';
-import { MAPGEN_CONFIG } from '../sim/MapGenerator';
 import type { World } from '../sim/World';
 import { BuildingLayer } from './BuildingLayer';
 import { BuildingMeshFactory } from './BuildingMeshFactory';
@@ -11,17 +10,15 @@ import { StockpileStacks } from './StockpileStacks';
 import { TerrainMeshBuilder } from './TerrainMeshBuilder';
 import { TreeLayer } from './TreeLayer';
 import { TreeShadowLayer } from './TreeShadowLayer';
-import { WaterMeshBuilder } from './WaterMeshBuilder';
+import { WaterLayer } from './WaterLayer';
 import type { WorldLayer } from './WorldLayer';
 
 export class WorldView {
   public readonly scene = new THREE.Scene();
   private readonly terrainBuilder = new TerrainMeshBuilder();
-  private readonly waterBuilder = new WaterMeshBuilder();
   private readonly buildingFactory = new BuildingMeshFactory();
   private terrainChunks: THREE.Group | null = null;
-  private waterMesh: THREE.Mesh | null = null;
-  /** Tree shadows, trees, buildings, stockpile stacks, crops and peasants of the shown world, in drawing order; empty at first. */
+  /** Water, tree shadows, trees, buildings, stockpile stacks, crops and peasants of the shown world, in drawing order; empty at first. */
   private readonly layers: WorldLayer[] = [];
 
   /** Creates the scene with background and lights; no world is shown until `showWorld`. */
@@ -43,9 +40,9 @@ export class WorldView {
     const { map } = world;
     this.clearWorld();
     this.terrainChunks = this.terrainBuilder.build(map);
-    this.waterMesh = this.waterBuilder.build(map, MAPGEN_CONFIG.seaLevel);
-    this.scene.add(this.terrainChunks, this.waterMesh);
+    this.scene.add(this.terrainChunks);
     this.layers.push(
+      new WaterLayer(map),
       new TreeShadowLayer(world),
       new TreeLayer(world),
       new BuildingLayer(world, this.buildingFactory),
@@ -70,17 +67,15 @@ export class WorldView {
   }
 
   private clearWorld(): void {
-    for (const object of [this.terrainChunks, this.waterMesh]) {
-      if (!object) continue;
-      this.scene.remove(object);
-      disposeObject(object);
+    if (this.terrainChunks) {
+      this.scene.remove(this.terrainChunks);
+      disposeObject(this.terrainChunks);
     }
     for (const layer of this.layers) {
       this.scene.remove(layer.object);
       layer.dispose();
     }
     this.terrainChunks = null;
-    this.waterMesh = null;
     this.layers.length = 0;
   }
 }

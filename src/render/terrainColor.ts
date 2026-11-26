@@ -1,10 +1,12 @@
-// Terrain vertex colours: per-corner shades of grass, sand, rock and snow from height, slope, curvature and seed noise.
+// Terrain vertex colours: per-corner shades of grass, rock, snow and quarry ground from height, slope, curvature and seed
+// noise; beach and seabed colours come from shoreColor.
 // Render-only and pure: the same map always gets the same colours.
 import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
 import { MAPGEN_CONFIG } from '../sim/MapGenerator';
 import { fbm2 } from '../sim/noise';
 import { TileType } from '../sim/tiles';
+import { sandColor, seabedColor } from './shoreColor';
 
 /** Colour tuning for the terrain, in sRGB hex colours and world units. Tune by editing these values. */
 export const TERRAIN_LOOK_CONFIG = Object.freeze({
@@ -12,13 +14,13 @@ export const TERRAIN_LOOK_CONFIG = Object.freeze({
   grassMeadow: 0x5e9c3a,
   grassDry: 0x93a24c,
   grassHighland: 0x6f8a4e,
-  sandDry: 0xdcca8c,
-  sandWet: 0x9c8a5e,
   rockMoss: 0x737d5e,
   rockStone: 0x7f7a72,
   rockCliff: 0x4e4339,
   snow: 0xd8dee6,
-  seabed: 0x7a6f4e,
+  /** Quarry ground: pale cut limestone, warming to ochre in patches. */
+  quarryPale: 0xdccfab,
+  quarryOchre: 0xc9a66e,
   /** Noise frequency per tile of the large grass patches, of the dry spots, and of the fine mottling. */
   patchScale: 1 / 28,
   dryScale: 1 / 17,
@@ -43,8 +45,6 @@ export const TERRAIN_LOOK_CONFIG = Object.freeze({
   /** How much a corner's height below its neighbours' mean darkens it (and above lightens it), and the limits. */
   curvatureWeight: 0.35,
   curvatureRange: [0.72, 1.15],
-  /** Height above sea level over which sand dries. */
-  wetBand: 0.3,
 });
 
 const SALT = Object.freeze({ patch: 0x51a7, dry: 0x2d33, detail: 0x7e11, snow: 0x4b0b });
@@ -71,7 +71,7 @@ export function terrainVertexColor(map: GameMap, type: TileType, cx: number, cy:
       break;
     }
     case TileType.Sand:
-      out.set(c.sandWet).lerp(tmp.set(c.sandDry), clamp01((h - MAPGEN_CONFIG.seaLevel) / c.wetBand));
+      sandColor(map, cx, cy, out);
       break;
     case TileType.Rock: {
       const slope = slopeAt(map, cx, cy);
@@ -86,8 +86,11 @@ export function terrainVertexColor(map: GameMap, type: TileType, cx: number, cy:
       out.lerp(tmp.set(c.snow), snow);
       break;
     }
+    case TileType.Quarry:
+      out.set(c.quarryPale).lerp(tmp.set(c.quarryOchre), 0.7 * smooth(0.4, 0.7, n(SALT.dry, c.lichenScale, 2)));
+      break;
     default:
-      out.set(c.seabed).multiplyScalar(0.75 + 0.25 * clamp01(1 + h / MAPGEN_CONFIG.seabedDepth));
+      seabedColor(map, cx, cy, out);
   }
   return out.multiplyScalar(detail * curvatureShade(map, cx, cy, h));
 }

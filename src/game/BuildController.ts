@@ -17,7 +17,7 @@ const REASON_TEXT: Record<FailureReason, string> = {
   BadTerrain: 'bad terrain',
   Occupied: 'occupied',
   TooSteep: 'too steep',
-  NeedsRock: 'needs rock nearby',
+  NeedsQuarryGround: 'needs quarry ground',
   // Used only if the economy cannot name the missing resource; `click` normally says `not enough wood` etc.
   NotEnoughResources: 'not enough resources',
   UnknownObject: 'nothing here',
