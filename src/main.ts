@@ -1,6 +1,6 @@
-// Entry point: finds the page elements, creates the Game and starts it.
+// Entry point: finds the page elements and starts the launcher (start menu, loader, then the game).
 import './ui/ui.css';
-import { Game } from './game/Game';
+import { GameLauncher } from './game/GameLauncher';
 
 function showError(message: string): void {
   const el = document.getElementById('error');
@@ -14,21 +14,15 @@ function main(): void {
   const hudRoot = document.getElementById('hud');
   const resourceRoot = document.getElementById('resources');
   const buildBarRoot = document.getElementById('buildbar');
-  if (!(canvas instanceof HTMLCanvasElement) || !hudRoot || !resourceRoot || !buildBarRoot) {
+  const menuRoot = document.getElementById('menu');
+  const loadingRoot = document.getElementById('loading');
+  if (!(canvas instanceof HTMLCanvasElement) || !hudRoot || !resourceRoot || !buildBarRoot || !menuRoot || !loadingRoot) {
     throw new Error(
-      'index.html must contain <canvas id="game">, <div id="hud">, <div id="resources"> and <div id="buildbar">',
+      'index.html must contain <canvas id="game">, <div id="hud">, <div id="resources">, <div id="buildbar">, ' +
+        '<div id="menu"> and <div id="loading">',
     );
   }
-
-  let game: Game;
-  try {
-    game = new Game(canvas, hudRoot, resourceRoot, buildBarRoot);
-  } catch (err) {
-    console.error(err);
-    showError('WebGL is not available in this browser.');
-    return;
-  }
-  game.start();
+  new GameLauncher({ canvas, hudRoot, resourceRoot, buildBarRoot, menuRoot, loadingRoot, showError }).start();
 }
 
 main();
