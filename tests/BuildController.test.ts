@@ -279,6 +279,30 @@ describe('BuildController wall drags', () => {
     expect(messages).toEqual([]);
   });
 
+  it('keeps the same preview while the end tile, the objects and the stone stay the same', () => {
+    const { world, controller } = stoneSetup(10);
+    controller.startWallDrag(world, START);
+    const preview = controller.wallDragPreview(world, END);
+    expect(controller.wallDragPreview(world, { ...END })).toBe(preview);
+    expect(controller.wallDragPreview(world, null)).toBe(preview);
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Wall, tx: 12, ty: 12 }); // spends 2 stone
+    const afterStone = controller.wallDragPreview(world, END);
+    expect(afterStone).not.toBe(preview);
+    expect(afterStone?.placedCount).toBe(4);
+    expect(controller.wallDragPreview(world, END)).toBe(afterStone);
+    expect(controller.wallDragPreview(world, { tx: 8, ty: 5 })).not.toBe(afterStone);
+  });
+
+  it('recomputes the preview when the objects change, even with the stone unchanged', () => {
+    const { world, controller } = stoneSetup(10);
+    controller.startWallDrag(world, START);
+    const preview = controller.wallDragPreview(world, END);
+    world.spawn(ObjectKind.Tree, 7, 5);
+    const next = controller.wallDragPreview(world, END);
+    expect(next).not.toBe(preview);
+    expect(next?.placedCount).toBe(4);
+  });
+
   it('names the missing stone when nothing can be paid', () => {
     const { world, controller, messages } = stoneSetup(0);
     controller.startWallDrag(world, START);

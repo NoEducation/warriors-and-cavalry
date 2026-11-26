@@ -19,6 +19,9 @@ import { productionStatusText } from '../ui/statusText';
 import type { BuildController } from './BuildController';
 
 export class TileHover {
+  /** The wall line the ghost and the message line show now; an identical preview needs no redraw. */
+  private shownWallLine: WallLinePreview | null = null;
+
   /** Uses the given pointer, picker, highlight, ghosts, HUD and build controller; owns none of them. */
   public constructor(
     private readonly pointer: Pointer,
@@ -47,15 +50,22 @@ export class TileHover {
     this.updateGhosts(world, preview, wallLine);
     this.updateHighlight(world, tile, preview);
     this.updateHudLine(world, tile);
-    this.hud.setLiveMessage(wallLine ? wallLineText(wallLine.placedCount, wallLine.cost) : null);
   }
 
   /** Shows the wall line being dragged, else the building about to be placed; hides the ghosts not needed. */
   private updateGhosts(world: World, preview: PlacementPreview | null, wallLine: WallLinePreview | null): void {
     if (preview) this.ghost.show(world, preview);
     else this.ghost.hide();
+    this.showWallLine(world, wallLine);
+  }
+
+  /** Draws the wall line's ghost and cost, or hides them for null; skipped while the preview is the one shown. */
+  private showWallLine(world: World, wallLine: WallLinePreview | null): void {
+    if (wallLine === this.shownWallLine) return;
+    this.shownWallLine = wallLine;
     if (wallLine) this.wallGhost.show(world, wallLine);
     else this.wallGhost.hide();
+    this.hud.setLiveMessage(wallLine ? wallLineText(wallLine.placedCount, wallLine.cost) : null);
   }
 
   /** Outlines the placement footprint, else the hovered object's footprint, else the hovered tile. */

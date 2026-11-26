@@ -7,6 +7,7 @@ import type { WallLinePreview } from '../sim/WallBuilder';
 import type { World } from '../sim/World';
 import type { CommandResult } from '../sim/WorldCommand';
 import type { BuildTool } from '../ui/BuildTool';
+import { WallDrag } from './WallDrag';
 
 type FailureReason = Extract<CommandResult, { ok: false }>['reason'];
 
@@ -26,10 +27,8 @@ const REASON_TEXT: Record<FailureReason, string> = {
 
 export class BuildController {
   private currentTool: BuildTool = null;
-  /** Where the wall drag in progress started, or null when none is. */
-  private wallStart: TileCoord | null = null;
-  /** The last tile the drag's end was over; the line ends there while the cursor is off the map. */
-  private wallEnd: TileCoord | null = null;
+  /** The wall drag in progress, or null when none is. */
+  private wallDrag: WallDrag | null = null;
 
   /**
    * Holds no world: `preview` and `click` get the world to act on with every call.
@@ -44,7 +43,7 @@ export class BuildController {
 
   /** True while a wall drag is in progress. */
   public get isWallDragging(): boolean {
-    return this.wallStart !== null;
+    return this.wallDrag !== null;
   }
 
   /** Selects `tool`; null deselects. Cancels a wall drag. Call from the build bar, tool keys, Escape or right-click. */
@@ -58,19 +57,16 @@ export class BuildController {
    * is taken like in the other drag calls, though starting reads nothing from it yet.
    */
   public startWallDrag(world: World, tile: TileCoord | null): void {
-    if (!tile || !this.isWallTool()) return;
-    this.wallStart = { tx: tile.tx, ty: tile.ty };
-    this.wallEnd = null;
+    if (tile && this.isWallTool()) this.wallDrag = new WallDrag({ tx: tile.tx, ty: tile.ty });
   }
 
   /**
    * What the wall drag would build if released over `tile`; with `tile` null (cursor off the map), the line to the
-   * last tile seen, else just the start piece. Null without a drag. Call per frame.
+   * last tile seen, else just the start piece. Null without a drag. The same object as the previous call while the
+   * end tile, the world's objects and its stone are unchanged. Call per frame.
    */
   public wallDragPreview(world: World, tile: TileCoord | null): WallLinePreview | null {
-    if (!this.wallStart) return null;
-    if (tile) this.wallEnd = { tx: tile.tx, ty: tile.ty };
-    return world.previewWallLine(this.wallStart, this.wallEnd ?? this.wallStart);
+    return this.wallDrag?.previewTo(world, tile) ?? null;
   }
 
   /**
@@ -79,9 +75,10 @@ export class BuildController {
    * the stone did not cover through `onMessage`. Call on a left release.
    */
   public finishWallDrag(world: World, tile: TileCoord | null): CommandResult | null {
-    const start = this.wallStart;
-    if (!start) return null;
-    const end = tile ?? this.wallEnd ?? start;
+    const drag = this.wallDrag;
+    if (!drag) return null;
+    const { start } = drag;
+    const end = tile ?? drag.end;
     this.cancelWallDrag();
     const result = world.apply({ type: 'placeWallLine', fromTx: start.tx, fromTy: start.ty, toTx: end.tx, toTy: end.ty });
     this.reportWallLine(world, result);
@@ -90,8 +87,7 @@ export class BuildController {
 
   /** Drops the wall drag in progress without building. Call on Escape or a right click during a drag. */
   public cancelWallDrag(): void {
-    this.wallStart = null;
-    this.wallEnd = null;
+    this.wallDrag = null;
   }
 
   /**
