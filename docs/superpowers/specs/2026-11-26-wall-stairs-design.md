@@ -91,8 +91,10 @@ Until soldiers exist, **idle peasants keep watch on the walls** *(my call; it is
 walk working and becomes the soldiers' "post" later)*:
 
 - When an idle peasant needs a stand, it first looks for a free walk tile (no other stand on it) that it can reach in
-  climbing mode, nearest the Keep first in the same ring order as today; a search bounded like the tree search
-  (`treeSearchMaxExpanded`) so an unreachable wall costs little.
+  climbing mode: one search toward all of them at once, so it takes the nearest by walking distance (as built: simpler
+  and cheaper than a ring scan), bounded like the tree search (`treeSearchMaxExpanded`) so an unreachable wall costs
+  little. Only while some stairs stand. When a wall, tower or stairs is added or removed, idle peasants on the ground
+  look again, so building stairs later sends them up.
 - With no such tile, it takes a ground stand around the Keep as today.
 - A peasant on a wall that gets a job walks along the wall and down a stair on its way (ground-trip rules allow it).
 - If its wall stand is demolished, it stands on the ground where it is and picks a new stand (existing "stand no longer
