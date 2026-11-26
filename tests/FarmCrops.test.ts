@@ -34,14 +34,14 @@ describe('FarmCrops', () => {
     const world = flatWorld();
     placeFarm(world, 1, 1);
     const crops = new FarmCrops(world);
-    crops.update();
+    crops.update(world);
     expect(crops.object.children).toHaveLength(1);
     const second = placeFarm(world, 8, 8);
     world.apply({ type: 'placeBuilding', kind: ObjectKind.Hovel, tx: 1, ty: 8 });
-    crops.update();
+    crops.update(world);
     expect(crops.object.children).toHaveLength(2);
     world.apply({ type: 'demolish', objectId: second.id });
-    crops.update();
+    crops.update(world);
     expect(crops.object.children).toHaveLength(1);
     crops.dispose();
   });
@@ -52,24 +52,24 @@ describe('FarmCrops', () => {
     // A Keep right of the farm: its peasant works the farm and delivers to the Keep a step or two away.
     world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 6, ty: 1 });
     const crops = new FarmCrops(world);
-    crops.update();
+    crops.update(world);
     const crop = crops.object.children[0];
     const stubble = heightOf(crop);
     const startColor = colorOf(crop).clone();
 
     while (world.productionProgress(farm.id) === 0) world.tick(); // until the worker has started
     for (let i = 1; i < 199; i++) world.tick();
-    crops.update();
+    crops.update(world);
     const full = heightOf(crop);
     expect(full).toBeGreaterThan(stubble * 3);
     expect(colorOf(crop).r).toBeGreaterThan(startColor.r); // gold has more red than green does
 
     world.tick(); // completes the cycle
-    crops.update();
+    crops.update(world);
     expect(heightOf(crop)).toBeCloseTo(stubble);
 
     for (let i = 0; i < 100; i++) world.tick();
-    crops.update();
+    crops.update(world);
     expect(heightOf(crop) / full).toBeGreaterThan(0.4);
     expect(heightOf(crop) / full).toBeLessThan(0.6);
     expect(crops.object.children[0]).toBe(crop);
@@ -81,7 +81,7 @@ describe('FarmCrops', () => {
     world.map.heights[1 * (SIZE + 1) + 5] = 0.5; // a corner of the farm at (1, 1)
     placeFarm(world, 1, 1);
     const crops = new FarmCrops(world);
-    crops.update();
+    crops.update(world);
     const box = new THREE.Box3().setFromObject(crops.object);
     expect(box.min.x).toBeGreaterThanOrEqual(1);
     expect(box.max.x).toBeLessThanOrEqual(5);
@@ -93,7 +93,7 @@ describe('FarmCrops', () => {
     const world = flatWorld();
     placeFarm(world, 1, 1);
     const crops = new FarmCrops(world);
-    crops.update();
+    crops.update(world);
     crops.dispose();
     expect(crops.object.children).toHaveLength(0);
   });

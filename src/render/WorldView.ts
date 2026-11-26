@@ -34,7 +34,7 @@ export class WorldView {
 
   /**
    * Replaces everything shown with meshes for `world`: terrain, water, trees, and buildings, stockpile stacks, crops
-   * and peasants (which then follow the world's changes). Call on every world load.
+   * and peasants (which then follow the world passed to `update`). Call on every world load.
    */
   public showWorld(world: World): void {
     const { map } = world;
@@ -48,17 +48,17 @@ export class WorldView {
       new BuildingLayer(world, this.buildingFactory),
       new StockpileStacks(world),
       new FarmCrops(world),
-      new PeasantLayer(world),
+      new PeasantLayer(),
     );
     for (const layer of this.layers) this.scene.add(layer.object);
   }
 
   /**
-   * Brings every layer (e.g. stockpile stacks, crops and peasants) in line with the shown world, `tickFraction` of a
-   * tick past the last simulation tick. Call once per frame, after ticking.
+   * Brings every layer (e.g. buildings, stockpile stacks, crops and peasants) in line with `world`, the one last passed
+   * to `showWorld`, `tickFraction` of a tick past the last simulation tick. Call once per frame, after ticking.
    */
-  public update(tickFraction: number): void {
-    for (const layer of this.layers) layer.update(tickFraction);
+  public update(world: World, tickFraction: number): void {
+    for (const layer of this.layers) layer.update(world, tickFraction);
   }
 
   /** Removes and frees everything shown. Call when the view is no longer needed. */

@@ -49,8 +49,9 @@ function worldWithStockpile(): { world: World; stockpile: MapObject } {
 
 describe('StockpileStacks', () => {
   it('draws nothing without a stockpile', () => {
-    const stacks = new StockpileStacks(flatWorld());
-    stacks.update();
+    const world = flatWorld();
+    const stacks = new StockpileStacks(world);
+    stacks.update(world);
     expect(stacks.object.children).toHaveLength(0);
     stacks.dispose();
   });
@@ -60,7 +61,7 @@ describe('StockpileStacks', () => {
     expect(world.economy.amount(ResourceKind.Wood)).toBe(100);
     expect(world.economy.capacity(ResourceKind.Wood)).toBe(250);
     const stacks = new StockpileStacks(world);
-    stacks.update();
+    stacks.update(world);
     expect(instances(stacks, 'logs')).toBe(4);
     expect(instances(stacks, 'stones')).toBe(0);
     stacks.dispose();
@@ -69,13 +70,13 @@ describe('StockpileStacks', () => {
   it('follows the wood after update and creates nothing new when nothing changed', () => {
     const { world } = worldWithStockpile();
     const stacks = new StockpileStacks(world);
-    stacks.update();
+    stacks.update(world);
     place(world, ObjectKind.Hovel, 10, 2); // 100 - 15 = 85 wood → ceil(2.72) = 3
-    stacks.update();
+    stacks.update(world);
     expect(instances(stacks, 'logs')).toBe(3);
     const before = [...stacks.object.children];
-    stacks.update();
-    stacks.update();
+    stacks.update(world);
+    stacks.update(world);
     expect(stacks.object.children).toEqual(before);
     stacks.object.children.forEach((child, i) => expect(child).toBe(before[i]));
     stacks.dispose();
@@ -84,11 +85,11 @@ describe('StockpileStacks', () => {
   it('keeps the same mesh and changes only its count when the wood amount changes', () => {
     const { world } = worldWithStockpile();
     const stacks = new StockpileStacks(world);
-    stacks.update();
+    stacks.update(world);
     const logs = stacks.object.getObjectByName('logs') as THREE.InstancedMesh;
     expect(logs.count).toBe(4);
     place(world, ObjectKind.Hovel, 10, 2); // 100 - 15 = 85 wood → 3
-    stacks.update();
+    stacks.update(world);
     expect(stacks.object.getObjectByName('logs')).toBe(logs);
     expect(logs.count).toBe(3);
     stacks.dispose();
@@ -101,7 +102,7 @@ describe('StockpileStacks', () => {
     const world = new World(new GameMap(SIZE, SIZE, 1, heights, tiles), economy);
     place(world, ObjectKind.Stockpile, 2, 2); // 100 of 250 stone → 4 blocks, one layer; 5 starts the second
     const stacks = new StockpileStacks(world);
-    stacks.update();
+    stacks.update(world);
     const stones = stacks.object.getObjectByName('stones') as THREE.InstancedMesh;
     const position = (i: number): THREE.Vector3 => {
       const matrix = new THREE.Matrix4();
@@ -119,13 +120,13 @@ describe('StockpileStacks', () => {
     const { world, stockpile } = worldWithStockpile();
     const second = place(world, ObjectKind.Stockpile, 2, 8); // 90 of 400 wood → ceil(1.8) = 2 each
     const stacks = new StockpileStacks(world);
-    stacks.update();
+    stacks.update(world);
     expect(instances(stacks, 'logs')).toBe(4);
     world.apply({ type: 'demolish', objectId: second.id }); // 95 of 250 wood → ceil(3.04) = 4 on one stockpile
-    stacks.update();
+    stacks.update(world);
     expect(instances(stacks, 'logs')).toBe(4);
     world.apply({ type: 'demolish', objectId: stockpile.id });
-    stacks.update();
+    stacks.update(world);
     expect(instances(stacks, 'logs')).toBe(0);
     stacks.dispose();
   });
@@ -133,7 +134,7 @@ describe('StockpileStacks', () => {
   it('puts the stacks on the stockpile', () => {
     const { world } = worldWithStockpile();
     const stacks = new StockpileStacks(world);
-    stacks.update();
+    stacks.update(world);
     const box = new THREE.Box3().setFromObject(stacks.object);
     expect(box.min.x).toBeGreaterThanOrEqual(2);
     expect(box.max.x).toBeLessThanOrEqual(5);
@@ -146,7 +147,7 @@ describe('StockpileStacks', () => {
   it('empties its group on dispose', () => {
     const { world } = worldWithStockpile();
     const stacks = new StockpileStacks(world);
-    stacks.update();
+    stacks.update(world);
     stacks.dispose();
     expect(stacks.object.children).toHaveLength(0);
   });

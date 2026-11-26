@@ -60,16 +60,16 @@ function positionOf(instanced: THREE.InstancedMesh, index: number): THREE.Vector
 describe('PeasantLayer', () => {
   it('draws one body per peasant and one bundle per carrier', () => {
     const world = camp();
-    const layer = new PeasantLayer(world);
-    layer.update(0);
+    const layer = new PeasantLayer();
+    layer.update(world, 0);
     expect(bodies(layer).count).toBe(0);
     expect(bundles(layer).count).toBe(0);
     tickUntil(world, () => world.population.count === 2);
-    layer.update(0);
+    layer.update(world, 0);
     expect(bodies(layer).count).toBe(2);
     expect(bundles(layer).count).toBe(0);
     tickUntil(world, () => [...world.peasants()].some((p) => p.load !== null));
-    layer.update(0.5);
+    layer.update(world, 0.5);
     const carriers = [...world.peasants()].filter((p) => p.load !== null).length;
     expect(carriers).toBe(1);
     expect(bodies(layer).count).toBe(world.population.count);
@@ -79,10 +79,10 @@ describe('PeasantLayer', () => {
 
   it('draws a peasant one tick behind: from where it was at the last tick toward where it is now', () => {
     const world = camp();
-    const layer = new PeasantLayer(world);
+    const layer = new PeasantLayer();
     let walker: PeasantView | undefined;
     tickUntil(world, () => {
-      layer.update(0);
+      layer.update(world, 0);
       walker = [...world.peasants()].find(
         (p) => p.stepTicks === 4 && p.stepProgress === 2 && p.nextTx === p.tx + 1 && p.nextTy === p.ty,
       );
@@ -90,12 +90,12 @@ describe('PeasantLayer', () => {
     });
     const index = [...world.peasants()].indexOf(walker!);
     // Now at 2/4 of the step (tx + 1.0); at the last tick it was at 1/4 (tx + 0.75).
-    layer.update(0);
+    layer.update(world, 0);
     const position = positionOf(bodies(layer), index);
     expect(position.x).toBeCloseTo(walker!.tx + 0.75);
     expect(position.z).toBeCloseTo(walker!.ty + 0.5);
     expect(position.y).toBeCloseTo(0);
-    layer.update(0.5);
+    layer.update(world, 0.5);
     expect(positionOf(bodies(layer), index).x).toBeCloseTo(walker!.tx + 0.875);
     layer.dispose();
   });
@@ -105,16 +105,16 @@ describe('PeasantLayer', () => {
     world.spawn(ObjectKind.Tree, 26, 6);
     world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 2, ty: 2 });
     world.apply({ type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 20, ty: 6 }); // a long walk east
-    const layer = new PeasantLayer(world);
+    const layer = new PeasantLayer();
     tickUntil(world, () => world.population.count === 1);
     for (let i = 0; i < 3; i++) {
-      layer.update(0);
+      layer.update(world, 0);
       world.tick();
     }
     const samples: THREE.Vector3[] = [];
     for (let tick = 0; tick < 16; tick++) {
       for (const fraction of [0, 0.25, 0.5, 0.75]) {
-        layer.update(fraction);
+        layer.update(world, fraction);
         samples.push(positionOf(bodies(layer), 0));
       }
       world.tick();
@@ -129,9 +129,9 @@ describe('PeasantLayer', () => {
 
   it('colours each bundle by the resource carried', () => {
     const world = camp();
-    const layer = new PeasantLayer(world);
+    const layer = new PeasantLayer();
     tickUntil(world, () => [...world.peasants()].some((p) => p.load?.resource === ResourceKind.Wood));
-    layer.update(0);
+    layer.update(world, 0);
     const color = new THREE.Color();
     bundles(layer).getColorAt(0, color);
     expect(color.getHex()).toBe(0x6b4a2b);
@@ -145,7 +145,7 @@ describe('PeasantLayer', () => {
     world.spawn(ObjectKind.Keep, 2, 2);
     // 64 Hovels: housing for 4 + 256 peasants.
     for (let i = 0; i < 64; i++) world.spawn(ObjectKind.Hovel, 10 + (i % 16) * 3, 10 + Math.floor(i / 16) * 3);
-    const layer = new PeasantLayer(world);
+    const layer = new PeasantLayer();
     tickUntil(
       world,
       () => {
@@ -154,7 +154,7 @@ describe('PeasantLayer', () => {
       },
       20000,
     );
-    expect(() => layer.update(0)).not.toThrow();
+    expect(() => layer.update(world, 0)).not.toThrow();
     expect(bodies(layer).count).toBe(world.population.count);
     expect(bodies(layer).instanceMatrix.count).toBeGreaterThanOrEqual(world.population.count);
     layer.dispose();
@@ -162,9 +162,9 @@ describe('PeasantLayer', () => {
 
   it('empties its group on dispose', () => {
     const world = camp();
-    const layer = new PeasantLayer(world);
+    const layer = new PeasantLayer();
     tickUntil(world, () => world.population.count === 1);
-    layer.update(0);
+    layer.update(world, 0);
     layer.dispose();
     expect(layer.object.children).toHaveLength(0);
   });

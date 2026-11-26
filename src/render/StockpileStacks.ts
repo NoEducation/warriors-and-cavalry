@@ -4,10 +4,10 @@ import type { MapObject } from '../sim/MapObject';
 import { ObjectKind } from '../sim/ObjectKind';
 import { ResourceKind } from '../sim/ResourceKind';
 import type { World } from '../sim/World';
-import type { WorldChange } from '../sim/WorldCommand';
 import { StockpileShape } from './buildings/StockpileShape';
 import { SHAPE_COLORS } from './buildings/shapeParts';
 import { floorHeight } from './floorHeight';
+import { WorldChangeQueue } from './WorldChangeQueue';
 import type { WorldLayer } from './WorldLayer';
 
 /** Stack slots per resource on one stockpile: 2 columns x 2 rows x 2 layers. */
@@ -39,12 +39,12 @@ export class StockpileStacks implements WorldLayer {
   private readonly stockpiles = new Map<number, THREE.Vector3>();
   /** One mesh per style (same order), with room for every slot of every stockpile; empty without stockpiles. */
   private readonly meshes: THREE.InstancedMesh[] = [];
-  private readonly unsubscribe: () => void;
+  private readonly changes: WorldChangeQueue;
   private readonly matrix = new THREE.Matrix4();
   private stockpilesChanged = true;
 
   /** Follows the stockpiles of `world` until `dispose`; draws nothing before the first `update`. Reads only. */
-  public constructor(private readonly world: World) {
+  public constructor(world: World) {
     this.styles = [
       {
         name: 'logs',
@@ -63,20 +63,24 @@ export class StockpileStacks implements WorldLayer {
         layerStep: STONE_SIZE.y,
       },
     ];
-    for (const object of world.objects()) this.add(object);
-    this.unsubscribe = world.onChange(this.onChange);
+    for (const object of world.objects()) this.add(world, object);
+    this.changes = new WorldChangeQueue(world);
   }
 
   /**
-   * Brings the stacks in line with the stored wood and stone. Call once per frame. Allocates meshes only when
-   * stockpiles were placed or demolished; otherwise only the instance counts change.
+   * Brings the stacks in line with `world`'s stockpiles and stored wood and stone. Call once per frame. Allocates meshes
+   * only when stockpiles were placed or demolished; otherwise only the instance counts change.
    */
-  public update(): void {
+  public update(world: World): void {
+    this.changes.drain((change) => {
+      if (change.type === 'added') this.add(world, change.object);
+      else this.remove(change.object);
+    });
     if (this.stockpilesChanged) this.allocateMeshes();
     this.styles.forEach((style, i) => {
       const mesh = this.meshes[i];
       if (!mesh) return;
-      const count = this.stackCount(style.resource) * this.stockpiles.size;
+      const count = this.stackCount(world, style.resource) * this.stockpiles.size;
       if (count === mesh.count) return;
       mesh.count = count;
       mesh.visible = count > 0; // an empty instanced mesh would still cost a draw call
@@ -85,7 +89,7 @@ export class StockpileStacks implements WorldLayer {
 
   /** Stops following the world and frees every mesh, geometry and material. Call after removing `object`. */
   public dispose(): void {
-    this.unsubscribe();
+    this.changes.dispose();
     this.clearMeshes();
     for (const style of this.styles) {
       style.geometry.dispose();
@@ -93,15 +97,10 @@ export class StockpileStacks implements WorldLayer {
     }
   }
 
-  private readonly onChange = (change: WorldChange): void => {
-    if (change.type === 'added') this.add(change.object);
-    else this.remove(change.object);
-  };
-
-  /** Ignores objects that are not stockpiles. The stacks follow at the next `update`. */
-  private add(object: MapObject): void {
+  /** Ignores objects that are not stockpiles. The stacks follow later in the same `update`. */
+  private add(world: World, object: MapObject): void {
     if (object.kind !== ObjectKind.Stockpile) return;
-    const y = floorHeight(this.world.map, object.kind, object.tx, object.ty) + StockpileShape.deckTop;
+    const y = floorHeight(world.map, object.kind, object.tx, object.ty) + StockpileShape.deckTop;
     this.stockpiles.set(object.id, new THREE.Vector3(object.tx, y, object.ty));
     this.stockpilesChanged = true;
   }
@@ -112,9 +111,9 @@ export class StockpileStacks implements WorldLayer {
   }
 
   /** `ceil(SLOTS × amount / capacity)`: how many stacks of `kind` each stockpile shows. */
-  private stackCount(kind: ResourceKind): number {
-    const capacity = this.world.economy.capacity(kind);
-    return capacity > 0 ? Math.min(SLOTS, Math.ceil((SLOTS * this.world.economy.amount(kind)) / capacity)) : 0;
+  private stackCount(world: World, kind: ResourceKind): number {
+    const capacity = world.economy.capacity(kind);
+    return capacity > 0 ? Math.min(SLOTS, Math.ceil((SLOTS * world.economy.amount(kind)) / capacity)) : 0;
   }
 
   /**
