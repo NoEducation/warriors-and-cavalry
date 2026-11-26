@@ -87,8 +87,8 @@
         background: rgba(255, 220, 80, 0.35);
         border-color: #ffdc50;
       }
-      /* Narrow windows: smaller buttons so all eight fit in one row. */
-      @media (max-width: 700px) {
+      /* Narrow windows: smaller buttons so all eleven fit in one row. */
+      @media (max-width: 900px) {
         #buildbar {
           gap: 2px;
           padding: 3px 4px;
@@ -96,6 +96,17 @@
         #buildbar button {
           font-size: 10px;
           padding: 2px 3px;
+        }
+      }
+      /* Down to a 530 px window: smaller still, with the gaps and padding nearly gone. */
+      @media (max-width: 640px) {
+        #buildbar {
+          gap: 1px;
+          padding: 2px 3px;
+        }
+        #buildbar button {
+          font-size: 9px;
+          padding: 1px 2px;
         }
       }
       #error {
