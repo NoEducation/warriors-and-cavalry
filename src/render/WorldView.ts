@@ -26,9 +26,11 @@ export class WorldView {
   /** Creates the scene with background and lights; no world is shown until `showWorld`. */
   public constructor() {
     this.scene.background = new THREE.Color(0x1b2a38);
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-    sun.position.set(-0.6, 1, -0.4); // shines towards the origin (default target)
+    // Sky light from above and bounce light from the ground keep shadowed slopes readable; a warm, low sun gives relief.
+    this.scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x5a4a30, 1.1));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+    const sun = new THREE.DirectionalLight(0xfff1d8, 2.1);
+    sun.position.set(-0.8, 0.85, -0.35); // shines towards the origin (default target)
     this.scene.add(sun);
   }
 
