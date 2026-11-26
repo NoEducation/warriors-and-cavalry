@@ -74,7 +74,7 @@ export class StockpileStacks implements WorldLayer {
   public update(world: World): void {
     this.changes.drain((change) => {
       if (change.type === 'added') this.add(world, change.object);
-      else this.remove(change.object);
+      else if (change.type === 'removed') this.remove(change.object);
     });
     if (this.stockpilesChanged) this.allocateMeshes();
     this.styles.forEach((style, i) => {

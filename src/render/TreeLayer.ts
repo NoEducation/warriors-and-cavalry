@@ -1,5 +1,5 @@
 // Every tree of a world: one instanced mesh per species and square region, so three.js can skip regions out of view.
-// A felled tree tips over and is hidden; trees are never added after the world is generated.
+// A chopped tree is drawn smaller per round taken; a felled tree tips over and is hidden; trees are never added after the world is generated.
 import * as THREE from 'three';
 import { TICKS_PER_SECOND } from '../sim/gameTime';
 import { ObjectKind } from '../sim/ObjectKind';
@@ -8,6 +8,7 @@ import { FallingTrees } from './FallingTrees';
 import type { TreeSlot } from './TreeShadowLayer';
 import { treeAppearance, type TreeAppearance } from './treeAppearance';
 import { TreeGeometryFactory } from './TreeGeometryFactory';
+import { TreeStages } from './TreeStages';
 import { ALL_TREE_SPECIES, type TreeSpecies } from './TreeSpecies';
 import { WorldChangeQueue } from './WorldChangeQueue';
 import type { WorldLayer } from './WorldLayer';
@@ -37,6 +38,7 @@ export class TreeLayer implements WorldLayer {
   private readonly meshes: THREE.InstancedMesh[] = [];
   /** Where each tree is drawn, by tree id. */
   private readonly slots = new Map<number, TreeSlot>();
+  private readonly stages = new TreeStages(false);
   private readonly falling = new FallingTrees();
   private readonly changes: WorldChangeQueue;
   private readonly chopper = new THREE.Vector3();
@@ -58,14 +60,19 @@ export class TreeLayer implements WorldLayer {
   }
 
   /**
-   * Starts the fall of each tree removed from `world` since the last call (away from the nearest peasant, its
-   * woodcutter) and poses the falling ones for the current game time. Call once per frame.
+   * Shrinks each tree chopped in `world` since the last call, starts the fall of each one removed (away from the
+   * nearest peasant, its woodcutter) and poses the falling ones for the current game time. Call once per frame.
    */
   public update(world: World, tickFraction: number): void {
     const time = (world.tickCount + tickFraction) / TICKS_PER_SECOND;
     this.changes.drain((change) => {
-      const slot = change.type === 'removed' ? this.slots.get(change.object.id) : undefined;
+      const slot = change.type === 'added' ? undefined : this.slots.get(change.object.id);
       if (!slot) return;
+      if (change.type === 'chopped') {
+        this.stages.chopped(world, change.object.id, slot);
+        return;
+      }
+      this.stages.forget(change.object.id);
       this.slots.delete(change.object.id);
       const base = new THREE.Matrix4();
       slot.mesh.getMatrixAt(slot.index, base);
@@ -79,6 +86,7 @@ export class TreeLayer implements WorldLayer {
     this.changes.dispose();
     this.falling.clear();
     this.slots.clear();
+    this.stages.clear();
     this.object.clear();
     for (const mesh of this.meshes) mesh.dispose();
     for (const geometry of this.geometries.values()) geometry.dispose();

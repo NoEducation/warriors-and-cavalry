@@ -49,7 +49,7 @@ export class StumpLayer implements WorldLayer {
       if (change.object.kind !== ObjectKind.Stump) return;
       changed = true;
       if (change.type === 'added') this.stumps.push(change.object);
-      else this.stumps.splice(this.stumps.indexOf(change.object), 1);
+      else if (change.type === 'removed') this.stumps.splice(this.stumps.indexOf(change.object), 1);
     });
     if (changed) this.refill(world);
   }

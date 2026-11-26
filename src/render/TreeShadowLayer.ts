@@ -7,6 +7,7 @@ import type { World } from '../sim/World';
 import { treeAppearance } from './treeAppearance';
 import { TREE_LAYER_CONFIG } from './TreeLayer';
 import { TREE_SPECIES } from './TreeSpecies';
+import { TreeStages } from './TreeStages';
 import { WorldChangeQueue } from './WorldChangeQueue';
 import type { WorldLayer } from './WorldLayer';
 
@@ -49,6 +50,7 @@ export class TreeShadowLayer implements WorldLayer {
   private readonly meshes: THREE.InstancedMesh[] = [];
   /** Where each tree's shadow is drawn, by tree id. */
   private readonly slots = new Map<number, TreeSlot>();
+  private readonly stages = new TreeStages(true);
   private readonly changes: WorldChangeQueue;
 
   /**
@@ -83,11 +85,19 @@ export class TreeShadowLayer implements WorldLayer {
     if (this.meshes.length > 0) this.object.add(...this.meshes);
   }
 
-  /** Hides the shadow of each tree removed from the world since the last call. Call once per frame. */
-  public update(): void {
+  /**
+   * Shrinks the shadow of each tree chopped in `world` since the last call and hides that of each tree removed. Call
+   * once per frame.
+   */
+  public update(world: World): void {
     this.changes.drain((change) => {
-      const slot = change.type === 'removed' ? this.slots.get(change.object.id) : undefined;
+      const slot = change.type === 'added' ? undefined : this.slots.get(change.object.id);
       if (!slot) return;
+      if (change.type === 'chopped') {
+        this.stages.chopped(world, change.object.id, slot);
+        return;
+      }
+      this.stages.forget(change.object.id);
       this.slots.delete(change.object.id);
       slot.mesh.setMatrixAt(slot.index, HIDDEN);
       slot.mesh.instanceMatrix.needsUpdate = true;
@@ -98,6 +108,7 @@ export class TreeShadowLayer implements WorldLayer {
   public dispose(): void {
     this.changes.dispose();
     this.slots.clear();
+    this.stages.clear();
     this.object.clear();
     for (const mesh of this.meshes) mesh.dispose();
     this.geometry.dispose();
