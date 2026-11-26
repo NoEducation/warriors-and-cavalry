@@ -20,6 +20,7 @@ export class Peasant implements PeasantView {
   private _load: Load | null = null;
   private _workplaceId: number | null = null;
   private _targetId: number | null = null;
+  private _treeId: number | null = null;
   private _waitTicks = 0;
   private _path = NO_TILES;
   private _pathIndex = 0;
@@ -41,6 +42,7 @@ export class Peasant implements PeasantView {
   public get load(): Load | null { return this._load; }
   public get workplaceId(): number | null { return this._workplaceId; }
   public get targetId(): number | null { return this._targetId; }
+  public get treeId(): number | null { return this._treeId; }
   public get waitTicks(): number { return this._waitTicks; }
   public get path(): readonly TileCoord[] { return this._path; }
   public get pathIndex(): number { return this._pathIndex; }
@@ -64,9 +66,32 @@ export class Peasant implements PeasantView {
     this._state = 'working';
   }
 
-  /** working -> toStore: takes its building's finished batch to carry to storage. */
+  /** -> toTree: a woodcutter heads for the tree `treeId`, which it has claimed. */
+  public headToTree(treeId: number): void {
+    this._treeId = treeId;
+    this._state = 'toTree';
+  }
+
+  /** toTree -> chopping: stands next to its tree, so its hut's production advances. */
+  public startChopping(): void {
+    this._state = 'chopping';
+  }
+
+  /** Forgets its tree (gone, or about to be replaced by another); the state is unchanged. */
+  public dropTree(): void {
+    this._treeId = null;
+  }
+
+  /** -> working: a woodcutter with no tree to fell stands at its hut and looks again after a retry wait. */
+  public waitAtWork(): void {
+    this._state = 'working';
+    this.waitToRetry();
+  }
+
+  /** working or chopping -> toStore: takes its building's finished batch to carry to storage, forgetting its tree. */
   public pickUp(load: Load): void {
     this._load = load;
+    this._treeId = null;
     this._state = 'toStore';
   }
 
@@ -85,7 +110,7 @@ export class Peasant implements PeasantView {
   }
 
   /**
-   * Any state -> idle: drops its job, load, target, stand, wait and walk where it stands; a step under way is
+   * Any state -> idle: drops its job, load, target, tree, stand, wait and walk where it stands; a step under way is
    * finished.
    */
   public goIdle(): void {
@@ -93,6 +118,7 @@ export class Peasant implements PeasantView {
     this._workplaceId = null;
     this._load = null;
     this._targetId = null;
+    this._treeId = null;
     this._stand = null;
     this._waitTicks = 0;
     this.startWalk(NO_TILES);
