@@ -43,6 +43,13 @@ export interface MapParams {
   readonly height: number;
 }
 
+/** A generated map and the tiles its forests will cover: everything heavy about a world, as plain data. */
+export interface MapLayout {
+  readonly map: GameMap;
+  /** Tree tiles, index ty * width + tx, ascending (see `TreePlacer.plan`). */
+  readonly treeTiles: Uint32Array;
+}
+
 /** Per-map values shared by every corner height computation. */
 interface IslandShape extends MapParams {
   readonly wobbleMean: number;
@@ -54,8 +61,19 @@ export class MapGenerator {
 
   /** Builds a new world (terrain, then trees) for `params`; the same params always give the same world. The seed is taken as unsigned 32-bit. */
   public generate(params: MapParams): World {
-    const world = new World(this.generateTerrain(params));
-    this.treePlacer.place(world, world.map.seed);
+    return this.buildWorld(this.generateLayout(params));
+  }
+
+  /** Computes the terrain and forest plan for `params` without making a world. Pure; the slow part, safe in a worker. */
+  public generateLayout(params: MapParams): MapLayout {
+    const map = this.generateTerrain(params);
+    return { map, treeTiles: this.treePlacer.plan(map, map.seed) };
+  }
+
+  /** Makes the world for `layout`: its map with the planned trees spawned. `buildWorld(generateLayout(p))` equals `generate(p)`. */
+  public buildWorld(layout: MapLayout): World {
+    const world = new World(layout.map);
+    this.treePlacer.spawnPlan(world, layout.treeTiles);
     return world;
   }
 
