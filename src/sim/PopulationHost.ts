@@ -10,5 +10,6 @@ export interface PopulationHost {
   isWalkable: IsWalkable;
   accessTiles(objectId: number): TileCoord[];
   objectById(id: number): MapObject | undefined;
+  objectAt(tx: number, ty: number): MapObject | undefined;
   objects(): Iterable<MapObject>;
 }

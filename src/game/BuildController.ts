@@ -52,11 +52,8 @@ export class BuildController {
     this.cancelWallDrag();
   }
 
-  /**
-   * Starts a wall drag at `tile` when the Wall tool is selected and `tile` is not null. Call on a left press; `world`
-   * is taken like in the other drag calls, though starting reads nothing from it yet.
-   */
-  public startWallDrag(world: World, tile: TileCoord | null): void {
+  /** Starts a wall drag at `tile` when the Wall tool is selected and `tile` is not null. Call on a left press. */
+  public startWallDrag(tile: TileCoord | null): void {
     if (tile && this.isWallTool()) this.wallDrag = new WallDrag({ tx: tile.tx, ty: tile.ty });
   }
 

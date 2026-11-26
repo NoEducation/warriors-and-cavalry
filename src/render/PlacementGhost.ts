@@ -1,10 +1,11 @@
 // Translucent preview of the building about to be placed, tinted by whether it fits.
 import * as THREE from 'three';
-import type { ObjectKind } from '../sim/ObjectKind';
+import { ObjectKind } from '../sim/ObjectKind';
 import type { PlacementPreview } from '../sim/PlacementPreview';
 import type { World } from '../sim/World';
-import type { BuildingMeshFactory } from './BuildingMeshFactory';
+import type { BuildingMeshFactory, GatePassage } from './BuildingMeshFactory';
 import { floorHeight } from './floorHeight';
+import { gatePassage } from './gatePassage';
 
 const OK_COLOR = 0x44ff66;
 const BLOCKED_COLOR = 0xff4444;
@@ -25,6 +26,8 @@ export class PlacementGhost {
   });
   private model: THREE.Mesh | null = null;
   private modelKind: ObjectKind | null = null;
+  /** The passage the model was made with; null for kinds other than Gate. */
+  private modelPassage: GatePassage | null = null;
   private tintedOk: boolean | null = null;
 
   /** Builds ghost meshes with `factory`; starts hidden. */
@@ -32,9 +35,13 @@ export class PlacementGhost {
     this.object.visible = false;
   }
 
-  /** Shows the ghost for `preview` on `world`'s terrain, green when it fits, red otherwise. Call per frame. */
+  /**
+   * Shows the ghost for `preview` on `world`'s terrain, green when it fits, red otherwise; a Gate is turned the way it
+   * would be built there. Call per frame: the mesh is rebuilt only when the kind or the gate's passage changes.
+   */
   public show(world: World, preview: PlacementPreview): void {
-    if (this.modelKind !== preview.kind) this.rebuild(preview.kind);
+    const passage = preview.kind === ObjectKind.Gate ? gatePassage(world, preview.tx, preview.ty) : null;
+    if (this.modelKind !== preview.kind || this.modelPassage !== passage) this.rebuild(preview.kind, passage);
     if (this.tintedOk !== preview.ok) {
       this.material.color.setHex(preview.ok ? OK_COLOR : BLOCKED_COLOR);
       this.tintedOk = preview.ok;
@@ -48,13 +55,13 @@ export class PlacementGhost {
     this.object.visible = false;
   }
 
-  /** Replaces the model with a fresh mesh of `kind` drawn with the ghost's material. */
-  private rebuild(kind: ObjectKind): void {
+  /** Replaces the model with a fresh mesh of `kind` (a Gate turned to `passage`) drawn with the ghost's material. */
+  private rebuild(kind: ObjectKind, passage: GatePassage | null): void {
     if (this.model) {
       this.object.remove(this.model);
       this.model.geometry.dispose(); // the material is the ghost's own and stays
     }
-    const model = this.factory.create(kind);
+    const model = this.factory.create(kind, passage ?? undefined);
     (model.material as THREE.Material).dispose();
     model.material = this.material;
     // Draw after other translucent meshes (the water plane), which would otherwise be blended over the ghost.
@@ -62,5 +69,6 @@ export class PlacementGhost {
     this.object.add(model);
     this.model = model;
     this.modelKind = kind;
+    this.modelPassage = passage;
   }
 }

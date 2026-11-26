@@ -1,6 +1,6 @@
 // Where idle peasants wait: each on its own free tile around the Keep, found ring by ring in a fixed order.
 import type { MapObject } from './MapObject';
-import { OBJECT_KINDS } from './ObjectKind';
+import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import type { Peasant } from './Peasant';
 import type { PeasantWalker } from './PeasantWalker';
 import type { PopulationHost } from './PopulationHost';
@@ -56,12 +56,15 @@ export class IdleStands {
     return taken;
   }
 
-  /** The first walkable tile not in `taken` on the rings around `keep`'s footprint, nearest ring first; else null. */
+  /** The first walkable tile, not a gate and not in `taken`, on the rings around `keep`'s footprint, nearest ring first; else null. */
   private firstFreeTile(keep: MapObject, taken: Set<number>): TileCoord | null {
     const { width, height } = OBJECT_KINDS[keep.kind];
     const { map } = this.world;
+    // A gate is walkable but is the way through a wall, so nobody waits in it.
     const isFree = (tx: number, ty: number): boolean =>
-      this.world.isWalkable(tx, ty) && !taken.has(ty * map.width + tx);
+      this.world.isWalkable(tx, ty) &&
+      this.world.objectAt(tx, ty)?.kind !== ObjectKind.Gate &&
+      !taken.has(ty * map.width + tx);
     for (let r = 1; r <= Math.max(map.width, map.height); r++) {
       const left = keep.tx - r;
       const top = keep.ty - r;

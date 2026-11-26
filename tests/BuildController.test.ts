@@ -194,7 +194,7 @@ describe('BuildController wall drags', () => {
   it('previews the line from the start to the hovered tile and builds it on finish', () => {
     const { world, controller, messages } = stoneSetup();
     expect(controller.wallDragPreview(world, END)).toBeNull();
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     expect(controller.isWallDragging).toBe(true);
     const preview = controller.wallDragPreview(world, END);
     expect(preview?.placedCount).toBe(5);
@@ -218,7 +218,7 @@ describe('BuildController wall drags', () => {
 
   it('builds nothing after a cancel', () => {
     const { world, controller, messages } = stoneSetup();
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     controller.cancelWallDrag();
     expect(controller.isWallDragging).toBe(false);
     expect(controller.finishWallDrag(world, END)).toBeNull();
@@ -228,7 +228,7 @@ describe('BuildController wall drags', () => {
 
   it('clears the drag when the tool changes', () => {
     const { world, controller } = stoneSetup();
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     controller.selectTool(HOVEL);
     expect(controller.wallDragPreview(world, END)).toBeNull();
     controller.selectTool(WALL);
@@ -238,7 +238,7 @@ describe('BuildController wall drags', () => {
 
   it('builds a single piece at the start when the drag never left the start tile and the release has no tile', () => {
     const { world, controller } = stoneSetup();
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     expect(controller.wallDragPreview(world, null)?.tiles).toEqual([START]);
     expect(controller.finishWallDrag(world, null)).toEqual({ ok: true, placed: 1, skipped: 0, unpaid: 0 });
     expect(world.objectAt(5, 5)?.kind).toBe(ObjectKind.Wall);
@@ -247,7 +247,7 @@ describe('BuildController wall drags', () => {
 
   it('builds the line to the last tile seen when the release is off the map', () => {
     const { world, controller } = stoneSetup();
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     controller.wallDragPreview(world, { tx: 7, ty: 5 });
     controller.wallDragPreview(world, END);
     controller.wallDragPreview(world, null);
@@ -257,31 +257,31 @@ describe('BuildController wall drags', () => {
 
   it('forgets the last tile seen when a new drag starts', () => {
     const { world, controller } = stoneSetup();
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     controller.wallDragPreview(world, END);
     controller.cancelWallDrag();
-    controller.startWallDrag(world, { tx: 2, ty: 2 });
+    controller.startWallDrag({ tx: 2, ty: 2 });
     expect(controller.finishWallDrag(world, null)).toEqual({ ok: true, placed: 1, skipped: 0, unpaid: 0 });
     expect(world.objectAt(2, 2)?.kind).toBe(ObjectKind.Wall);
   });
 
   it('says how many pieces of a partly paid line were built', () => {
     const { world, controller, messages } = stoneSetup(6);
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     expect(controller.finishWallDrag(world, END)).toEqual({ ok: true, placed: 3, skipped: 0, unpaid: 2 });
     expect(messages).toEqual(['Wall: 3 of 5 built, not enough stone']);
   });
 
   it('says nothing when the whole line was paid', () => {
     const { world, controller, messages } = stoneSetup(10);
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     controller.finishWallDrag(world, END);
     expect(messages).toEqual([]);
   });
 
   it('keeps the same preview while the end tile, the objects and the stone stay the same', () => {
     const { world, controller } = stoneSetup(10);
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     const preview = controller.wallDragPreview(world, END);
     expect(controller.wallDragPreview(world, { ...END })).toBe(preview);
     expect(controller.wallDragPreview(world, null)).toBe(preview);
@@ -295,7 +295,7 @@ describe('BuildController wall drags', () => {
 
   it('recomputes the preview when the objects change, even with the stone unchanged', () => {
     const { world, controller } = stoneSetup(10);
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     const preview = controller.wallDragPreview(world, END);
     world.spawn(ObjectKind.Tree, 7, 5);
     const next = controller.wallDragPreview(world, END);
@@ -305,7 +305,7 @@ describe('BuildController wall drags', () => {
 
   it('names the missing stone when nothing can be paid', () => {
     const { world, controller, messages } = stoneSetup(0);
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     expect(controller.finishWallDrag(world, END)).toEqual({ ok: false, reason: 'NotEnoughResources' });
     expect(messages).toEqual(['Cannot build: not enough stone']);
     expect(world.objectCount).toBe(0);
@@ -313,10 +313,10 @@ describe('BuildController wall drags', () => {
 
   it('does not start a drag with another tool or without a tile', () => {
     const { world, controller } = stoneSetup();
-    controller.startWallDrag(world, null);
+    controller.startWallDrag(null);
     expect(controller.isWallDragging).toBe(false);
     controller.selectTool(HOVEL);
-    controller.startWallDrag(world, START);
+    controller.startWallDrag(START);
     expect(controller.isWallDragging).toBe(false);
     expect(controller.wallDragPreview(world, END)).toBeNull();
     expect(controller.finishWallDrag(world, END)).toBeNull();

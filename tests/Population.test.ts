@@ -224,4 +224,15 @@ describe('World population: idle peasants', () => {
     expect(new Set(tilesOf(world)).size).toBe(6);
     expect(worldChecksum(world)).toBe(worldChecksum(run()));
   });
+
+  it('never stands an idle peasant on a Gate tile', () => {
+    const world = new World(flatMap(), new Economy(resources(100, 46, 30)));
+    place(world, ObjectKind.Keep, 2, 2);
+    place(world, ObjectKind.Gate, 2, 6); // the first tile of the first ring
+    place(world, ObjectKind.Hovel, 10, 10);
+    ticks(world, 6 * 50 + 40);
+    const peasants = [...world.peasants()];
+    expect(peasants.every((p) => p.state === 'idle' && p.stepTicks === 0)).toBe(true);
+    expect(tilesOf(world).sort()).toEqual(['3,6', '4,6', '5,6', '6,2', '6,3', '6,4'].sort());
+  });
 });

@@ -55,4 +55,32 @@ describe('PlacementGhost', () => {
     expect((keepMeshes[0].material as THREE.Material).transparent).toBe(true);
     layer.dispose();
   });
+
+  it('turns a Gate ghost between walls to the west and east north-south, as the built gate will be', () => {
+    const world = flatWorld();
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Wall, tx: 4, ty: 5 });
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Wall, tx: 6, ty: 5 });
+    const ghost = new PlacementGhost(new BuildingMeshFactory());
+    ghost.show(world, { kind: ObjectKind.Gate, tx: 5, ty: 5, ok: true });
+    ghost.object.updateMatrixWorld(true);
+    const along = (origin: THREE.Vector3, direction: THREE.Vector3): number =>
+      new THREE.Raycaster(origin, direction).intersectObject(ghost.object).length;
+    expect(along(new THREE.Vector3(5.5, 0.5, 4), new THREE.Vector3(0, 0, 1))).toBe(0);
+    expect(along(new THREE.Vector3(4.5, 0.5, 5.5), new THREE.Vector3(1, 0, 0))).toBeGreaterThan(0);
+  });
+
+  it('rebuilds its mesh only when the kind or the gate passage changes', () => {
+    const world = flatWorld();
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Wall, tx: 4, ty: 5 });
+    const ghost = new PlacementGhost(new BuildingMeshFactory());
+    ghost.show(world, { kind: ObjectKind.Gate, tx: 9, ty: 9, ok: true });
+    const [lone] = meshesOf(ghost.object);
+    ghost.show(world, { kind: ObjectKind.Gate, tx: 10, ty: 9, ok: false });
+    expect(meshesOf(ghost.object)).toEqual([lone]);
+    ghost.show(world, { kind: ObjectKind.Gate, tx: 5, ty: 5, ok: true }); // beside the wall: turned
+    const [turned] = meshesOf(ghost.object);
+    expect(turned).not.toBe(lone);
+    ghost.show(world, { kind: ObjectKind.Gate, tx: 3, ty: 5, ok: true }); // the wall is east of it: still turned
+    expect(meshesOf(ghost.object)).toEqual([turned]);
+  });
 });

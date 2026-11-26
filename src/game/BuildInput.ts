@@ -75,8 +75,7 @@ export class BuildInput {
       this.rightPressCancelledDrag = this.builder.isWallDragging;
       this.builder.cancelWallDrag();
     } else if (button === LEFT_BUTTON) {
-      const { world, tile } = this.clickTarget();
-      this.builder.startWallDrag(world, tile);
+      this.builder.startWallDrag(this.clickTarget().tile);
     }
   };
 

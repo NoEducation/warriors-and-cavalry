@@ -16,6 +16,7 @@ import { WoodcutterHutShape } from './buildings/WoodcutterHutShape';
 export type { GatePassage } from './buildings/GateShape';
 
 export class BuildingMeshFactory {
+  /** Gates are built apart from `shapes`: their shape also takes the passage direction. */
   private readonly gate = new GateShape();
   private readonly shapes = new Map<ObjectKind, BuildingShape>([
     [ObjectKind.Keep, new KeepShape()],
@@ -26,7 +27,6 @@ export class BuildingMeshFactory {
     [ObjectKind.Quarry, new QuarryShape()],
     [ObjectKind.WheatFarm, new WheatFarmShape()],
     [ObjectKind.Wall, new WallShape()],
-    [ObjectKind.Gate, this.gate],
     [ObjectKind.Tower, new TowerShape()],
   ]);
 
