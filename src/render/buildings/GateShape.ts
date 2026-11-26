@@ -8,6 +8,9 @@ import { type BoxSpec, FOUNDATION_LIFT, SHAPE_COLORS } from './shapeParts';
 /** Which way walkers pass through a gate: along z (north–south) or along x (east–west). */
 export type GatePassage = 'northSouth' | 'eastWest';
 
+/** Thickness of the earth floor laid through the opening. */
+const FLOOR_THICKNESS = 0.02;
+
 /** `spec` mirrored across the tile's diagonal (x and z swapped), turning an east–west part north–south. */
 function turned(spec: BoxSpec): BoxSpec {
   return { x0: spec.z0, z0: spec.x0, x1: spec.z1, z1: spec.x1, y0: spec.y0, y1: spec.y1 };
@@ -27,13 +30,19 @@ export class GateShape implements BuildingShape {
       { x0: 0, z0: 0, x1: 1, z1: side, y0: lift, y1: walkHeight },
       { x0: 0, z0: 1 - side, x1: 1, z1: 1, y0: lift, y1: walkHeight },
       { x0: 0, z0: side, x1: 1, z1: 1 - side, y0: openingHeight, y1: walkHeight },
-      { x0: 0, z0: side, x1: 1, z1: side + archStep, y0: openingHeight - archStep, y1: openingHeight },
-      { x0: 0, z0: 1 - side - archStep, x1: 1, z1: 1 - side, y0: openingHeight - archStep, y1: openingHeight },
       ...cornerMerlons(0, 0, 1, 1, merlonSize, walkHeight, walkHeight + merlonHeight),
     ];
+    // Darker arch corners and an earth floor make the opening stand out against the wall face.
+    const arch: BoxSpec[] = [
+      { x0: 0, z0: side, x1: 1, z1: side + archStep, y0: openingHeight - archStep, y1: openingHeight },
+      { x0: 0, z0: 1 - side - archStep, x1: 1, z1: 1 - side, y0: openingHeight - archStep, y1: openingHeight },
+    ];
+    const floor: BoxSpec = { x0: 0, z0: side, x1: 1, z1: 1 - side, y0: lift, y1: lift + FLOOR_THICKNESS };
     const place = passage === 'eastWest' ? (spec: BoxSpec): BoxSpec => spec : turned;
     const shape = new ShapeBuilder().addBox(castleFoundation(0, 0, 1, 1), SHAPE_COLORS.foundation);
     for (const spec of stone) shape.addBox(place(spec), SHAPE_COLORS.stone);
+    for (const spec of arch) shape.addBox(place(spec), SHAPE_COLORS.darkStone);
+    shape.addBox(place(floor), SHAPE_COLORS.bareEarth);
     return shape.build();
   }
 }
