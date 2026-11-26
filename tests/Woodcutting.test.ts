@@ -3,6 +3,7 @@ import { Economy } from '../src/sim/Economy';
 import { GameMap } from '../src/sim/GameMap';
 import type { MapObject } from '../src/sim/MapObject';
 import { ObjectKind } from '../src/sim/ObjectKind';
+import { PATH_CONFIG } from '../src/sim/pathConfig';
 import type { PeasantView } from '../src/sim/PeasantView';
 import { ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
@@ -166,15 +167,23 @@ describe('Woodcutters', () => {
     place(world, ObjectKind.Keep, 100, 100);
     place(world, ObjectKind.Stockpile, 110, 110);
     const hut = place(world, ObjectKind.WoodcutterHut, 124, 104);
+    // Path searches ask the world which tiles are walkable; count those questions per tick as the measure of work.
+    let asked = 0;
+    const isWalkable = world.isWalkable.bind(world);
+    world.isWalkable = (tx: number, ty: number): boolean => {
+      asked++;
+      return isWalkable(tx, ty);
+    };
     let worst = 0;
     let cannotReach = false;
     for (let n = 0; n < 1500; n++) {
-      const start = performance.now();
+      asked = 0;
       world.tick();
-      worst = Math.max(worst, performance.now() - start);
+      worst = Math.max(worst, asked);
       cannotReach ||= world.productionState(hut.id)?.status === 'workerCannotReach';
     }
     expect(cannotReach).toBe(true);
-    expect(worst, `slowest tick ${worst.toFixed(1)} ms`).toBeLessThan(20);
+    // A search bounded by treeSearchMaxExpanded asks about 8 neighbours per tile; a whole-map search asks ~500 000.
+    expect(worst).toBeLessThan(8 * PATH_CONFIG.treeSearchMaxExpanded + 1000);
   }, 30000);
 });
