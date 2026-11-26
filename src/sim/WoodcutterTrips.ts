@@ -1,6 +1,7 @@
 // The woodcutter's part of a trip: picking the nearest free tree in reach of its hut, walking there and chopping.
 import type { MapObject } from './MapObject';
 import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
+import { PATH_CONFIG } from './pathConfig';
 import type { Peasant } from './Peasant';
 import type { PeasantWalker } from './PeasantWalker';
 import type { PopulationHost } from './PopulationHost';
@@ -71,14 +72,17 @@ export class WoodcutterTrips {
     p.dropTree();
   }
 
-  /** Releases `p`'s tree, then one search toward every free tree in reach; claims the one the path ends next to. */
+  /**
+   * Releases `p`'s tree, then one search toward every free tree in reach, bounded by `treeSearchMaxExpanded`;
+   * claims the one the path ends next to.
+   */
   private pickTree(p: Peasant): PickResult {
     this.release(p);
     const candidates = this.candidates(p.workplaceId);
     if (candidates.length === 0) return 'none';
     const goals: TileCoord[] = [];
     for (const candidate of candidates) goals.push(...candidate.tiles);
-    if (!this.walker.walkTo(p, goals)) return 'unreachable';
+    if (!this.walker.walkTo(p, goals, PATH_CONFIG.treeSearchMaxExpanded)) return 'unreachable';
     const end = p.path.length > 0 ? p.path[p.path.length - 1] : { tx: p.nextTx, ty: p.nextTy };
     const tree = candidates.find(({ tiles }) => tiles.some((t) => t.tx === end.tx && t.ty === end.ty));
     if (!tree) return 'unreachable';

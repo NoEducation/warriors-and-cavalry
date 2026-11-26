@@ -151,4 +151,30 @@ describe('Woodcutters', () => {
     tickUntil(world, () => world.productionState(huts[0].id)?.status === 'workerCannotReach');
     expect(world.objectAt(25, 7)?.kind).toBe(ObjectKind.Tree);
   });
+
+  it('do not stall the game when the only trees in reach stand on an island they cannot reach', () => {
+    const size = 256;
+    const tiles = new Uint8Array(size * size).fill(TileType.Grass);
+    for (let ty = 98; ty <= 112; ty++) {
+      for (let tx = 128; tx <= 142; tx++) {
+        if (tx < 130 || tx > 140 || ty < 100 || ty > 110) tiles[ty * size + tx] = TileType.Water;
+      }
+    }
+    const map = new GameMap(size, size, 1, new Float32Array((size + 1) * (size + 1)), tiles);
+    const world = new World(map, new Economy(resources(200, 80, 5)));
+    for (let ty = 100; ty <= 110; ty++) for (let tx = 130; tx <= 133; tx++) world.spawn(ObjectKind.Tree, tx, ty);
+    place(world, ObjectKind.Keep, 100, 100);
+    place(world, ObjectKind.Stockpile, 110, 110);
+    const hut = place(world, ObjectKind.WoodcutterHut, 124, 104);
+    let worst = 0;
+    let cannotReach = false;
+    for (let n = 0; n < 1500; n++) {
+      const start = performance.now();
+      world.tick();
+      worst = Math.max(worst, performance.now() - start);
+      cannotReach ||= world.productionState(hut.id)?.status === 'workerCannotReach';
+    }
+    expect(cannotReach).toBe(true);
+    expect(worst, `slowest tick ${worst.toFixed(1)} ms`).toBeLessThan(20);
+  }, 30000);
 });
