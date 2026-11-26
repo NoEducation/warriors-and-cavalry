@@ -1,5 +1,7 @@
-// Deterministic world generator: fbm hills on an island whose coastline wobbles with low-frequency noise, then forests.
+// Deterministic world generator: fbm hills on an island whose coastline wobbles with low-frequency noise, ridged
+// mountains on the high ground, then forests.
 import { GameMap } from './GameMap';
+import { mountainLift } from './mountainLift';
 import { fbm2 } from './noise';
 import { TileType } from './tiles';
 import { TreePlacer } from './TreePlacer';
@@ -115,7 +117,8 @@ export class MapGenerator {
     const n = fbm2(seed, cx * c.noiseScale, cy * c.noiseScale, c.octaves);
     const s = 1 - d * d;
     // Far from the island the shape keeps falling; the seabed stops it.
-    return Math.max(seabed, (c.maxHeight * n + c.coastLift) * s - c.shoreDrop);
+    const hill = Math.max(seabed, (c.maxHeight * n + c.coastLift) * s - c.shoreDrop);
+    return hill + mountainLift(seed, cx, cy, hill);
   }
 
   private classifyTile(corners: [number, number, number, number]): TileType {

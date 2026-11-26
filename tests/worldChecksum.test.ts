@@ -109,9 +109,10 @@ describe('worldChecksum', () => {
   it('keeps the seed 1 world of 512 x 512 tiles unchanged', () => {
     // Re-recorded when the checksum started covering the tick count (was 3842414936 before that), and again when it
     // started covering resource amounts and capacities (was 541835208 before that), and again when it started
-    // covering the arrival timer and the peasants (was 1606265378 before that).
+    // covering the arrival timer and the peasants (was 1606265378 before that), and again when map generation gained
+    // ridged mountains (was 3863915074 before that).
     // Tree looks are render-only, so changing them must not change this value.
-    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(3863915074);
+    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(3247290596);
   });
 
   it('differs for different seeds', () => {
