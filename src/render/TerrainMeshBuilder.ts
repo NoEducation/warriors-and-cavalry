@@ -5,6 +5,7 @@ import type { GameMap } from '../sim/GameMap';
 import { hash2 } from '../sim/rng';
 import { TileType } from '../sim/tiles';
 import { terrainVertexColor } from './terrainColor';
+import { terrainTileShade } from './terrainTileShade';
 
 /** Tiles per chunk side. Chunks let three.js skip the parts of the map outside the view. */
 export const TERRAIN_CHUNK_SIZE = 32;
@@ -58,7 +59,8 @@ export class TerrainMeshBuilder {
         const type = map.tileAt(tx, ty) ?? TileType.Water;
         const cx = [tx, tx + 1, tx, tx + 1];
         const cy = [ty, ty, ty + 1, ty + 1];
-        for (let k = 0; k < 4; k++) terrainVertexColor(map, type, cx[k], cy[k], corner[k]);
+        const shade = terrainTileShade(map, type, tx, ty);
+        for (let k = 0; k < 4; k++) terrainVertexColor(map, type, cx[k], cy[k], corner[k]).multiplyScalar(shade);
         // Corners a, b, c, d; split along the b-c diagonal, which heightfieldRaycast tests too.
         for (const [n, k] of [0, 2, 1, 1, 2, 3].entries()) {
           const speckle = 1 + SPECKLE * 2 * (hash2(map.seed, tx * 2 + (n < 3 ? 0 : 1), ty) - 0.5);

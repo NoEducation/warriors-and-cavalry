@@ -19,6 +19,9 @@ export const TERRAIN_LOOK_CONFIG = Object.freeze({
   rockCliff: 0x4e4339,
   snow: 0xd8dee6,
   seabed: 0x7a6f4e,
+  /** Quarry ground: pale cut limestone, warming to ochre in patches. */
+  quarryPale: 0xdccfab,
+  quarryOchre: 0xc9a66e,
   /** Noise frequency per tile of the large grass patches, of the dry spots, and of the fine mottling. */
   patchScale: 1 / 28,
   dryScale: 1 / 17,
@@ -86,6 +89,9 @@ export function terrainVertexColor(map: GameMap, type: TileType, cx: number, cy:
       out.lerp(tmp.set(c.snow), snow);
       break;
     }
+    case TileType.Quarry:
+      out.set(c.quarryPale).lerp(tmp.set(c.quarryOchre), 0.7 * smooth(0.4, 0.7, n(SALT.dry, c.lichenScale, 2)));
+      break;
     default:
       out.set(c.seabed).multiplyScalar(0.75 + 0.25 * clamp01(1 + h / MAPGEN_CONFIG.seabedDepth));
   }
