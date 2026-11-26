@@ -20,7 +20,7 @@ export class HovelShape implements BuildingShape {
     shape.addBox(WALLS, SHAPE_COLORS.plaster);
     addPlinth(shape, WALLS, 0.14, 0.04);
     addTimberFrame(shape, WALLS, 0.08);
-    addDoor(shape, { wall: WALLS, face: 'south', along: 0.72, bottom: 0.1, width: 0.26, height: 0.55 });
+    addDoor(shape, { wall: WALLS, face: 'south', along: 0.72, bottom: 0.14, width: 0.26, height: 0.52 });
     addWindow(shape, { wall: WALLS, face: 'south', along: 1.3, bottom: 0.42, width: 0.18, height: 0.22 });
     addWindow(shape, { wall: WALLS, face: 'east', along: 0.75, bottom: 0.42, width: 0.18, height: 0.22 });
     addWindow(shape, { wall: WALLS, face: 'west', along: 1.0, bottom: 0.42, width: 0.18, height: 0.22 });

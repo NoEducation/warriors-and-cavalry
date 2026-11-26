@@ -24,7 +24,7 @@ export class WoodcutterHutShape implements BuildingShape {
     shape.addCourses(WALLS, SHAPE_COLORS.timber, PLANKS, PLANK_SALT);
     addPlinth(shape, WALLS, 0.12, 0.03);
     addTimberFrame(shape, WALLS, 0.08);
-    addDoor(shape, { wall: WALLS, face: 'south', along: 0.65, bottom: FOUNDATION_LIFT, width: 0.26, height: 0.55 });
+    addDoor(shape, { wall: WALLS, face: 'south', along: 0.65, bottom: 0.12, width: 0.26, height: 0.53 });
     addWindow(shape, { wall: WALLS, face: 'south', along: 1.32, bottom: 0.42, width: 0.18, height: 0.2 });
     addWindow(shape, { wall: WALLS, face: 'east', along: 0.6, bottom: 0.42, width: 0.16, height: 0.2 });
     shape.add(gableRoofGeometry(WALLS, ROOF.rise, ROOF.overhang), SHAPE_COLORS.hutRoof);

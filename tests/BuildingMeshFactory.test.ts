@@ -145,6 +145,9 @@ const DETAIL_FLOOR: ReadonlyArray<readonly [ObjectKind, number]> = [
   [ObjectKind.Granary, 300],
   [ObjectKind.Stockpile, 150],
   [ObjectKind.Keep, 600],
+  [ObjectKind.Wall, 90],
+  [ObjectKind.Gate, 200],
+  [ObjectKind.Tower, 400],
 ];
 
 describe('building detail', () => {
@@ -159,5 +162,13 @@ describe('building detail', () => {
     mesh.updateMatrixWorld();
     const hit = new THREE.Raycaster(new THREE.Vector3(1.5, 5, 1.5), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)[0];
     expect(hit.point.y).toBeCloseTo(StockpileShape.deckTop);
+  });
+
+  it('keeps a Gate passage open high up, under the arch, both ways', () => {
+    const factory = new BuildingMeshFactory();
+    const eastWest = factory.create(ObjectKind.Gate, 'eastWest');
+    const northSouth = factory.create(ObjectKind.Gate, 'northSouth');
+    expect(hits(eastWest, new THREE.Vector3(-1, 0.8, 0.5), new THREE.Vector3(1, 0, 0))).toBe(false);
+    expect(hits(northSouth, new THREE.Vector3(0.5, 0.8, -1), new THREE.Vector3(0, 0, 1))).toBe(false);
   });
 });
