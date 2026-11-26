@@ -53,9 +53,9 @@ describe('OBJECT_KINDS', () => {
 
   it('holds costs, storage, placement rules and production', () => {
     const rows = Object.values(ObjectKind).map((kind) => {
-      const { cost, storage, grassOnly, needsRock, rockAllowed, housing, production } = OBJECT_KINDS[kind];
+      const { cost, storage, grassOnly, quarryOnly, rockAllowed, housing, production } = OBJECT_KINDS[kind];
       const amounts = (r: typeof cost): number[] => RESOURCE_KINDS.map((k) => r[k]);
-      return [amounts(cost), amounts(storage), grassOnly, needsRock, rockAllowed, housing, production];
+      return [amounts(cost), amounts(storage), grassOnly, quarryOnly, rockAllowed, housing, production];
     });
     const { Wood: wood, Stone: stone, Food: food } = ResourceKind;
     expect(rows).toEqual([
@@ -135,15 +135,20 @@ describe('World.canPlace', () => {
     }
   });
 
-  it('places a Quarry only with rock touching an edge of its footprint', () => {
-    const bare = flatMap();
-    expect(new World(bare).canPlace(ObjectKind.Quarry, 5, 5)).toEqual({ ok: false, reason: 'NeedsRock' });
-    const edge = flatMap();
-    setTile(edge, 8, 6, TileType.Rock); // right of the footprint's middle row
-    expect(new World(edge).canPlace(ObjectKind.Quarry, 5, 5)).toEqual({ ok: true });
-    const diagonal = flatMap();
-    setTile(diagonal, 8, 8, TileType.Rock); // off the bottom-right corner only
-    expect(new World(diagonal).canPlace(ObjectKind.Quarry, 5, 5)).toEqual({ ok: false, reason: 'NeedsRock' });
+  it('places a Quarry only with every footprint tile on quarry ground', () => {
+    expect(new World(flatMap()).canPlace(ObjectKind.Quarry, 5, 5)).toEqual({ ok: false, reason: 'NeedsQuarryGround' });
+    const site = flatMap();
+    for (let ty = 5; ty < 8; ty++) for (let tx = 5; tx < 8; tx++) setTile(site, tx, ty, TileType.Quarry);
+    expect(new World(site).canPlace(ObjectKind.Quarry, 5, 5)).toEqual({ ok: true });
+    expect(new World(site).canPlace(ObjectKind.Quarry, 6, 5)).toEqual({ ok: false, reason: 'NeedsQuarryGround' });
+  });
+
+  it('keeps every other building off quarry ground', () => {
+    const site = flatMap();
+    setTile(site, 4, 4, TileType.Quarry);
+    for (const kind of [ObjectKind.Hovel, ObjectKind.Stockpile, ObjectKind.Wall, ObjectKind.Tower]) {
+      expect(new World(site).canPlace(kind, 4, 4), OBJECT_KINDS[kind].name).toEqual({ ok: false, reason: 'BadTerrain' });
+    }
   });
 
   it('places a Wheat farm only on grass', () => {

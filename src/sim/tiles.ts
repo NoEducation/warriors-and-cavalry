@@ -1,6 +1,7 @@
 // Terrain tile types. Values are stored directly in GameMap.tiles (Uint8Array).
 
-export const TileType = { Water: 0, Sand: 1, Grass: 2, Rock: 3 } as const;
+/** Quarry is quarry ground: the flat shelves at the foot of mountains where (only) quarries may stand. */
+export const TileType = { Water: 0, Sand: 1, Grass: 2, Rock: 3, Quarry: 4 } as const;
 export type TileType = (typeof TileType)[keyof typeof TileType];
 
 export const TILE_NAMES: Record<TileType, string> = {
@@ -8,4 +9,5 @@ export const TILE_NAMES: Record<TileType, string> = {
   [TileType.Sand]: 'Sand',
   [TileType.Grass]: 'Grass',
   [TileType.Rock]: 'Rock',
+  [TileType.Quarry]: 'Quarry ground',
 };
