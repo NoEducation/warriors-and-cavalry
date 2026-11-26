@@ -1,11 +1,11 @@
 // Soft dark discs on the ground under every tree, offset away from the sun, so trees sit on the terrain instead of
-// floating. One instanced mesh per TREE_REGION_SIZE region, so three.js can skip regions out of view.
+// floating. One instanced mesh per tree layer region, so three.js can skip regions out of view.
 import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
 import { ObjectKind } from '../sim/ObjectKind';
 import type { World } from '../sim/World';
 import { treeAppearance } from './treeAppearance';
-import { TREE_REGION_SIZE } from './TreeLayer';
+import { TREE_LAYER_CONFIG } from './TreeLayer';
 import { TREE_SPECIES } from './TreeSpecies';
 import type { WorldLayer } from './WorldLayer';
 
@@ -43,14 +43,14 @@ export class TreeShadowLayer implements WorldLayer {
   /** Builds a shadow for every tree currently in `world`. Reads the world only; call again for a new world. */
   public constructor(world: World) {
     const { map } = world;
-    const regionsPerRow = Math.ceil(map.width / TREE_REGION_SIZE);
+    const regionsPerRow = Math.ceil(map.width / TREE_LAYER_CONFIG.regionSize);
     const regions = new Map<number, THREE.Matrix4[]>();
     for (const object of world.objects()) {
       if (object.kind !== ObjectKind.Tree) continue;
       const look = treeAppearance(map, object.tx, object.ty);
       const species = TREE_SPECIES[look.species];
       const region =
-        Math.floor(object.ty / TREE_REGION_SIZE) * regionsPerRow + Math.floor(object.tx / TREE_REGION_SIZE);
+        Math.floor(object.ty / TREE_LAYER_CONFIG.regionSize) * regionsPerRow + Math.floor(object.tx / TREE_LAYER_CONFIG.regionSize);
       let matrices = regions.get(region);
       if (!matrices) {
         matrices = [];

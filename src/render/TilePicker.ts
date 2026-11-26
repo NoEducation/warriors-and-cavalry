@@ -2,10 +2,8 @@
 import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
 import type { TileCoord } from '../sim/TileCoord';
+import { CAMERA_CONFIG } from './cameraMath';
 import { raycastHeightfield } from './heightfieldRaycast';
-
-/** Farthest pick distance in world units. */
-const MAX_PICK_DISTANCE = 1000;
 
 export class TilePicker {
   private readonly raycaster = new THREE.Raycaster();
@@ -19,7 +17,7 @@ export class TilePicker {
     this.ndcVector.set(ndc.x, ndc.y);
     this.raycaster.setFromCamera(this.ndcVector, camera);
     const { origin, direction } = this.raycaster.ray;
-    const hit = raycastHeightfield(map, origin, direction, MAX_PICK_DISTANCE);
+    const hit = raycastHeightfield(map, origin, direction, CAMERA_CONFIG.maxPickDistance);
     return hit ? { tx: hit.tx, ty: hit.ty } : null;
   }
 }

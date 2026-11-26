@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { TERRAIN_CHUNK_SIZE, TerrainMeshBuilder } from '../src/render/TerrainMeshBuilder';
+import { TERRAIN_MESH_CONFIG, TerrainMeshBuilder } from '../src/render/TerrainMeshBuilder';
 import { GameMap } from '../src/sim/GameMap';
 
 function flatMap(width: number, height: number): GameMap {
@@ -19,7 +19,7 @@ describe('TerrainMeshBuilder', () => {
   const builder = new TerrainMeshBuilder();
 
   it('uses 32-tile chunks', () => {
-    expect(TERRAIN_CHUNK_SIZE).toBe(32);
+    expect(TERRAIN_MESH_CONFIG.chunkSize).toBe(32);
   });
 
   it('splits a 64 x 64 map into 4 chunks', () => {

@@ -15,6 +15,8 @@ export const CAMERA_CONFIG = {
   maxDt: 0.1,
   /** How fast the focus height follows the ground, per second; higher snaps sooner. */
   groundFollowRate: 6,
+  /** Farthest tile pick distance in world units. */
+  maxPickDistance: 1000,
 } as const;
 
 /** `v` limited to [lo, hi]. */

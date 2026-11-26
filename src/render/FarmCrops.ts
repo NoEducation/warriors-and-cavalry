@@ -9,9 +9,13 @@ import { floorHeight } from './floorHeight';
 import { WorldChangeQueue } from './WorldChangeQueue';
 import type { WorldLayer } from './WorldLayer';
 
-/** Crop height right after a harvest and at the end of a cycle. */
-const STUBBLE_HEIGHT = 0.05;
-const FULL_HEIGHT = 0.6;
+/** Crop growth tuning. */
+export const FARM_CROP_CONFIG = Object.freeze({
+  /** Crop height right after a harvest. */
+  stubbleHeight: 0.05,
+  /** Crop height at the end of a cycle. */
+  fullHeight: 0.6,
+});
 const CROP_GREEN = new THREE.Color(SHAPE_COLORS.cropGreen);
 const CROP_GOLD = new THREE.Color(SHAPE_COLORS.cropGold);
 
@@ -90,7 +94,8 @@ export class FarmCrops implements WorldLayer {
 
   /** Shows `growth` (0 = just cut, 1 = ripe) as height and colour. */
   private show(crop: Crop, growth: number): void {
-    crop.mesh.scale.y = STUBBLE_HEIGHT + (FULL_HEIGHT - STUBBLE_HEIGHT) * growth;
+    const { stubbleHeight, fullHeight } = FARM_CROP_CONFIG;
+    crop.mesh.scale.y = stubbleHeight + (fullHeight - stubbleHeight) * growth;
     crop.material.color.lerpColors(CROP_GREEN, CROP_GOLD, growth);
   }
 }
