@@ -1,27 +1,31 @@
-// Connects the cursor to the tile under it: placement ghost, footprint highlight and HUD tile line.
+// Connects the cursor to the tile under it: placement or wall-line ghost, footprint highlight and HUD lines.
 import type * as THREE from 'three';
 import type { Pointer } from '../input/Pointer';
 import type { PlacementGhost } from '../render/PlacementGhost';
 import type { TileHighlight } from '../render/TileHighlight';
 import type { TilePicker } from '../render/TilePicker';
+import type { WallLineGhost } from '../render/WallLineGhost';
 import { Footprint } from '../sim/Footprint';
 import type { GameMap } from '../sim/GameMap';
 import { OBJECT_KINDS } from '../sim/ObjectKind';
 import type { PlacementPreview } from '../sim/PlacementPreview';
 import type { TileCoord } from '../sim/TileCoord';
 import { TILE_NAMES } from '../sim/tiles';
+import type { WallLinePreview } from '../sim/WallBuilder';
 import type { World } from '../sim/World';
+import { wallLineText } from '../ui/costText';
 import type { Hud } from '../ui/Hud';
 import { productionStatusText } from '../ui/statusText';
 import type { BuildController } from './BuildController';
 
 export class TileHover {
-  /** Uses the given pointer, picker, highlight, ghost, HUD and build controller; owns none of them. */
+  /** Uses the given pointer, picker, highlight, ghosts, HUD and build controller; owns none of them. */
   public constructor(
     private readonly pointer: Pointer,
     private readonly picker: TilePicker,
     private readonly highlight: TileHighlight,
     private readonly ghost: PlacementGhost,
+    private readonly wallGhost: WallLineGhost,
     private readonly hud: Hud,
     private readonly builder: BuildController,
   ) {}
@@ -32,19 +36,26 @@ export class TileHover {
     return cursor ? this.picker.pick(cursor, camera, map) : null;
   }
 
-  /** Finds the tile hovered in `world` and updates the ghost, the highlight and the HUD tile line. Call once per frame. */
+  /**
+   * Finds the tile hovered in `world` and updates the ghosts, the highlight, the HUD tile line and, while a wall is
+   * dragged, its cost on the message line. Call once per frame.
+   */
   public update(camera: THREE.Camera, world: World): void {
     const tile = this.tileUnderCursor(camera, world.map);
-    const preview = this.builder.preview(world, tile);
-    this.updateGhost(world, preview);
+    const wallLine = this.builder.wallDragPreview(world, tile);
+    const preview = wallLine ? null : this.builder.preview(world, tile);
+    this.updateGhosts(world, preview, wallLine);
     this.updateHighlight(world, tile, preview);
     this.updateHudLine(world, tile);
+    this.hud.setLiveMessage(wallLine ? wallLineText(wallLine.placedCount, wallLine.cost) : null);
   }
 
-  /** Shows the building about to be placed, or hides the ghost when there is none. */
-  private updateGhost(world: World, preview: PlacementPreview | null): void {
+  /** Shows the wall line being dragged, else the building about to be placed; hides the ghosts not needed. */
+  private updateGhosts(world: World, preview: PlacementPreview | null, wallLine: WallLinePreview | null): void {
     if (preview) this.ghost.show(world, preview);
     else this.ghost.hide();
+    if (wallLine) this.wallGhost.show(world, wallLine);
+    else this.wallGhost.hide();
   }
 
   /** Outlines the placement footprint, else the hovered object's footprint, else the hovered tile. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BuildController } from '../src/game/BuildController';
-import { BUILD_TOOLS, type BuildTool } from '../src/ui/BuildTool';
+import { BUILD_TOOLS, type BuildTool, keyLabel } from '../src/ui/BuildTool';
 import { Economy } from '../src/sim/Economy';
 import { GameMap } from '../src/sim/GameMap';
 import { ObjectKind } from '../src/sim/ObjectKind';
@@ -13,6 +13,7 @@ const HOVEL: BuildTool = { type: 'build', kind: ObjectKind.Hovel };
 const KEEP: BuildTool = { type: 'build', kind: ObjectKind.Keep };
 const QUARRY: BuildTool = { type: 'build', kind: ObjectKind.Quarry };
 const DEMOLISH: BuildTool = { type: 'demolish' };
+const WALL: BuildTool = { type: 'build', kind: ObjectKind.Wall };
 
 /** A flat all-grass world; `start` gives the economy's start amounts (default: the normal ones). */
 function flatWorld(start?: ResourceAmounts): World {
@@ -28,7 +29,7 @@ function setup(world: World = flatWorld()): { world: World; controller: BuildCon
 }
 
 describe('BUILD_TOOLS', () => {
-  it('lists seven buildings and Demolish on digit keys 1-8', () => {
+  it('lists ten buildings on the digit keys 1-9 and 0, then Demolish on X', () => {
     expect(BUILD_TOOLS.map((e) => [e.label, e.key])).toEqual([
       ['Keep', 'Digit1'],
       ['Hovel', 'Digit2'],
@@ -37,9 +38,12 @@ describe('BUILD_TOOLS', () => {
       ['Granary', 'Digit5'],
       ['Quarry', 'Digit6'],
       ['Farm', 'Digit7'],
-      ['Demolish', 'Digit8'],
+      ['Wall', 'Digit8'],
+      ['Gate', 'Digit9'],
+      ['Tower', 'Digit0'],
+      ['Demolish', 'KeyX'],
     ]);
-    expect(BUILD_TOOLS.slice(0, 7).map((e) => e.tool)).toEqual(
+    expect(BUILD_TOOLS.slice(0, 10).map((e) => e.tool)).toEqual(
       [
         ObjectKind.Keep,
         ObjectKind.Hovel,
@@ -48,9 +52,12 @@ describe('BUILD_TOOLS', () => {
         ObjectKind.Granary,
         ObjectKind.Quarry,
         ObjectKind.WheatFarm,
+        ObjectKind.Wall,
+        ObjectKind.Gate,
+        ObjectKind.Tower,
       ].map((kind) => ({ type: 'build', kind })),
     );
-    expect(BUILD_TOOLS[7].tool).toEqual(DEMOLISH);
+    expect(BUILD_TOOLS[10].tool).toEqual(DEMOLISH);
   });
 });
 
@@ -171,5 +178,96 @@ describe('BuildController', () => {
     expect(world.economy.amount(ResourceKind.Wood)).toBe(50);
     expect(world.economy.amount(ResourceKind.Stone)).toBe(0);
     expect(messages).toEqual([]);
+  });
+});
+
+describe('BuildController wall drags', () => {
+  const START = { tx: 5, ty: 5 };
+  const END = { tx: 9, ty: 5 };
+
+  function stoneSetup(stone = 100): ReturnType<typeof setup> {
+    const result = setup(flatWorld(resources(0, stone, 0)));
+    result.controller.selectTool(WALL);
+    return result;
+  }
+
+  it('previews the line from the start to the hovered tile and builds it on finish', () => {
+    const { world, controller, messages } = stoneSetup();
+    expect(controller.wallDragPreview(world, END)).toBeNull();
+    controller.startWallDrag(world, START);
+    expect(controller.isWallDragging).toBe(true);
+    const preview = controller.wallDragPreview(world, END);
+    expect(preview?.placedCount).toBe(5);
+    expect(preview?.cost).toEqual(resources(0, 10, 0));
+    expect(controller.wallDragPreview(world, null)).toBeNull();
+    expect(world.objectCount).toBe(0);
+    const result = controller.finishWallDrag(world, END);
+    expect(result).toEqual({ ok: true, placed: 5, skipped: 0, unpaid: 0 });
+    for (let tx = 5; tx <= 9; tx++) expect(world.objectAt(tx, 5)?.kind).toBe(ObjectKind.Wall);
+    expect(world.economy.amount(ResourceKind.Stone)).toBe(90);
+    expect(controller.isWallDragging).toBe(false);
+    expect(controller.wallDragPreview(world, END)).toBeNull();
+    expect(messages).toEqual([]);
+  });
+
+  it('does not build on a click with the Wall tool, so the release builds only once', () => {
+    const { world, controller } = stoneSetup();
+    expect(controller.click(world, START)).toBeNull();
+    expect(world.objectCount).toBe(0);
+  });
+
+  it('builds nothing after a cancel', () => {
+    const { world, controller, messages } = stoneSetup();
+    controller.startWallDrag(world, START);
+    controller.cancelWallDrag();
+    expect(controller.isWallDragging).toBe(false);
+    expect(controller.finishWallDrag(world, END)).toBeNull();
+    expect(world.objectCount).toBe(0);
+    expect(messages).toEqual([]);
+  });
+
+  it('clears the drag when the tool changes', () => {
+    const { world, controller } = stoneSetup();
+    controller.startWallDrag(world, START);
+    controller.selectTool(HOVEL);
+    expect(controller.wallDragPreview(world, END)).toBeNull();
+    controller.selectTool(WALL);
+    expect(controller.finishWallDrag(world, END)).toBeNull();
+    expect(world.objectCount).toBe(0);
+  });
+
+  it('builds a single piece at the start when the release has no tile', () => {
+    const { world, controller } = stoneSetup();
+    controller.startWallDrag(world, START);
+    expect(controller.finishWallDrag(world, null)).toEqual({ ok: true, placed: 1, skipped: 0, unpaid: 0 });
+    expect(world.objectAt(5, 5)?.kind).toBe(ObjectKind.Wall);
+    expect(world.objectCount).toBe(1);
+  });
+
+  it('names the missing stone when nothing can be paid', () => {
+    const { world, controller, messages } = stoneSetup(0);
+    controller.startWallDrag(world, START);
+    expect(controller.finishWallDrag(world, END)).toEqual({ ok: false, reason: 'NotEnoughResources' });
+    expect(messages).toEqual(['Cannot build: not enough stone']);
+    expect(world.objectCount).toBe(0);
+  });
+
+  it('does not start a drag with another tool or without a tile', () => {
+    const { world, controller } = stoneSetup();
+    controller.startWallDrag(world, null);
+    expect(controller.isWallDragging).toBe(false);
+    controller.selectTool(HOVEL);
+    controller.startWallDrag(world, START);
+    expect(controller.isWallDragging).toBe(false);
+    expect(controller.wallDragPreview(world, END)).toBeNull();
+    expect(controller.finishWallDrag(world, END)).toBeNull();
+    expect(world.objectCount).toBe(0);
+  });
+});
+
+describe('keyLabel', () => {
+  it('shows a digit or letter key as its character', () => {
+    expect(keyLabel('Digit0')).toBe('0');
+    expect(keyLabel('KeyX')).toBe('X');
   });
 });

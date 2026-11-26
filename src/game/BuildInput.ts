@@ -1,4 +1,5 @@
-// Player input for building: digit keys, Escape, the build bar and clicks on the map drive a BuildController.
+// Player input for building: tool keys, Escape, the build bar, and clicks and wall drags on the map drive a
+// BuildController.
 import type { Pointer } from '../input/Pointer';
 import type { EconomyView } from '../sim/Economy';
 import type { TileCoord } from '../sim/TileCoord';
@@ -10,7 +11,7 @@ import type { BuildController } from './BuildController';
 const LEFT_BUTTON = 0;
 const RIGHT_BUTTON = 2;
 
-/** What a left click on the map acts on: the current world and the tile under the cursor in it (null for none). */
+/** What a left press, release or click on the map acts on: the current world and the tile under the cursor in it. */
 export interface MapClickTarget {
   readonly world: World;
   readonly tile: TileCoord | null;
@@ -18,10 +19,12 @@ export interface MapClickTarget {
 
 export class BuildInput {
   private readonly bar: BuildBar;
+  /** True when the latest right press cancelled a wall drag, so its click does not also deselect the tool. */
+  private rightPressCancelledDrag = false;
 
   /**
-   * Builds the bar in `barRoot` and listens for keys on `keyTarget` (usually `window`) and clicks on `pointer`;
-   * `clickTarget` returns the world and tile a left click acts on. Create once at setup.
+   * Builds the bar in `barRoot` and listens for keys on `keyTarget` (usually `window`) and presses, releases and
+   * clicks on `pointer`; `clickTarget` returns the world and tile under the cursor. Create once at setup.
    */
   public constructor(
     private readonly builder: BuildController,
@@ -32,6 +35,8 @@ export class BuildInput {
   ) {
     this.bar = new BuildBar(barRoot, (tool) => this.select(tool));
     keyTarget.addEventListener('keydown', this.onKeyDown);
+    pointer.onPress(this.onPress);
+    pointer.onRelease(this.onRelease);
     pointer.onClick(this.onClick);
   }
 
@@ -46,18 +51,40 @@ export class BuildInput {
     this.bar.setActive(tool);
   }
 
+  /** Tool keys and Escape, without key repeats or Ctrl, Meta or Alt. Escape during a wall drag only cancels it. */
   private readonly onKeyDown = (e: Event): void => {
-    const { code, repeat } = e as KeyboardEvent;
-    if (repeat) return;
-    if (code === 'Escape') this.select(null);
+    const { code, repeat, ctrlKey, metaKey, altKey } = e as KeyboardEvent;
+    if (repeat || ctrlKey || metaKey || altKey) return;
+    if (code === 'Escape') {
+      if (this.builder.isWallDragging) this.builder.cancelWallDrag();
+      else this.select(null);
+    }
     const entry = BUILD_TOOLS.find((t) => t.key === code);
     if (entry) this.select(entry.tool);
   };
 
-  /** Left click applies the tool to the tile under the cursor; right click deselects it. */
+  /** A left press starts a wall drag with the Wall tool; a right press cancels one. */
+  private readonly onPress = (button: number): void => {
+    if (button === RIGHT_BUTTON) {
+      this.rightPressCancelledDrag = this.builder.isWallDragging;
+      this.builder.cancelWallDrag();
+    } else if (button === LEFT_BUTTON) {
+      const { world, tile } = this.clickTarget();
+      this.builder.startWallDrag(world, tile);
+    }
+  };
+
+  /** A left release builds the wall drag in progress, if any, up to the tile under the cursor. */
+  private readonly onRelease = (button: number): void => {
+    if (button !== LEFT_BUTTON) return;
+    const { world, tile } = this.clickTarget();
+    this.builder.finishWallDrag(world, tile);
+  };
+
+  /** Left click applies the tool to the tile under the cursor; right click deselects it unless it ended a drag. */
   private readonly onClick = (button: number): void => {
     if (button === RIGHT_BUTTON) {
-      this.select(null);
+      if (!this.rightPressCancelledDrag) this.select(null);
     } else if (button === LEFT_BUTTON) {
       const { world, tile } = this.clickTarget();
       this.builder.click(world, tile);

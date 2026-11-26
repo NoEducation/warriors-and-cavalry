@@ -10,10 +10,16 @@ export interface NdcPoint {
 }
 
 const MIDDLE_BUTTON = 1;
+/** Each `PointerEvent.button` reported by press and release (left, middle, right) with its `buttons` bit. */
+const BUTTON_BITS: readonly (readonly [button: number, bit: number])[] = [[0, 1], [1, 4], [2, 2]];
 
 export class Pointer {
   private position: NdcPoint | null = null;
   private readonly tracker = new DragTracker();
+  /** `PointerEvent.buttons` as last seen: a button pressed or let go while another is held arrives only as a move. */
+  private heldButtons = 0;
+  private readonly pressListeners: ((button: number) => void)[] = [];
+  private readonly releaseListeners: ((button: number) => void)[] = [];
   private readonly clickListeners: ((button: number) => void)[] = [];
   private readonly dragListeners: ((drag: PointerDrag) => void)[] = [];
 
@@ -35,8 +41,24 @@ export class Pointer {
   }
 
   /**
-   * Calls `listener` with the button (`PointerEvent.button`: 0 left, 1 middle, 2 right) whenever a button is pressed
-   * and released on the canvas without moving more than a few pixels in between. Register once at setup.
+   * Calls `listener` with the button (`PointerEvent.button`: 0 left, 1 middle, 2 right) whenever a button is pressed on
+   * the canvas, also a second button pressed while another is held. Register once at setup.
+   */
+  public onPress(listener: (button: number) => void): void {
+    this.pressListeners.push(listener);
+  }
+
+  /**
+   * Calls `listener` with the button whenever a button pressed on the canvas is let go, also outside the canvas while
+   * the pointer is captured. Fires before any `onClick` for the same release. Register once at setup.
+   */
+  public onRelease(listener: (button: number) => void): void {
+    this.releaseListeners.push(listener);
+  }
+
+  /**
+   * Calls `listener` with the button whenever a button is pressed and released on the canvas without moving more
+   * than a few pixels in between. Register once at setup.
    */
   public onClick(listener: (button: number) => void): void {
     this.clickListeners.push(listener);
@@ -61,6 +83,8 @@ export class Pointer {
     this.canvas.removeEventListener('lostpointercapture', this.onPointerCancel);
     this.canvas.removeEventListener('mousedown', this.preventMiddleButton);
     this.canvas.removeEventListener('auxclick', this.preventMiddleButton);
+    this.pressListeners.length = 0;
+    this.releaseListeners.length = 0;
     this.clickListeners.length = 0;
     this.dragListeners.length = 0;
     this.position = null;
@@ -78,6 +102,7 @@ export class Pointer {
 
   private readonly onPointerMove = (e: PointerEvent): void => {
     this.updatePosition(e);
+    this.notifyButtonChanges(e.buttons);
     const drag = this.tracker.move(e.clientX, e.clientY);
     if (drag) for (const listener of this.dragListeners) listener(drag);
   };
@@ -92,6 +117,8 @@ export class Pointer {
     if (e.button === MIDDLE_BUTTON) e.preventDefault();
     this.updatePosition(e);
     this.tracker.press(e.button, e.clientX, e.clientY);
+    this.heldButtons = e.buttons;
+    this.notify(this.pressListeners, e.button);
     try {
       this.canvas.setPointerCapture(e.pointerId);
     } catch {
@@ -102,12 +129,28 @@ export class Pointer {
   private readonly onPointerUp = (e: PointerEvent): void => {
     const release = this.tracker.release();
     if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
+    this.heldButtons = e.buttons;
+    this.notify(this.releaseListeners, e.button);
     if (!release || release.button !== e.button || release.wasDrag) return;
-    for (const listener of this.clickListeners) listener(e.button);
+    this.notify(this.clickListeners, e.button);
   };
+
+  /** Reports each button whose state in `buttons` differs from the last seen as pressed or released. */
+  private notifyButtonChanges(buttons: number): void {
+    const changed = this.heldButtons ^ buttons;
+    this.heldButtons = buttons;
+    for (const [button, bit] of BUTTON_BITS) {
+      if (changed & bit) this.notify(buttons & bit ? this.pressListeners : this.releaseListeners, button);
+    }
+  }
+
+  private notify(listeners: readonly ((button: number) => void)[], button: number): void {
+    for (const listener of listeners) listener(button);
+  }
 
   private readonly onPointerCancel = (): void => {
     this.tracker.cancel();
+    this.heldButtons = 0;
   };
 
   /** Stops the browser's middle-click auto-scroll and middle-click paste/open over the canvas. */
@@ -115,3 +158,4 @@ export class Pointer {
     if (e.button === MIDDLE_BUTTON) e.preventDefault();
   };
 }
+

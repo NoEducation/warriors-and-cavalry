@@ -19,6 +19,8 @@ export class Hud {
   private readonly fpsLine: HTMLDivElement;
   private readonly messageLine: HTMLDivElement;
   private messageTimer: ReturnType<typeof setTimeout> | null = null;
+  /** True while the message line shows a `setLiveMessage` text rather than a timed message. */
+  private liveMessage = false;
 
   /** Builds the HUD inside `root`; `onNewMap` runs when the player clicks "New map". */
   public constructor(
@@ -75,11 +77,28 @@ export class Hud {
   /** Shows `text` on a message line for `seconds`, replacing any message still shown. Call for player feedback. */
   public showMessage(text: string, seconds: number): void {
     if (this.messageTimer !== null) clearTimeout(this.messageTimer);
+    this.liveMessage = false;
     this.messageLine.textContent = text;
     this.messageTimer = setTimeout(() => {
       this.messageLine.textContent = '';
       this.messageTimer = null;
     }, seconds * 1000);
+  }
+
+  /**
+   * Shows `text` on the message line until it changes, e.g. the cost of a wall drag; null clears the line unless a
+   * timed message has replaced the text since. Cheap to call every frame: the DOM changes only when the text does.
+   */
+  public setLiveMessage(text: string | null): void {
+    if (text === null) {
+      if (this.liveMessage) this.messageLine.textContent = '';
+      this.liveMessage = false;
+      return;
+    }
+    if (this.messageTimer !== null) clearTimeout(this.messageTimer);
+    this.messageTimer = null;
+    this.liveMessage = true;
+    if (this.messageLine.textContent !== text) this.messageLine.textContent = text;
   }
 
   /** Shows the frame rate, rounded. Call a few times per second. */

@@ -5,6 +5,7 @@ import type { CameraRig } from '../render/CameraRig';
 import type { PlacementGhost } from '../render/PlacementGhost';
 import type { TileHighlight } from '../render/TileHighlight';
 import { TilePicker } from '../render/TilePicker';
+import type { WallLineGhost } from '../render/WallLineGhost';
 import type { World } from '../sim/World';
 import type { Hud } from '../ui/Hud';
 import { BuildController } from './BuildController';
@@ -20,6 +21,7 @@ export interface GameInputTargets {
   readonly hud: Hud;
   readonly highlight: TileHighlight;
   readonly ghost: PlacementGhost;
+  readonly wallGhost: WallLineGhost;
   readonly rig: CameraRig;
   readonly runner: SimulationRunner;
   readonly currentWorld: () => World;
@@ -28,7 +30,7 @@ export interface GameInputTargets {
 export class GameInput {
   /** Held keys; the camera reads them every frame. */
   public readonly keyboard = new Keyboard(window);
-  /** Updates the ghost, highlight and HUD tile line; call its `update` every frame. */
+  /** Updates the ghosts, highlight and HUD lines; call its `update` every frame. */
   public readonly tileHover: TileHover;
   /** The build bar and build keys; shows which buildings can be paid. */
   public readonly buildInput: BuildInput;
@@ -42,9 +44,9 @@ export class GameInput {
     private readonly targets: GameInputTargets,
   ) {
     const pointer = new Pointer(canvas);
-    const { hud, highlight, ghost, rig, runner } = targets;
+    const { hud, highlight, ghost, wallGhost, rig, runner } = targets;
     const builder = new BuildController((text) => hud.showMessage(text, GAME_CONFIG.messageSeconds));
-    this.tileHover = new TileHover(pointer, new TilePicker(), highlight, ghost, hud, builder);
+    this.tileHover = new TileHover(pointer, new TilePicker(), highlight, ghost, wallGhost, hud, builder);
     this.buildInput = new BuildInput(builder, buildBarRoot, window, pointer, () => this.mapClickTarget());
     this.cameraDragInput = new CameraDragInput(pointer, rig);
     this.timeInput = new TimeInput(window, runner);

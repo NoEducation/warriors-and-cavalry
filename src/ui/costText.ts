@@ -14,3 +14,9 @@ export function shortCostText(cost: ResourceAmounts): string {
   );
   return parts.length > 0 ? parts.join(' ') : 'free';
 }
+
+/** `Wall: 12 pieces, 24 stone`: how many pieces a wall drag would place and their `cost`; no cost for none. */
+export function wallLineText(pieces: number, cost: ResourceAmounts): string {
+  const count = `Wall: ${pieces} ${pieces === 1 ? 'piece' : 'pieces'}`;
+  return pieces > 0 ? `${count}, ${costText(cost)}` : count;
+}

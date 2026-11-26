@@ -4,6 +4,7 @@ import { CameraRig } from '../render/CameraRig';
 import { PixelRenderer } from '../render/PixelRenderer';
 import { PlacementGhost } from '../render/PlacementGhost';
 import { TileHighlight } from '../render/TileHighlight';
+import { WallLineGhost } from '../render/WallLineGhost';
 import { WorldView } from '../render/WorldView';
 import { TICKS_PER_SECOND } from '../sim/gameTime';
 import { MapGenerator } from '../sim/MapGenerator';
@@ -27,7 +28,9 @@ export class Game {
   private readonly mapGenerator = new MapGenerator();
   private readonly worldView = new WorldView();
   private readonly highlight = new TileHighlight();
-  private readonly ghost = new PlacementGhost(new BuildingMeshFactory());
+  private readonly ghostFactory = new BuildingMeshFactory();
+  private readonly ghost = new PlacementGhost(this.ghostFactory);
+  private readonly wallGhost = new WallLineGhost(this.ghostFactory);
   private readonly rig = new CameraRig(GAME_CONFIG.mapSize, GAME_CONFIG.mapSize);
   private readonly runner = new SimulationRunner(TICKS_PER_SECOND);
   private readonly pixelRenderer: PixelRenderer;
@@ -50,8 +53,8 @@ export class Game {
     this.hud = new Hud(hudRoot, () => this.onNewMap());
     this.input = this.createInput(canvas, buildBarRoot);
     this.widgets = this.createWidgets(resourceRoot);
-    // The hover outline and placement ghost stay in the scene across maps.
-    this.worldView.scene.add(this.highlight.object, this.ghost.object);
+    // The hover outline and the ghosts stay in the scene across maps.
+    this.worldView.scene.add(this.highlight.object, this.ghost.object, this.wallGhost.object);
     this.showWorld();
   }
 
@@ -70,10 +73,11 @@ export class Game {
     this.showWorld();
   }
 
-  /** Creates the keyboard, pointer and canvas input, acting on the HUD, hover outline, ghost, camera and runner. */
+  /** Creates the keyboard, pointer and canvas input, acting on the HUD, hover outline, ghosts, camera and runner. */
   private createInput(canvas: HTMLCanvasElement, buildBarRoot: HTMLElement): GameInput {
-    const { hud, highlight, ghost, rig, runner } = this;
-    return new GameInput(canvas, buildBarRoot, { hud, highlight, ghost, rig, runner, currentWorld: () => this.world });
+    const { hud, highlight, ghost, wallGhost, rig, runner } = this;
+    const currentWorld = (): World => this.world;
+    return new GameInput(canvas, buildBarRoot, { hud, highlight, ghost, wallGhost, rig, runner, currentWorld });
   }
 
   /** Creates the FPS reading and the clock, resource bar and affordability display. Call after `createInput`. */

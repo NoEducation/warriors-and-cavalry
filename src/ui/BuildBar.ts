@@ -1,5 +1,5 @@
 // HTML bar with one button per build tool: its key, label and cost. Shows the active tool and what cannot be paid.
-import { BUILD_TOOLS, type BuildTool, sameTool } from './BuildTool';
+import { BUILD_TOOLS, type BuildTool, keyLabel, sameTool } from './BuildTool';
 import type { EconomyView } from '../sim/Economy';
 import { OBJECT_KINDS } from '../sim/ObjectKind';
 import { costText, shortCostText } from './costText';
@@ -10,10 +10,10 @@ export class BuildBar {
 
   /** Builds the buttons inside `root`; `onSelect` receives the clicked tool, or null when the active one is clicked. */
   public constructor(root: HTMLElement, onSelect: (tool: BuildTool) => void) {
-    BUILD_TOOLS.forEach((entry, i) => {
+    BUILD_TOOLS.forEach((entry) => {
       const button = root.appendChild(document.createElement('button'));
       button.type = 'button';
-      button.appendChild(document.createElement('span')).textContent = `${i + 1} ${entry.label}`;
+      button.appendChild(document.createElement('span')).textContent = `${keyLabel(entry.key)} ${entry.label}`;
       if (entry.tool.type === 'build') {
         const cost = OBJECT_KINDS[entry.tool.kind].cost;
         const costLine = button.appendChild(document.createElement('span'));

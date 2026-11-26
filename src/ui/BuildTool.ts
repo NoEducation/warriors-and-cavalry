@@ -19,8 +19,16 @@ export const BUILD_TOOLS: readonly BuildToolEntry[] = Object.freeze([
   { label: 'Granary', key: 'Digit5', tool: { type: 'build', kind: ObjectKind.Granary } },
   { label: 'Quarry', key: 'Digit6', tool: { type: 'build', kind: ObjectKind.Quarry } },
   { label: 'Farm', key: 'Digit7', tool: { type: 'build', kind: ObjectKind.WheatFarm } },
-  { label: 'Demolish', key: 'Digit8', tool: { type: 'demolish' } },
+  { label: 'Wall', key: 'Digit8', tool: { type: 'build', kind: ObjectKind.Wall } },
+  { label: 'Gate', key: 'Digit9', tool: { type: 'build', kind: ObjectKind.Gate } },
+  { label: 'Tower', key: 'Digit0', tool: { type: 'build', kind: ObjectKind.Tower } },
+  { label: 'Demolish', key: 'KeyX', tool: { type: 'demolish' } },
 ]);
+
+/** The key a button shows for `code`: `8` for `Digit8`, `X` for `KeyX`. */
+export function keyLabel(code: string): string {
+  return code.replace(/^(Digit|Key)/, '');
+}
 
 /** True when `a` and `b` are the same tool (or both null). */
 export function sameTool(a: BuildTool, b: BuildTool): boolean {
