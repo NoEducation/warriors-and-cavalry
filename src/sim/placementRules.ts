@@ -5,10 +5,13 @@ import { OBJECT_KINDS, type ObjectKind, type ObjectKindInfo } from './ObjectKind
 import { TileType } from './tiles';
 import type { PlacementCheck } from './WorldCommand';
 
-/** Allowed corner height range under a footprint, per tile of its longer side (0.6 for 2 x 2, 1.2 for 4 x 4). */
-export const SLOPE_PER_TILE = 0.3;
-/** The smallest allowed corner height range, so a one-tile piece may stand on ground as uneven as a 2 x 2 building. */
-export const MIN_SLOPE_LIMIT = 0.6;
+/** How uneven the ground under a building may be. Frozen; tune by editing the values here. */
+export const PLACEMENT_CONFIG = Object.freeze({
+  /** Allowed corner height range under a footprint, per tile of its longer side (0.6 for 2 x 2, 1.2 for 4 x 4). */
+  slopePerTile: 0.3,
+  /** The smallest allowed corner height range, so a one-tile piece may stand on ground as uneven as a 2 x 2 building. */
+  minSlopeLimit: 0.6,
+});
 /** Heights are stored as float32, so a range of exactly the limit can read slightly above it. */
 const SLOPE_TOLERANCE = 1e-5;
 
@@ -32,7 +35,7 @@ export function checkPlacement(
   if (!info.quarryOnly && !terrainAllows(map, info, footprint)) return { ok: false, reason: 'BadTerrain' };
   if (!isFree(footprint)) return { ok: false, reason: 'Occupied' };
   const range = footprint.cornerHeightRange(map);
-  const limit = Math.max(MIN_SLOPE_LIMIT, SLOPE_PER_TILE * Math.max(info.width, info.height));
+  const limit = Math.max(PLACEMENT_CONFIG.minSlopeLimit, PLACEMENT_CONFIG.slopePerTile * Math.max(info.width, info.height));
   if (!range || range.max - range.min > limit + SLOPE_TOLERANCE) return { ok: false, reason: 'TooSteep' };
   return { ok: true };
 }

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { ObjectKind } from '../sim/ObjectKind';
 import type { WallLinePreview } from '../sim/WallBuilder';
-import { WALL_LINE_MAX_TILES } from '../sim/wallLine';
+import { WALL_LINE_CONFIG } from '../sim/wallLine';
 import type { World } from '../sim/World';
 import type { BuildingMeshFactory } from './BuildingMeshFactory';
 import { floorHeight } from './floorHeight';
@@ -70,7 +70,7 @@ export class WallLineGhost {
       depthWrite: false,
       flatShading: true,
     });
-    const pieces = new THREE.InstancedMesh(this.geometry, material, WALL_LINE_MAX_TILES);
+    const pieces = new THREE.InstancedMesh(this.geometry, material, WALL_LINE_CONFIG.maxTiles);
     pieces.count = 0;
     // The instances move every frame, so a bounding sphere computed once would cull the wrong pieces.
     pieces.frustumCulled = false;

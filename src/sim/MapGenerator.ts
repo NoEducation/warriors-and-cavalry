@@ -31,12 +31,11 @@ export const MAPGEN_CONFIG = Object.freeze({
   borderSteepness: 8,
   /** Deepest the seabed goes below sea level; the forced water border sits at this depth too. */
   seabedDepth: 6,
+  /** Seed offset for the coastline noise, so it differs from the terrain noise (which uses seed + octave). */
+  coastSeedOffset: 0x5eed,
+  /** Samples per axis when averaging the coastline noise. */
+  wobbleSamples: 16,
 });
-
-/** Seed offset for the coastline noise, so it differs from the terrain noise (which uses seed + octave). */
-const COAST_SEED_OFFSET = 0x5eed;
-/** Samples per axis when averaging the coastline noise. */
-const WOBBLE_SAMPLES = 16;
 
 export interface MapParams {
   readonly seed: number;
@@ -88,14 +87,14 @@ export class MapGenerator {
   private coastWobbleMean(seed: number): number {
     const c = MAPGEN_CONFIG;
     let sum = 0;
-    for (let j = 0; j < WOBBLE_SAMPLES; j++) {
-      for (let i = 0; i < WOBBLE_SAMPLES; i++) {
-        const u = (i + 0.5) / WOBBLE_SAMPLES;
-        const v = (j + 0.5) / WOBBLE_SAMPLES;
-        sum += fbm2(seed + COAST_SEED_OFFSET, u * c.coastFrequency, v * c.coastFrequency, c.coastOctaves);
+    for (let j = 0; j < c.wobbleSamples; j++) {
+      for (let i = 0; i < c.wobbleSamples; i++) {
+        const u = (i + 0.5) / c.wobbleSamples;
+        const v = (j + 0.5) / c.wobbleSamples;
+        sum += fbm2(seed + c.coastSeedOffset, u * c.coastFrequency, v * c.coastFrequency, c.coastOctaves);
       }
     }
-    return sum / (WOBBLE_SAMPLES * WOBBLE_SAMPLES);
+    return sum / (c.wobbleSamples * c.wobbleSamples);
   }
 
   private cornerHeight(shape: IslandShape, cx: number, cy: number): number {
@@ -109,7 +108,7 @@ export class MapGenerator {
     const dx = Math.abs(u * 2 - 1);
     const dy = Math.abs(v * 2 - 1);
     // Round island whose radius wobbles with low-frequency noise (bays, peninsulas).
-    const wobble = fbm2(seed + COAST_SEED_OFFSET, u * c.coastFrequency, v * c.coastFrequency, c.coastOctaves);
+    const wobble = fbm2(seed + c.coastSeedOffset, u * c.coastFrequency, v * c.coastFrequency, c.coastOctaves);
     const radial = Math.sqrt(dx * dx + dy * dy) + c.coastWarp * 2 * (wobble - shape.wobbleMean);
     // Pushes the coast smoothly away from the map border instead of cutting it off in a straight line.
     const border = Math.max(0, 1 - (1 - Math.max(dx, dy)) * c.borderSteepness);
