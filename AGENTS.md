@@ -17,7 +17,7 @@ A browser strategy game in the spirit of Stronghold: TypeScript (strict), Vite, 
 
 | Folder | Holds | May depend on |
 | --- | --- | --- |
-| `src/sim/` | Deterministic game state and rules: `GameMap`, `MapGenerator`, `World`, commands, `Footprint`, trees, game time, `Economy`, `Production`, peasants (`Population`, `Jobs`, `WorkerTrips`), `PathFinder` | nothing outside `src/sim/` |
+| `src/sim/` | Deterministic game state and rules: `GameMap`, `MapGenerator`, `World`, commands, `Footprint`, trees, game time, `Economy`, `Production`, peasants (`Population`, `Jobs`, `WorkerTrips`), `PathFinder`, walls (`WallBuilder`), `ObjectLifecycle` | nothing outside `src/sim/` |
 | `src/render/` | three.js drawing: terrain, water, trees, buildings, peasants, ghost, highlight, camera | `src/sim/` |
 | `src/input/` | Keyboard and pointer state, click-versus-drag | — |
 | `src/ui/` | HTML widgets: `Hud`, `BuildBar`, `ResourceBar`; the build tool table (`BuildTool`) | `src/sim/` types |
