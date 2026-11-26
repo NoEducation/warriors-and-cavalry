@@ -1,9 +1,10 @@
-// Meshes for every building in a world, kept in step with the world's changes.
+// Meshes for every building in a world, each on its earth bank, kept in step with the world's changes.
 import * as THREE from 'three';
 import type { MapObject } from '../sim/MapObject';
 import { OBJECT_KINDS, ObjectKind } from '../sim/ObjectKind';
 import type { World } from '../sim/World';
 import type { BuildingMeshFactory } from './BuildingMeshFactory';
+import { bankMesh } from './buildingBank';
 import { disposeObject } from './disposeObject';
 import { floorHeight } from './floorHeight';
 import { gatePassage } from './gatePassage';
@@ -55,7 +56,10 @@ export class BuildingLayer implements WorldLayer {
     // A gate's passage is decided once, when its mesh is made.
     const passage = object.kind === ObjectKind.Gate ? gatePassage(world, object.tx, object.ty) : undefined;
     const mesh = this.factory.create(object.kind, passage);
-    mesh.position.set(object.tx, floorHeight(world.map, object.kind, object.tx, object.ty), object.ty);
+    const floor = floorHeight(world.map, object.kind, object.tx, object.ty);
+    mesh.position.set(object.tx, floor, object.ty);
+    // The earth bank is a child, so it moves and is disposed with the building.
+    mesh.add(bankMesh(world.map, object.kind, object.tx, object.ty, floor));
     this.meshes.set(object.id, mesh);
     this.object.add(mesh);
   }
