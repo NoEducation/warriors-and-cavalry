@@ -1,9 +1,5 @@
 // Turns real frame time into a whole number of simulation ticks, with pause and speed steps.
-
-/** Speed multipliers the player can step through, slowest first. */
-export const SIMULATION_SPEEDS = [1, 2, 4] as const;
-/** Most ticks run in one frame; time beyond that (a long stall, a hidden tab) is dropped. */
-export const MAX_TICKS_PER_FRAME = 10;
+import { GAME_CONFIG } from './GameConfig';
 
 export class SimulationRunner {
   /** Elapsed simulation time not yet turned into ticks, in ticks (always below 1 between frames). */
@@ -19,9 +15,9 @@ export class SimulationRunner {
     return this.isPaused;
   }
 
-  /** The current speed multiplier, one of SIMULATION_SPEEDS. */
+  /** The current speed multiplier, one of `GAME_CONFIG.simulationSpeeds`. */
   public get speed(): number {
-    return SIMULATION_SPEEDS[this.speedIndex];
+    return GAME_CONFIG.simulationSpeeds[this.speedIndex];
   }
 
   /**
@@ -39,7 +35,7 @@ export class SimulationRunner {
 
   /** Steps to the next faster speed; stays at the fastest. */
   public faster(): void {
-    this.speedIndex = Math.min(this.speedIndex + 1, SIMULATION_SPEEDS.length - 1);
+    this.speedIndex = Math.min(this.speedIndex + 1, GAME_CONFIG.simulationSpeeds.length - 1);
   }
 
   /** Steps to the next slower speed; stays at the slowest. */
@@ -60,9 +56,9 @@ export class SimulationRunner {
     if (this.isPaused || !(dtSeconds > 0)) return 0;
     this.pending += dtSeconds * this.ticksPerSecond * this.speed;
     const ticks = Math.floor(this.pending);
-    if (ticks > MAX_TICKS_PER_FRAME) {
+    if (ticks > GAME_CONFIG.maxTicksPerFrame) {
       this.pending = 0;
-      return MAX_TICKS_PER_FRAME;
+      return GAME_CONFIG.maxTicksPerFrame;
     }
     this.pending -= ticks;
     return ticks;

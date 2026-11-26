@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SEED, parseSeed, randomSeed } from '../src/game/seed';
+import { GAME_CONFIG } from '../src/game/GameConfig';
+import { parseSeed, randomSeed } from '../src/game/seed';
 
 describe('parseSeed', () => {
   it('defaults to seed 1', () => {
-    expect(DEFAULT_SEED).toBe(1);
+    expect(GAME_CONFIG.defaultSeed).toBe(1);
   });
 
   it('reads valid seeds', () => {
