@@ -10,6 +10,7 @@ import { PeasantLayer } from './PeasantLayer';
 import { StockpileStacks } from './StockpileStacks';
 import { TerrainMeshBuilder } from './TerrainMeshBuilder';
 import { TreeLayer } from './TreeLayer';
+import { TreeShadowLayer } from './TreeShadowLayer';
 import { WaterMeshBuilder } from './WaterMeshBuilder';
 import type { WorldLayer } from './WorldLayer';
 
@@ -20,7 +21,7 @@ export class WorldView {
   private readonly buildingFactory = new BuildingMeshFactory();
   private terrainChunks: THREE.Group | null = null;
   private waterMesh: THREE.Mesh | null = null;
-  /** Trees, buildings, stockpile stacks, crops and peasants of the shown world, in drawing order; empty at first. */
+  /** Tree shadows, trees, buildings, stockpile stacks, crops and peasants of the shown world, in drawing order; empty at first. */
   private readonly layers: WorldLayer[] = [];
 
   /** Creates the scene with background and lights; no world is shown until `showWorld`. */
@@ -45,6 +46,7 @@ export class WorldView {
     this.waterMesh = this.waterBuilder.build(map, MAPGEN_CONFIG.seaLevel);
     this.scene.add(this.terrainChunks, this.waterMesh);
     this.layers.push(
+      new TreeShadowLayer(world),
       new TreeLayer(world),
       new BuildingLayer(world, this.buildingFactory),
       new StockpileStacks(world),
