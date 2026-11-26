@@ -135,9 +135,11 @@ from `stumpTicks` (config, 600 ticks = 1 minute) and removes it when it reaches
 0, in ascending id order. Stumps are part of the checksum through the object
 list as all objects are.
 
-**Facing.** `PeasantView` gains `choppingTx` / `choppingTy` (the claimed
-tree's tile, or -1 when none) so render can face a chopping worker at its
-tree. The checksum covers them.
+**Facing.** `PeasantView` gains `treeId` (the claimed tree, or null) so render
+can face a chopping worker at its tree. The checksum covers it.
+
+**Tree and shadow layers.** Both are built once per world today; they must
+follow tree removals (the shadow goes at once, the tree falls first).
 
 **Config.** `POPULATION_CONFIG` gains `stumpTicks`. The woodcutter's
 `cycleTicks` (100) and `yield` (2) stay; one tree gives one batch.
