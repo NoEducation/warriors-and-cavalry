@@ -1,6 +1,7 @@
 // Owns every game object and the current world, and runs the frame loop.
 import { BuildingMeshFactory } from '../render/BuildingMeshFactory';
 import { CameraRig } from '../render/CameraRig';
+import { groundHeightAt } from '../render/groundHeightAt';
 import { PixelRenderer } from '../render/PixelRenderer';
 import { PlacementGhost } from '../render/PlacementGhost';
 import { TileHighlight } from '../render/TileHighlight';
@@ -129,6 +130,7 @@ export class Game {
     this.lastFrameTime = time;
     for (let ticks = this.runner.ticksFor(dt); ticks > 0; ticks--) this.world.tick();
     this.rig.update(dt, this.input.keyboard);
+    this.rig.followGround((x, z) => groundHeightAt(this.world.map, x, z), dt);
     this.input.tileHover.update(this.rig.camera, this.world);
     this.worldView.update(this.runner.tickFraction);
     this.widgets.status.update(this.world);
