@@ -38,6 +38,7 @@ A browser strategy game in the spirit of Stronghold: TypeScript (strict), Vite, 
 - No `enum` keyword (use `as const` objects); no factory functions returning object literals.
 - Keep each source file under about 150 lines; split by responsibility when one grows.
 - Tunable values live in one config object per area (`GAME_CONFIG`, `CAMERA_CONFIG`, `MAPGEN_CONFIG`).
+- **CSS colours live in `src/ui/colors.css`.** Every colour in CSS (`ui.css`, the `<style>` in `index.html`) is a `var(--name)` defined there; never write a hex, `rgb()` or `hsl()` value anywhere else. Add a new colour as a variable in `colors.css`, and derive translucent shades of an existing colour with `color-mix(in srgb, var(--base) N%, transparent)`. Colours drawn from code stay in code: icon colours in `iconShapes.ts`, scene colours in `src/render/`.
 - No image, model or audio asset files yet: shapes are built in code.
 - No new dependencies without asking the owner.
 
