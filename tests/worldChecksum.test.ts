@@ -8,7 +8,7 @@ import type { PeasantView } from '../src/sim/PeasantView';
 import { RESOURCE_KINDS, ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
-import type { CommandResult } from '../src/sim/WorldCommand';
+import type { ObjectCommandResult } from '../src/sim/WorldCommand';
 import { worldChecksum } from '../src/sim/worldChecksum';
 
 const generator = new MapGenerator();
@@ -67,7 +67,7 @@ function tickWhile(world: World, going: () => boolean, also?: World): void {
   }
 }
 
-function demolish(world: World, placed: CommandResult): void {
+function demolish(world: World, placed: ObjectCommandResult): void {
   if (!placed.ok) throw new Error('placement failed');
   world.apply({ type: 'demolish', objectId: placed.object.id });
 }

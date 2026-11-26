@@ -7,6 +7,8 @@ import type { PlacementCheck } from './WorldCommand';
 
 /** Allowed corner height range under a footprint, per tile of its longer side (0.6 for 2 x 2, 1.2 for 4 x 4). */
 export const SLOPE_PER_TILE = 0.3;
+/** The smallest allowed corner height range, so a one-tile piece may stand on ground as uneven as a 2 x 2 building. */
+export const MIN_SLOPE_LIMIT = 0.6;
 /** Heights are stored as float32, so a range of exactly the limit can read slightly above it. */
 const SLOPE_TOLERANCE = 1e-5;
 
@@ -29,17 +31,22 @@ export function checkPlacement(
   if (!terrainAllows(map, info, footprint)) return { ok: false, reason: 'BadTerrain' };
   if (!isFree(footprint)) return { ok: false, reason: 'Occupied' };
   const range = footprint.cornerHeightRange(map);
-  const limit = SLOPE_PER_TILE * Math.max(info.width, info.height);
+  const limit = Math.max(MIN_SLOPE_LIMIT, SLOPE_PER_TILE * Math.max(info.width, info.height));
   if (!range || range.max - range.min > limit + SLOPE_TOLERANCE) return { ok: false, reason: 'TooSteep' };
   if (info.needsRock && !touchesRock(map, footprint)) return { ok: false, reason: 'NeedsRock' };
   return { ok: true };
 }
 
-/** Every tile is Grass, or Grass or Sand for kinds that are not grass-only. Assumes the footprint is in bounds. */
+/**
+ * Every tile is Grass for grass-only kinds; otherwise Grass or Sand, or also Rock for rock-allowed kinds.
+ * Assumes the footprint is in bounds.
+ */
 function terrainAllows(map: GameMap, info: ObjectKindInfo, footprint: Footprint): boolean {
   for (const tile of footprint.tiles()) {
     const type = map.tileAt(tile.tx, tile.ty);
-    if (type !== TileType.Grass && (info.grassOnly || type !== TileType.Sand)) return false;
+    if (type === TileType.Grass) continue;
+    if (info.grassOnly) return false;
+    if (type !== TileType.Sand && !(info.rockAllowed && type === TileType.Rock)) return false;
   }
   return true;
 }

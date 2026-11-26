@@ -10,6 +10,9 @@ export const ObjectKind = {
   Granary: 6,
   Quarry: 7,
   WheatFarm: 8,
+  Wall: 9,
+  Gate: 10,
+  Tower: 11,
 } as const;
 export type ObjectKind = (typeof ObjectKind)[keyof typeof ObjectKind];
 
@@ -37,13 +40,25 @@ export interface ObjectKindInfo {
   readonly grassOnly: boolean;
   /** True when a Rock tile must touch an edge of the footprint. */
   readonly needsRock: boolean;
+  /** True when footprint tiles may also be Rock (walls, gates and towers, so castles can stand on hills). */
+  readonly rockAllowed: boolean;
   /** Peasants this building houses while it stands. */
   readonly housing: number;
   readonly production: ProductionInfo | null;
 }
 
 /** Shared values of the kinds that neither store, produce nor have extra placement rules. */
-const PLAIN = { storage: NO_RESOURCES, grassOnly: false, needsRock: false, housing: 0, production: null } as const;
+const PLAIN = {
+  storage: NO_RESOURCES,
+  grassOnly: false,
+  needsRock: false,
+  rockAllowed: false,
+  housing: 0,
+  production: null,
+} as const;
+
+/** Shared values of the stone castle pieces: plain, buildable, and allowed on rock. */
+const CASTLE = { ...PLAIN, buildable: true, rockAllowed: true } as const;
 
 /** Freezes `value` and every object reachable from it, so no nested table entry can be changed at run time. */
 function deepFreeze<T extends object>(value: T): T {
@@ -121,4 +136,7 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
     grassOnly: true,
     production: { resource: ResourceKind.Food, cycleTicks: 200, yield: 3, treeRadius: null },
   },
+  [ObjectKind.Wall]: { ...CASTLE, name: 'Wall', width: 1, height: 1, cost: resources(0, 2, 0) },
+  [ObjectKind.Gate]: { ...CASTLE, name: 'Gate', width: 1, height: 1, cost: resources(0, 6, 0) },
+  [ObjectKind.Tower]: { ...CASTLE, name: 'Tower', width: 2, height: 2, cost: resources(0, 20, 0) },
 });

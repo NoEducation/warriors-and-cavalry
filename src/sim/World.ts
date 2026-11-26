@@ -11,13 +11,22 @@ import { checkPlacement } from './placementRules';
 import { Population, type PopulationSummary } from './Population';
 import { Production, type ProductionState } from './Production';
 import type { TileCoord } from './TileCoord';
-import type { CommandResult, PlacementCheck, WorldChange, WorldCommand } from './WorldCommand';
+import { WallBuilder, type WallLinePreview } from './WallBuilder';
+import type {
+  CommandResult,
+  ObjectCommand,
+  ObjectCommandResult,
+  PlacementCheck,
+  WorldChange,
+  WorldCommand,
+} from './WorldCommand';
 
 export class World {
   private readonly index: ObjectIndex;
   private readonly listeners = new Listeners<WorldChange>();
   private readonly production: Production;
   private readonly populace: Population;
+  private readonly walls: WallBuilder;
   private nextId = 1;
   private ticks = 0;
 
@@ -26,6 +35,8 @@ export class World {
     this.index = new ObjectIndex(map);
     this.production = new Production(map, economyState, (tx, ty) => this.objectAt(tx, ty)?.kind === ObjectKind.Tree);
     this.populace = new Population(this, economyState);
+    const site = { canPlace: this.canPlace.bind(this), add: this.add.bind(this) };
+    this.walls = new WallBuilder(site, economyState);
   }
 
   /** Read-only view of `economyState`: resource amounts and capacities, changed only through `apply` and `tick`. */
@@ -90,7 +101,7 @@ export class World {
     return this.index.objectAt(tx, ty);
   }
 
-  /** Whether a walker may stand on tile (tx, ty): inside the map, not water, and free or a tree. */
+  /** Whether a walker may stand on tile (tx, ty): inside the map, not water, and free, a tree or a gate. */
   public isWalkable(tx: number, ty: number): boolean {
     return this.index.isWalkable(tx, ty);
   }
@@ -113,7 +124,17 @@ export class World {
     return checkPlacement(this.map, kind, tx, ty, (footprint) => this.index.isFree(footprint));
   }
 
+  /**
+   * What a `placeWallLine` command from `from` to `to` would build now: its tiles, which get a piece, and the cost.
+   * Changes nothing; the command builds exactly these pieces. Call per frame for the drag ghost.
+   */
+  public previewWallLine(from: TileCoord, to: TileCoord): WallLinePreview {
+    return this.walls.preview(from, to);
+  }
+
   /** Executes a player command. On failure, including a malformed command, nothing changes and no listener is called. */
+  public apply(command: ObjectCommand): ObjectCommandResult;
+  public apply(command: WorldCommand): CommandResult;
   public apply(command: WorldCommand): CommandResult {
     switch (command.type) {
       case 'placeBuilding': {
@@ -123,6 +144,8 @@ export class World {
         return { ok: true, object: this.add(command.kind, command.tx, command.ty) };
       }
       case 'demolish': return this.demolish(command.objectId);
+      case 'placeWallLine':
+        return this.walls.build({ tx: command.fromTx, ty: command.fromTy }, { tx: command.toTx, ty: command.toTy });
       default: return { ok: false, reason: 'UnknownCommand' };
     }
   }
@@ -144,7 +167,7 @@ export class World {
   }
 
   /** Removes the object, then refunds part of its cost into the capacity that remains. */
-  private demolish(objectId: number): CommandResult {
+  private demolish(objectId: number): ObjectCommandResult {
     const object = this.index.objectById(objectId);
     if (!object) return { ok: false, reason: 'UnknownObject' };
     const info = OBJECT_KINDS[object.kind];

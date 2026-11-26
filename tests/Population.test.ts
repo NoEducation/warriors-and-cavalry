@@ -8,7 +8,7 @@ import { POPULATION_CONFIG } from '../src/sim/populationConfig';
 import { ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
-import type { CommandResult } from '../src/sim/WorldCommand';
+import type { ObjectCommandResult } from '../src/sim/WorldCommand';
 import { worldChecksum } from '../src/sim/worldChecksum';
 
 const SIZE = 16;
@@ -22,7 +22,7 @@ function ticks(target: { tick(): void }, n: number): void {
   for (let i = 0; i < n; i++) target.tick();
 }
 
-function placed(result: CommandResult): MapObject {
+function placed(result: ObjectCommandResult): MapObject {
   if (!result.ok) throw new Error(`placement failed: ${result.reason}`);
   return result.object;
 }

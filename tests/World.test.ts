@@ -5,7 +5,7 @@ import { ObjectKind, OBJECT_KINDS } from '../src/sim/ObjectKind';
 import { NO_RESOURCES, RESOURCE_KINDS, ResourceKind } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { World } from '../src/sim/World';
-import type { CommandResult, WorldChange, WorldCommand } from '../src/sim/WorldCommand';
+import type { CommandResult, ObjectCommandResult, WorldChange, WorldCommand } from '../src/sim/WorldCommand';
 
 const SIZE = 16;
 
@@ -45,24 +45,31 @@ describe('OBJECT_KINDS', () => {
       ['Granary', 3, 3, true],
       ['Quarry', 3, 3, true],
       ['Wheat farm', 4, 4, true],
+      ['Wall', 1, 1, true],
+      ['Gate', 1, 1, true],
+      ['Tower', 2, 2, true],
     ]);
   });
 
   it('holds costs, storage, placement rules and production', () => {
     const rows = Object.values(ObjectKind).map((kind) => {
-      const { cost, storage, grassOnly, needsRock, production } = OBJECT_KINDS[kind];
-      return [RESOURCE_KINDS.map((k) => cost[k]), RESOURCE_KINDS.map((k) => storage[k]), grassOnly, needsRock, production];
+      const { cost, storage, grassOnly, needsRock, rockAllowed, housing, production } = OBJECT_KINDS[kind];
+      const amounts = (r: typeof cost): number[] => RESOURCE_KINDS.map((k) => r[k]);
+      return [amounts(cost), amounts(storage), grassOnly, needsRock, rockAllowed, housing, production];
     });
-    const wood = ResourceKind.Wood;
+    const { Wood: wood, Stone: stone, Food: food } = ResourceKind;
     expect(rows).toEqual([
-      [[0, 0, 0], [0, 0, 0], false, false, null],
-      [[50, 40, 0], [0, 0, 0], false, false, null],
-      [[15, 0, 0], [0, 0, 0], false, false, null],
-      [[20, 0, 0], [0, 0, 0], false, false, { resource: wood, cycleTicks: 100, yield: 2, treeRadius: 8 }],
-      [[10, 0, 0], [150, 150, 0], false, false, null],
-      [[25, 0, 0], [0, 0, 200], false, false, null],
-      [[30, 0, 0], [0, 0, 0], false, true, { resource: ResourceKind.Stone, cycleTicks: 150, yield: 2, treeRadius: null }],
-      [[20, 0, 0], [0, 0, 0], true, false, { resource: ResourceKind.Food, cycleTicks: 200, yield: 3, treeRadius: null }],
+      [[0, 0, 0], [0, 0, 0], false, false, false, 0, null],
+      [[50, 40, 0], [0, 0, 0], false, false, false, 4, null],
+      [[15, 0, 0], [0, 0, 0], false, false, false, 4, null],
+      [[20, 0, 0], [0, 0, 0], false, false, false, 0, { resource: wood, cycleTicks: 100, yield: 2, treeRadius: 8 }],
+      [[10, 0, 0], [150, 150, 0], false, false, false, 0, null],
+      [[25, 0, 0], [0, 0, 200], false, false, false, 0, null],
+      [[30, 0, 0], [0, 0, 0], false, true, false, 0, { resource: stone, cycleTicks: 150, yield: 2, treeRadius: null }],
+      [[20, 0, 0], [0, 0, 0], true, false, false, 0, { resource: food, cycleTicks: 200, yield: 3, treeRadius: null }],
+      [[0, 2, 0], [0, 0, 0], false, false, true, 0, null],
+      [[0, 6, 0], [0, 0, 0], false, false, true, 0, null],
+      [[0, 20, 0], [0, 0, 0], false, false, true, 0, null],
     ]);
   });
 });
@@ -107,8 +114,9 @@ describe('World.canPlace', () => {
     expect(world.canPlace(ObjectKind.Hovel, 5, 5)).toEqual({ ok: true });
   });
 
-  it('allows a corner height range of 0.3 per tile of the longer footprint side', () => {
+  it('allows a corner height range of 0.3 per tile of the longer footprint side, and at least 0.6', () => {
     const cases: [ObjectKind, number, number][] = [
+      [ObjectKind.Wall, 0.6, 0.7], // 1 x 1: the 0.6 floor
       [ObjectKind.Hovel, 0.6, 0.7], // 2 x 2
       [ObjectKind.Stockpile, 0.9, 1.0], // 3 x 3
       [ObjectKind.Keep, 1.2, 1.3], // 4 x 4
@@ -254,7 +262,7 @@ describe('World.apply', () => {
 describe('World costs and storage', () => {
   const amounts = (world: World): number[] => RESOURCE_KINDS.map((k) => world.economy.amount(k));
   const capacities = (world: World): number[] => RESOURCE_KINDS.map((k) => world.economy.capacity(k));
-  const place = (world: World, kind: ObjectKind, tx: number, ty: number): CommandResult =>
+  const place = (world: World, kind: ObjectKind, tx: number, ty: number): ObjectCommandResult =>
     world.apply({ type: 'placeBuilding', kind, tx, ty });
 
   it('spends the cost of a placed building', () => {

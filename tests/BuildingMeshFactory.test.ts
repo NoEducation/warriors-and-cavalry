@@ -30,8 +30,8 @@ function size(kind: ObjectKind): THREE.Vector3 {
 describe('BuildingMeshFactory', () => {
   const factory = new BuildingMeshFactory();
 
-  it('has seven buildable kinds', () => {
-    expect(BUILDABLE_KINDS).toHaveLength(7);
+  it('has ten buildable kinds', () => {
+    expect(BUILDABLE_KINDS).toHaveLength(10);
   });
 
   it('creates a non-empty, low-poly group within the footprint for every buildable kind', () => {

@@ -5,6 +5,7 @@ import type { BuildingShape } from './buildings/BuildingShape';
 import { GranaryShape } from './buildings/GranaryShape';
 import { HovelShape } from './buildings/HovelShape';
 import { KeepShape } from './buildings/KeepShape';
+import { PlaceholderShape } from './buildings/PlaceholderShape';
 import { QuarryShape } from './buildings/QuarryShape';
 import { StockpileShape } from './buildings/StockpileShape';
 import { WheatFarmShape } from './buildings/WheatFarmShape';
@@ -19,6 +20,10 @@ export class BuildingMeshFactory {
     [ObjectKind.Granary, new GranaryShape()],
     [ObjectKind.Quarry, new QuarryShape()],
     [ObjectKind.WheatFarm, new WheatFarmShape()],
+    // Placeholder stone blocks until the walls stage gives walls, gates and towers their own shapes.
+    [ObjectKind.Wall, new PlaceholderShape(ObjectKind.Wall, 1.6)],
+    [ObjectKind.Gate, new PlaceholderShape(ObjectKind.Gate, 1.6)],
+    [ObjectKind.Tower, new PlaceholderShape(ObjectKind.Tower, 3)],
   ]);
 
   /**
