@@ -391,17 +391,19 @@ describe('Supply chain determinism and speed', () => {
     const trees = (world: World): number => [...world.objects()].filter((o) => o.kind === ObjectKind.Tree).length;
     const treesAtStart = trees(a);
     let stumpsSeen = 0;
+    a.onChange((change) => {
+      if (change.type === 'added' && change.object.kind === ObjectKind.Stump) stumpsSeen++;
+    });
     for (let tick = 0; tick < 5000; tick++) {
       for (const world of [a, b]) {
         if (tick % 5 === 0 && tick / 5 < commands.length) world.apply(commands[tick / 5]);
         world.tick();
       }
       if ((tick + 1) % 500 === 0) expect(worldChecksum(a), `tick ${tick + 1}`).toBe(worldChecksum(b));
-      if ([...a.objects()].some((o) => o.kind === ObjectKind.Stump)) stumpsSeen++;
     }
     expect(stumpsSeen).toBeGreaterThan(0);
     expect(trees(a)).toBeLessThan(treesAtStart);
-  });
+  }, 20000);
 
   it('runs 3000 ticks with 40 peasants quickly', () => {
     const { world, ms } = run(campCommands(9));

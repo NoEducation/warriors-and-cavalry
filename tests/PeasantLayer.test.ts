@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { PEASANT_RENDER_CONFIG, PeasantLayer } from '../src/render/PeasantLayer';
+import { peasantLook } from '../src/render/peasantLook';
+import { PEASANT_JOINTS } from '../src/render/peasantParts';
+import { PEASANT_POSE_CONFIG } from '../src/render/peasantPose';
 import { Economy } from '../src/sim/Economy';
 import { GameMap } from '../src/sim/GameMap';
 import { ObjectKind } from '../src/sim/ObjectKind';
@@ -41,8 +44,10 @@ function camp(): World {
   return world;
 }
 
-const bodies = (layer: PeasantLayer): THREE.InstancedMesh => mesh(layer, 'peasants');
-const bundles = (layer: PeasantLayer): THREE.InstancedMesh => mesh(layer, 'bundles');
+const bodies = (layer: PeasantLayer): THREE.InstancedMesh => mesh(layer, 'peasant-torso');
+const logs = (layer: PeasantLayer): THREE.InstancedMesh => mesh(layer, 'peasant-logbundle');
+const bundleCount = (layer: PeasantLayer): number =>
+  ['peasant-logbundle', 'peasant-stonebundle', 'peasant-sackbundle'].reduce((n, name) => n + mesh(layer, name).count, 0);
 
 function mesh(layer: PeasantLayer, name: string): THREE.InstancedMesh {
   const found = layer.object.getObjectByName(name);
@@ -58,22 +63,69 @@ function positionOf(instanced: THREE.InstancedMesh, index: number): THREE.Vector
 }
 
 describe('PeasantLayer', () => {
-  it('draws one body per peasant and one bundle per carrier', () => {
+  it('draws two legs, two arms, a torso, a head and one headwear per peasant, and one bundle per carrier', () => {
     const world = camp();
     const layer = new PeasantLayer();
     layer.update(world, 0);
     expect(bodies(layer).count).toBe(0);
-    expect(bundles(layer).count).toBe(0);
+    expect(bundleCount(layer)).toBe(0);
     tickUntil(world, () => world.population.count === 2);
     layer.update(world, 0);
     expect(bodies(layer).count).toBe(2);
-    expect(bundles(layer).count).toBe(0);
+    expect(mesh(layer, 'peasant-head').count).toBe(2);
+    expect(mesh(layer, 'peasant-leg').count).toBe(4);
+    expect(mesh(layer, 'peasant-arm').count).toBe(4);
+    expect(mesh(layer, 'peasant-hat').count + mesh(layer, 'peasant-hood').count).toBe(2);
+    expect(bundleCount(layer)).toBe(0);
     tickUntil(world, () => [...world.peasants()].some((p) => p.load !== null));
     layer.update(world, 0.5);
     const carriers = [...world.peasants()].filter((p) => p.load !== null).length;
     expect(carriers).toBe(1);
     expect(bodies(layer).count).toBe(world.population.count);
-    expect(bundles(layer).count).toBe(carriers);
+    expect(bundleCount(layer)).toBe(carriers);
+    layer.dispose();
+  });
+
+  it('keeps a fixed set of 12 instanced meshes, however many peasants there are', () => {
+    const world = camp();
+    const layer = new PeasantLayer();
+    expect(layer.object.children.filter((c) => c instanceof THREE.InstancedMesh)).toHaveLength(12);
+    tickUntil(world, () => world.population.count === 2);
+    layer.update(world, 0);
+    expect(layer.object.children).toHaveLength(12);
+    layer.dispose();
+  });
+
+  it('gives the woodcutter an axe on the way to its tree and while chopping, none while carrying', () => {
+    const world = camp();
+    const layer = new PeasantLayer();
+    const axes = (): number => mesh(layer, 'peasant-axe').count;
+    tickUntil(world, () => [...world.peasants()].some((p) => p.state === 'toTree'));
+    layer.update(world, 0);
+    expect(axes()).toBe(1);
+    tickUntil(world, () => [...world.peasants()].some((p) => p.state === 'chopping'));
+    layer.update(world, 0);
+    expect(axes()).toBe(1);
+    tickUntil(world, () => [...world.peasants()].some((p) => p.load !== null));
+    layer.update(world, 0);
+    expect(axes()).toBe(0);
+    layer.dispose();
+  });
+
+  it('turns a chopping woodcutter to face its tree', () => {
+    const world = camp();
+    const layer = new PeasantLayer();
+    tickUntil(world, () => [...world.peasants()].some((p) => p.state === 'chopping'));
+    world.tick(); // one more tick, so its drawn position (one tick behind) is where it chops
+    layer.update(world, 0);
+    const index = [...world.peasants()].findIndex((p) => p.state === 'chopping');
+    const chopper = [...world.peasants()][index];
+    const tree = world.objectById(chopper.treeId!)!;
+    const matrix = new THREE.Matrix4();
+    bodies(layer).getMatrixAt(index, matrix);
+    const forward = new THREE.Vector3(0, 0, 1).transformDirection(matrix);
+    const toTree = new THREE.Vector3(tree.tx - chopper.tx, 0, tree.ty - chopper.ty).normalize();
+    expect(forward.setY(0).normalize().angleTo(toTree)).toBeLessThan(0.3);
     layer.dispose();
   });
 
@@ -94,7 +146,9 @@ describe('PeasantLayer', () => {
     const position = positionOf(bodies(layer), index);
     expect(position.x).toBeCloseTo(walker!.tx + 0.75);
     expect(position.z).toBeCloseTo(walker!.ty + 0.5);
-    expect(position.y).toBeCloseTo(0);
+    // The torso sits at the waist, lifted by at most the walk's bob.
+    expect(position.y).toBeGreaterThanOrEqual(PEASANT_JOINTS.waist - 1e-6);
+    expect(position.y).toBeLessThanOrEqual(PEASANT_JOINTS.waist + PEASANT_POSE_CONFIG.bob + 1e-6);
     layer.update(world, 0.5);
     expect(positionOf(bodies(layer), index).x).toBeCloseTo(walker!.tx + 0.875);
     layer.dispose();
@@ -127,14 +181,26 @@ describe('PeasantLayer', () => {
     layer.dispose();
   });
 
-  it('colours each bundle by the resource carried', () => {
+  it('shapes each bundle by the resource carried: logs for wood', () => {
     const world = camp();
     const layer = new PeasantLayer();
     tickUntil(world, () => [...world.peasants()].some((p) => p.load?.resource === ResourceKind.Wood));
     layer.update(world, 0);
+    expect(logs(layer).count).toBe(1);
+    expect(mesh(layer, 'peasant-sackbundle').count + mesh(layer, 'peasant-stonebundle').count).toBe(0);
+    layer.dispose();
+  });
+
+  it('gives peasants their own tunic colours', () => {
+    const world = camp();
+    const layer = new PeasantLayer();
+    tickUntil(world, () => world.population.count === 2);
+    layer.update(world, 0);
     const color = new THREE.Color();
-    bundles(layer).getColorAt(0, color);
-    expect(color.getHex()).toBe(0x6b4a2b);
+    for (const [i, p] of [...world.peasants()].entries()) {
+      bodies(layer).getColorAt(i, color);
+      expect(color.getHex()).toBe(peasantLook(p.id).tunic);
+    }
     layer.dispose();
   });
 

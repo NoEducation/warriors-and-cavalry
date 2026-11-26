@@ -10,6 +10,9 @@ interface Track {
   readonly current: THREE.Vector3;
   /** Yaw about +y, 0 facing +z. */
   heading: number;
+  /** Tiles walked up to the previous and the latest tick, which drive the steps of the walk. */
+  previousDistance: number;
+  distance: number;
   /** The tick it was last seen in; a track not seen in the latest tick belongs to a peasant who has left. */
   seenTick: number;
 }
@@ -38,6 +41,8 @@ export class PeasantTracks {
       track.seenTick = this.tick;
       const dx = track.current.x - track.previous.x;
       const dz = track.current.z - track.previous.z;
+      track.previousDistance = track.distance;
+      track.distance += Math.sqrt(dx * dx + dz * dz);
       if (dx !== 0 || dz !== 0) track.heading = Math.atan2(dx, dz);
     }
     for (const [id, track] of this.tracks) if (track.seenTick !== this.tick) this.tracks.delete(id);
@@ -53,6 +58,18 @@ export class PeasantTracks {
     return track.heading;
   }
 
+  /** Tiles peasant `id` has walked, `tickFraction` of the way from the previous tick to the latest; 0 if unknown. */
+  public distance(id: number, tickFraction: number): number {
+    const track = this.tracks.get(id);
+    return track ? track.previousDistance + (track.distance - track.previousDistance) * tickFraction : 0;
+  }
+
+  /** True when peasant `id` moved between the previous and the latest tick. */
+  public isMoving(id: number): boolean {
+    const track = this.tracks.get(id);
+    return track !== undefined && track.distance !== track.previousDistance;
+  }
+
   /** Forgets every peasant. */
   public clear(): void {
     this.tracks.clear();
@@ -62,7 +79,7 @@ export class PeasantTracks {
   private start(map: GameMap, peasant: PeasantView): Track {
     const current = tickPosition(map, peasant, new THREE.Vector3());
     const heading = peasant.stepTicks > 0 ? Math.atan2(peasant.nextTx - peasant.tx, peasant.nextTy - peasant.ty) : 0;
-    const track: Track = { previous: current.clone(), current, heading, seenTick: this.tick };
+    const track: Track = { previous: current.clone(), current, heading, previousDistance: 0, distance: 0, seenTick: this.tick };
     this.tracks.set(peasant.id, track);
     return track;
   }

@@ -1,10 +1,15 @@
-// Every peasant of a world, drawn each frame one tick behind the simulation, with a bundle on a carrier's back.
+// Every peasant of a world, drawn each frame one tick behind the simulation as posed body parts.
 import * as THREE from 'three';
-import type { GameMap } from '../sim/GameMap';
+import { TICKS_PER_SECOND } from '../sim/gameTime';
 import type { PeasantView } from '../sim/PeasantView';
 import { ResourceKind } from '../sim/ResourceKind';
+import { hash2 } from '../sim/rng';
 import type { World } from '../sim/World';
-import { PeasantGeometryFactory } from './PeasantGeometryFactory';
+import { PeasantMeshes } from './PeasantMeshes';
+import { peasantLook, toolFor } from './peasantLook';
+import { PeasantPart } from './peasantParts';
+import { type Pose, type PoseActivity, peasantPose } from './peasantPose';
+import { PeasantRig } from './PeasantRig';
 import { PeasantTracks } from './PeasantTracks';
 import type { WorldLayer } from './WorldLayer';
 
@@ -14,117 +19,92 @@ export const PEASANT_RENDER_CONFIG = Object.freeze({
   initialCapacity: 256,
 });
 
-/** Bundle colour per carried resource. */
-const BUNDLE_COLORS: Record<ResourceKind, THREE.Color> = {
-  [ResourceKind.Wood]: new THREE.Color(0x6b4a2b),
-  [ResourceKind.Stone]: new THREE.Color(0x9a9a94),
-  [ResourceKind.Food]: new THREE.Color(0xd9b93a),
+/** The bundle shape per carried resource. */
+const BUNDLES: Record<ResourceKind, PeasantPart> = {
+  [ResourceKind.Wood]: PeasantPart.LogBundle,
+  [ResourceKind.Stone]: PeasantPart.StoneBundle,
+  [ResourceKind.Food]: PeasantPart.SackBundle,
 };
+/** States in which a worker holds its tool (it is put away while carrying). */
+const TOOL_STATES: ReadonlySet<PeasantView['state']> = new Set(['toWork', 'toWorkBack', 'toTree', 'chopping', 'working']);
+const PHASE_SEED = 0x9a5e;
 const UP = new THREE.Vector3(0, 1, 0);
 const ONE = new THREE.Vector3(1, 1, 1);
 
 export class PeasantLayer implements WorldLayer {
-  /** Add this to the scene; holds one instanced mesh of bodies and one of bundles. */
+  /** Add this to the scene; holds one instanced mesh per body part. */
   public readonly object = new THREE.Group();
-  private readonly bodyGeometry: THREE.BufferGeometry;
-  private readonly bundleGeometry: THREE.BufferGeometry;
-  private readonly bodyMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  private readonly bundleMaterial = new THREE.MeshLambertMaterial({ flatShading: true });
-  private bodies: THREE.InstancedMesh;
-  private bundles: THREE.InstancedMesh;
-  private capacity = PEASANT_RENDER_CONFIG.initialCapacity;
-  /** Each peasant's positions at the last two ticks and the way it last walked. */
+  private readonly meshes = new PeasantMeshes(this.object, PEASANT_RENDER_CONFIG.initialCapacity);
+  /** Each peasant's positions at the last two ticks, the way it last walked and how far it has walked. */
   private readonly tracks = new PeasantTracks();
+  private readonly rig = new PeasantRig();
+  private readonly parts = this.rig.createMatrices();
+  private readonly pose: Pose = { bob: 0, lean: 0, leftLeg: 0, rightLeg: 0, leftArm: 0, rightArm: 0, tool: 0 };
   private readonly position = new THREE.Vector3();
   private readonly turn = new THREE.Quaternion();
-  private readonly matrix = new THREE.Matrix4();
-
-  /** Draws the peasants of the world passed to `update`, from the first `update` on. Create one per world. */
-  public constructor() {
-    const factory = new PeasantGeometryFactory();
-    this.bodyGeometry = factory.create();
-    this.bundleGeometry = factory.createBundle();
-    this.bodies = this.createMesh('peasants', this.bodyGeometry, this.bodyMaterial, false);
-    this.bundles = this.createMesh('bundles', this.bundleGeometry, this.bundleMaterial, true);
-  }
+  private readonly body = new THREE.Matrix4();
+  private readonly tint = new THREE.Color();
 
   /**
-   * Places every peasant of `world` (reading it only) one tick behind the simulation, `tickFraction` of the way from where it stood at the
-   * previous tick to where it stands at the last one (so it moves every frame), and a bundle on each carrier.
-   * Call once per frame, after ticking. Allocates only when the peasants outgrow the meshes or new ones arrive.
+   * Places every peasant of `world` (reading it only) one tick behind the simulation, `tickFraction` of the way from
+   * where it stood at the previous tick to where it stands at the last one, posed for what it is doing: walking,
+   * carrying its load, working with its tool or standing idle. Call once per frame, after ticking. Allocates only
+   * when the peasants outgrow the meshes or new ones arrive.
    */
   public update(world: World, tickFraction: number): void {
     this.tracks.refresh(world);
     let count = 0;
     for (const _ of world.peasants()) count++;
-    if (count > this.capacity) this.grow(count);
-    let bodyCount = 0;
-    let bundleCount = 0;
-    for (const peasant of world.peasants()) {
-      this.place(world.map, peasant, tickFraction);
-      this.bodies.setMatrixAt(bodyCount++, this.matrix);
-      if (!peasant.load) continue;
-      this.bundles.setMatrixAt(bundleCount, this.matrix);
-      this.bundles.setColorAt(bundleCount++, BUNDLE_COLORS[peasant.load.resource]);
-    }
-    this.show(this.bodies, bodyCount);
-    this.show(this.bundles, bundleCount);
+    this.meshes.ensure(count);
+    this.meshes.begin();
+    const time = (world.tickCount + tickFraction) / TICKS_PER_SECOND;
+    for (const peasant of world.peasants()) this.draw(world, peasant, tickFraction, time);
+    this.meshes.end();
   }
 
-  /** Removes both meshes and frees their instance buffers, the geometries and the materials. Call once. */
+  /** Removes the meshes and frees their buffers, the geometries and the material. Call once. */
   public dispose(): void {
+    this.meshes.dispose();
     this.object.clear();
-    this.bodies.dispose();
-    this.bundles.dispose();
-    this.bodyGeometry.dispose();
-    this.bundleGeometry.dispose();
-    this.bodyMaterial.dispose();
-    this.bundleMaterial.dispose();
     this.tracks.clear();
   }
 
-  /** Sets `matrix` to where `peasant` is drawn this frame, turned the way it walks. */
-  private place(map: GameMap, peasant: PeasantView, tickFraction: number): void {
-    const heading = this.tracks.place(map, peasant, tickFraction, this.position);
-    this.turn.setFromAxisAngle(UP, heading);
-    this.matrix.compose(this.position, this.turn, ONE);
+  private draw(world: World, peasant: PeasantView, tickFraction: number, time: number): void {
+    let heading = this.tracks.place(world.map, peasant, tickFraction, this.position);
+    const tree = peasant.state === 'chopping' && peasant.treeId !== null ? world.objectById(peasant.treeId) : undefined;
+    if (tree) heading = Math.atan2(tree.tx + 0.5 - this.position.x, tree.ty + 0.5 - this.position.z);
+    peasantPose(
+      {
+        activity: this.activity(peasant),
+        distance: this.tracks.distance(peasant.id, tickFraction),
+        time,
+        phase: hash2(PHASE_SEED, peasant.id, 0),
+      },
+      this.pose,
+    );
+    this.position.y += this.pose.bob;
+    this.body.compose(this.position, this.turn.setFromAxisAngle(UP, heading), ONE);
+    this.rig.pose(this.body, this.pose, this.parts);
+    const look = peasantLook(peasant.id);
+    const m = this.meshes;
+    m.push(PeasantPart.Leg, this.parts.leftLeg);
+    m.push(PeasantPart.Leg, this.parts.rightLeg);
+    m.push(PeasantPart.Arm, this.parts.leftArm);
+    m.push(PeasantPart.Arm, this.parts.rightArm);
+    m.push(PeasantPart.Torso, this.parts.torso, this.tint.set(look.tunic));
+    m.push(PeasantPart.Head, this.parts.head);
+    m.push(look.headwear === 'hat' ? PeasantPart.Hat : PeasantPart.Hood, this.parts.head, this.tint.set(look.headwearColor));
+    if (peasant.load) m.push(BUNDLES[peasant.load.resource], this.parts.bundle);
+    const workplace = peasant.workplaceId === null ? undefined : world.objectById(peasant.workplaceId);
+    const tool = TOOL_STATES.has(peasant.state) && !peasant.load ? toolFor(workplace?.kind) : null;
+    if (tool !== null) m.push(tool, this.parts.tool);
   }
 
-  private show(mesh: THREE.InstancedMesh, count: number): void {
-    mesh.count = count;
-    mesh.visible = count > 0; // an empty instanced mesh would still cost a draw call
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }
-
-  /** Replaces both meshes with ones holding at least `needed` instances (the room doubled until it fits). */
-  private grow(needed: number): void {
-    while (this.capacity < needed) this.capacity *= 2;
-    this.object.clear();
-    this.bodies.dispose();
-    this.bundles.dispose();
-    this.bodies = this.createMesh('peasants', this.bodyGeometry, this.bodyMaterial, false);
-    this.bundles = this.createMesh('bundles', this.bundleGeometry, this.bundleMaterial, true);
-  }
-
-  /** An empty instanced mesh with room for `capacity` peasants, added to `object`; `tinted` gives it instance colours. */
-  private createMesh(
-    name: string,
-    geometry: THREE.BufferGeometry,
-    material: THREE.Material,
-    tinted: boolean,
-  ): THREE.InstancedMesh {
-    const mesh = new THREE.InstancedMesh(geometry, material, this.capacity);
-    mesh.name = name;
-    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    // Created up front (not on the first carrier), so the shader does not change while playing.
-    if (tinted) mesh.setColorAt(0, BUNDLE_COLORS[ResourceKind.Wood]);
-    mesh.instanceColor?.setUsage(THREE.DynamicDrawUsage);
-    mesh.count = 0;
-    mesh.visible = false;
-    // Peasants move every frame, so bounds computed once would go stale; they are too cheap to cull.
-    mesh.frustumCulled = false;
-    this.object.add(mesh);
-    return mesh;
+  /** Carrying when it has a load, walking when it moved since the last tick, working at work, else idle. */
+  private activity(peasant: PeasantView): PoseActivity {
+    if (peasant.load) return 'carry';
+    if (this.tracks.isMoving(peasant.id)) return 'walk';
+    if (peasant.state === 'chopping' || (peasant.state === 'working' && peasant.waitTicks === 0)) return 'work';
+    return 'idle';
   }
 }
