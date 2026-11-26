@@ -8,6 +8,7 @@ import { FarmCrops } from './FarmCrops';
 import { PeasantLayer } from './PeasantLayer';
 import { StockpileStacks } from './StockpileStacks';
 import { TerrainMeshBuilder } from './TerrainMeshBuilder';
+import { StumpLayer } from './StumpLayer';
 import { TreeLayer } from './TreeLayer';
 import { TreeShadowLayer } from './TreeShadowLayer';
 import { WaterLayer } from './WaterLayer';
@@ -33,7 +34,7 @@ export class WorldView {
   }
 
   /**
-   * Replaces everything shown with meshes for `world`: terrain, water, trees, and buildings, stockpile stacks, crops
+   * Replaces everything shown with meshes for `world`: terrain, water, trees and stumps, and buildings, stockpile stacks, crops
    * and peasants (which then follow the world passed to `update`). Call on every world load.
    */
   public showWorld(world: World): void {
@@ -45,6 +46,7 @@ export class WorldView {
       new WaterLayer(map),
       new TreeShadowLayer(world),
       new TreeLayer(world),
+      new StumpLayer(world),
       new BuildingLayer(world, this.buildingFactory),
       new StockpileStacks(world),
       new FarmCrops(world),

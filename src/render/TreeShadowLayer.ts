@@ -7,6 +7,7 @@ import type { World } from '../sim/World';
 import { treeAppearance } from './treeAppearance';
 import { TREE_LAYER_CONFIG } from './TreeLayer';
 import { TREE_SPECIES } from './TreeSpecies';
+import { WorldChangeQueue } from './WorldChangeQueue';
 import type { WorldLayer } from './WorldLayer';
 
 /** Shadow tuning in world units. Tune by editing these values. */
@@ -24,6 +25,13 @@ export const TREE_SHADOW_CONFIG = Object.freeze({
 });
 
 const UP = new THREE.Vector3(0, 1, 0);
+const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
+
+/** Where one tree (or its shadow) is drawn: an instance of a region mesh. */
+export interface TreeSlot {
+  readonly mesh: THREE.InstancedMesh;
+  readonly index: number;
+}
 
 export class TreeShadowLayer implements WorldLayer {
   /** Add this to the scene; holds one instanced shadow mesh per region that has trees. */
@@ -39,37 +47,57 @@ export class TreeShadowLayer implements WorldLayer {
     polygonOffsetUnits: -2,
   });
   private readonly meshes: THREE.InstancedMesh[] = [];
+  /** Where each tree's shadow is drawn, by tree id. */
+  private readonly slots = new Map<number, TreeSlot>();
+  private readonly changes: WorldChangeQueue;
 
-  /** Builds a shadow for every tree currently in `world`. Reads the world only; call again for a new world. */
+  /**
+   * Builds a shadow for every tree currently in `world` and drops the shadows of trees felled from then on. Reads
+   * the world only; call again for a new world.
+   */
   public constructor(world: World) {
+    this.changes = new WorldChangeQueue(world);
     const { map } = world;
     const regionsPerRow = Math.ceil(map.width / TREE_LAYER_CONFIG.regionSize);
-    const regions = new Map<number, THREE.Matrix4[]>();
+    const regions = new Map<number, { ids: number[]; matrices: THREE.Matrix4[] }>();
     for (const object of world.objects()) {
       if (object.kind !== ObjectKind.Tree) continue;
       const look = treeAppearance(map, object.tx, object.ty);
       const species = TREE_SPECIES[look.species];
       const region =
         Math.floor(object.ty / TREE_LAYER_CONFIG.regionSize) * regionsPerRow + Math.floor(object.tx / TREE_LAYER_CONFIG.regionSize);
-      let matrices = regions.get(region);
-      if (!matrices) {
-        matrices = [];
-        regions.set(region, matrices);
+      let batch = regions.get(region);
+      if (!batch) {
+        batch = { ids: [], matrices: [] };
+        regions.set(region, batch);
       }
       const height = species.height * look.heightScale;
-      matrices.push(this.matrixFor(map, object.tx, object.ty, height, species.crownRadius * look.widthScale));
+      batch.ids.push(object.id);
+      batch.matrices.push(this.matrixFor(map, object.tx, object.ty, height, species.crownRadius * look.widthScale));
     }
-    for (const [, matrices] of [...regions.entries()].sort((a, b) => a[0] - b[0])) {
-      this.meshes.push(this.createMesh(matrices));
+    for (const [, batch] of [...regions.entries()].sort((a, b) => a[0] - b[0])) {
+      const mesh = this.createMesh(batch.matrices);
+      batch.ids.forEach((id, index) => this.slots.set(id, { mesh, index }));
+      this.meshes.push(mesh);
     }
     if (this.meshes.length > 0) this.object.add(...this.meshes);
   }
 
-  /** Nothing changes per frame: the shadows are built once per world. Part of WorldLayer. */
-  public update(): void {}
+  /** Hides the shadow of each tree removed from the world since the last call. Call once per frame. */
+  public update(): void {
+    this.changes.drain((change) => {
+      const slot = change.type === 'removed' ? this.slots.get(change.object.id) : undefined;
+      if (!slot) return;
+      this.slots.delete(change.object.id);
+      slot.mesh.setMatrixAt(slot.index, HIDDEN);
+      slot.mesh.instanceMatrix.needsUpdate = true;
+    });
+  }
 
-  /** Removes the meshes and frees the disc geometry, the material and the instance buffers. Call once. */
+  /** Stops following the world, removes the meshes and frees the geometry, the material and the buffers. Once. */
   public dispose(): void {
+    this.changes.dispose();
+    this.slots.clear();
     this.object.clear();
     for (const mesh of this.meshes) mesh.dispose();
     this.geometry.dispose();
