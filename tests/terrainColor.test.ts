@@ -64,7 +64,30 @@ describe('terrainVertexColor', () => {
 
   it('wets sand at the waterline', () => {
     const shore = mapOf(8, () => 0.02);
-    const dune = mapOf(8, () => 0.45);
+    const dune = mapOf(8, () => 0.2);
     expect(brightness(colorAt(shore, TileType.Sand, 4, 4))).toBeLessThan(brightness(colorAt(dune, TileType.Sand, 4, 4)));
+  });
+
+  it('gives Sand and Grass one colour at the same corner, so the beach edge has no seam', () => {
+    const map = mapOf(20, (x) => 0.2 + 0.05 * x);
+    for (let cx = 0; cx <= 20; cx++) {
+      expect(colorAt(map, TileType.Sand, cx, 10).equals(colorAt(map, TileType.Grass, cx, 10)), `cx ${cx}`).toBe(true);
+    }
+  });
+
+  it('fades from sand on the low side to grass on the high side', () => {
+    const map = mapOf(20, (x) => 2 - 0.0975 * x);
+    const grass = colorAt(map, TileType.Grass, 0, 10);
+    const sand = colorAt(map, TileType.Sand, 20, 10);
+    expect(grass.g).toBeGreaterThan(grass.r);
+    expect(sand.r).toBeGreaterThan(sand.g * 0.9);
+    expect(sand.r).toBeGreaterThan(sand.b * 1.3);
+  });
+
+  it('keeps Rock out of the beach blend', () => {
+    const map = mapOf(8, () => 0.5);
+    const rock = colorAt(map, TileType.Rock, 4, 4);
+    expect(Math.abs(rock.r - rock.b)).toBeLessThan(0.12);
+    expect(rock.equals(colorAt(map, TileType.Sand, 4, 4))).toBe(false);
   });
 });

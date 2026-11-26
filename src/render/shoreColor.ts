@@ -1,4 +1,5 @@
-// Beach and seabed colours: dry dunes, pebbles, a tide line and wet sand on the beach; sandy shallows darkening offshore.
+// Beach and seabed colours: dry dunes, pebbles, a tide line and wet sand on the beach; sandy shallows darkening offshore;
+// and the noisy height band where the beach fades into grass.
 import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
 import { MAPGEN_CONFIG } from '../sim/MapGenerator';
@@ -28,9 +29,17 @@ export const SHORE_LOOK_CONFIG = Object.freeze({
   deepAt: 3.2,
   seabedScale: 1 / 6,
   seabedWeight: 0.12,
+  /** Beach-to-grass fade: half its height band around the top of the beach (sea level plus the sand band). */
+  grassBlendHalfWidth: 0.15,
+  /** Coarse noise that makes the edge wobble along the coast: its frequency per tile and how far it moves the band. */
+  edgeScale: 1 / 7,
+  edgeJitter: 0.12,
+  /** Fine noise that frays the edge into grass tufts on the sand and sandy spots in the grass. */
+  tuftScale: 1 / 1.3,
+  tuftJitter: 0.05,
 });
 
-const SALT = Object.freeze({ dune: 0x3d11, bleach: 0x6a07, pebble: 0x2f9b, seabed: 0x5c21 });
+const SALT = Object.freeze({ dune: 0x3d11, bleach: 0x6a07, pebble: 0x2f9b, seabed: 0x5c21, edge: 0x1e57, tuft: 0x7a3d });
 const c = SHORE_LOOK_CONFIG;
 const tmp = new THREE.Color();
 
@@ -44,6 +53,17 @@ export function sandColor(map: GameMap, cx: number, cy: number, out: THREE.Color
   const tide = 1 - Math.abs(above - c.wetBand - c.tideBand / 2) / (c.tideBand / 2);
   out.multiplyScalar(1 - c.tideDarken * Math.max(0, tide));
   return out.lerp(tmp.set(c.sandWet), 1 - smooth(0, c.wetBand, above));
+}
+
+/**
+ * How far corner (cx, cy) has turned from beach (0) to grass (1). It depends only on the corner, so Sand and Grass
+ * tiles sharing a corner mix it alike and the beach edge has no seam. Pure; call once per sand or grass vertex.
+ */
+export function beachGrassBlend(map: GameMap, cx: number, cy: number): number {
+  const n = (salt: number, scale: number): number => fbm2((map.seed ^ salt) | 0, cx * scale, cy * scale, 2);
+  const mid = MAPGEN_CONFIG.seaLevel + MAPGEN_CONFIG.sandBand;
+  const jitter = c.edgeJitter * 2 * (n(SALT.edge, c.edgeScale) - 0.5) + c.tuftJitter * 2 * (n(SALT.tuft, c.tuftScale) - 0.5);
+  return smooth(mid - c.grassBlendHalfWidth, mid + c.grassBlendHalfWidth, map.heightAt(cx, cy) + jitter);
 }
 
 /** Writes into `out` the colour of seabed corner (cx, cy) and returns it. Pure; call once per underwater vertex. */

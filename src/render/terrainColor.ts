@@ -1,12 +1,12 @@
 // Terrain vertex colours: per-corner shades of grass, rock, snow and quarry ground from height, slope, curvature and seed
-// noise; beach and seabed colours come from shoreColor.
+// noise; beach and seabed colours come from shoreColor, and Sand and Grass corners mix by its beach-to-grass blend.
 // Render-only and pure: the same map always gets the same colours.
 import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
 import { MAPGEN_CONFIG } from '../sim/MapGenerator';
 import { fbm2 } from '../sim/noise';
 import { TileType } from '../sim/tiles';
-import { sandColor, seabedColor } from './shoreColor';
+import { beachGrassBlend, sandColor, seabedColor } from './shoreColor';
 
 /** Colour tuning for the terrain, in sRGB hex colours and world units. Tune by editing these values. */
 export const TERRAIN_LOOK_CONFIG = Object.freeze({
@@ -51,6 +51,7 @@ const SALT = Object.freeze({ patch: 0x51a7, dry: 0x2d33, detail: 0x7e11, snow: 0
 
 const c = TERRAIN_LOOK_CONFIG;
 const tmp = new THREE.Color();
+const sand = new THREE.Color();
 
 /**
  * Writes into `out` the colour of corner (cx, cy) as part of a tile of `type`, and returns `out`. Corners shared by
@@ -63,16 +64,14 @@ export function terrainVertexColor(map: GameMap, type: TileType, cx: number, cy:
   const detail = 1 + c.detailWeight * 2 * (n(SALT.detail, c.detailScale, 2) - 0.5);
 
   switch (type) {
-    case TileType.Grass: {
-      out.set(c.grassLush).lerp(tmp.set(c.grassMeadow), smooth(0.32, 0.62, n(SALT.patch, c.patchScale, 3)));
-      out.lerp(tmp.set(c.grassDry), 0.75 * smooth(0.58, 0.78, n(SALT.dry, c.dryScale, 2)));
-      const altitude = (h - MAPGEN_CONFIG.sandBand) / (MAPGEN_CONFIG.rockAltitude - MAPGEN_CONFIG.sandBand);
-      out.lerp(tmp.set(c.grassHighland), 0.6 * clamp01(altitude));
+    case TileType.Grass:
+    case TileType.Sand: {
+      const blend = beachGrassBlend(map, cx, cy);
+      if (blend > 0) grassColor(map, cx, cy, h, n, out);
+      if (blend < 1) sandColor(map, cx, cy, blend > 0 ? sand : out);
+      if (blend > 0 && blend < 1) out.lerp(sand, 1 - blend);
       break;
     }
-    case TileType.Sand:
-      sandColor(map, cx, cy, out);
-      break;
     case TileType.Rock: {
       const slope = slopeAt(map, cx, cy);
       out.set(c.rockMoss).lerp(tmp.set(c.rockStone), smooth(MAPGEN_CONFIG.rockAltitude - 0.5, c.snowLine - 1, h));
@@ -93,6 +92,16 @@ export function terrainVertexColor(map: GameMap, type: TileType, cx: number, cy:
       seabedColor(map, cx, cy, out);
   }
   return out.multiplyScalar(detail * curvatureShade(map, cx, cy, h));
+}
+
+type Noise = (salt: number, scale: number, octaves: number) => number;
+
+/** Writes into `out` the grass colour of corner (cx, cy) at height `h`: lush and meadow patches, dry spots, highland tint. */
+function grassColor(map: GameMap, cx: number, cy: number, h: number, n: Noise, out: THREE.Color): void {
+  out.set(c.grassLush).lerp(tmp.set(c.grassMeadow), smooth(0.32, 0.62, n(SALT.patch, c.patchScale, 3)));
+  out.lerp(tmp.set(c.grassDry), 0.75 * smooth(0.58, 0.78, n(SALT.dry, c.dryScale, 2)));
+  const altitude = (h - MAPGEN_CONFIG.sandBand) / (MAPGEN_CONFIG.rockAltitude - MAPGEN_CONFIG.sandBand);
+  out.lerp(tmp.set(c.grassHighland), 0.6 * clamp01(altitude));
 }
 
 /** Steepness at a corner: the height gradient's length from its neighbours (clamped at the map edge). */
