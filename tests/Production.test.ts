@@ -100,7 +100,7 @@ describe('Production', () => {
     p.added(quarry);
     p.added(farm);
     expect(run(p, 149)).toEqual([]);
-    expect(p.tick(ALWAYS)).toEqual([{ buildingId: quarry.id, resource: ResourceKind.Stone, amount: 2 }]);
+    expect(p.tick(ALWAYS)).toEqual([{ buildingId: quarry.id, resource: ResourceKind.Stone, amount: 8 }]);
     expect(run(p, 49)).toEqual([]);
     expect(p.tick(ALWAYS)).toEqual([{ buildingId: farm.id, resource: ResourceKind.Food, amount: 3 }]);
     expect(p.state(quarry.id)).toEqual({ status: 'working', progress: 50, cycleTicks: 150 });

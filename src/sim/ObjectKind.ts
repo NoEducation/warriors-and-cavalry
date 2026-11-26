@@ -125,7 +125,7 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
     buildable: true,
     cost: resources(30, 0, 0),
     quarryOnly: true,
-    production: { resource: ResourceKind.Stone, cycleTicks: 150, yield: 2, treeRadius: null },
+    production: { resource: ResourceKind.Stone, cycleTicks: 150, yield: 8, treeRadius: null },
   },
   [ObjectKind.WheatFarm]: {
     ...PLAIN,
