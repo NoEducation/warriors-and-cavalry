@@ -385,6 +385,24 @@ describe('Supply chain determinism and speed', () => {
     expect(workers).toHaveLength(3);
   });
 
+  it('stays in step over 5000 ticks of woodcutting: equal checksums every 500 ticks, trees felled into stumps', () => {
+    const commands = campCommands(2);
+    const [a, b] = [seedOneWorld(richEconomy()), seedOneWorld(richEconomy())];
+    const trees = (world: World): number => [...world.objects()].filter((o) => o.kind === ObjectKind.Tree).length;
+    const treesAtStart = trees(a);
+    let stumpsSeen = 0;
+    for (let tick = 0; tick < 5000; tick++) {
+      for (const world of [a, b]) {
+        if (tick % 5 === 0 && tick / 5 < commands.length) world.apply(commands[tick / 5]);
+        world.tick();
+      }
+      if ((tick + 1) % 500 === 0) expect(worldChecksum(a), `tick ${tick + 1}`).toBe(worldChecksum(b));
+      if ([...a.objects()].some((o) => o.kind === ObjectKind.Stump)) stumpsSeen++;
+    }
+    expect(stumpsSeen).toBeGreaterThan(0);
+    expect(trees(a)).toBeLessThan(treesAtStart);
+  });
+
   it('runs 3000 ticks with 40 peasants quickly', () => {
     const { world, ms } = run(campCommands(9));
     expect(world.population.count).toBe(40);
