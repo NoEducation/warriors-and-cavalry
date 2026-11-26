@@ -60,3 +60,42 @@ describe('TerrainMeshBuilder', () => {
     expect(maxZ).toBe(40);
   });
 });
+
+describe('TerrainMeshBuilder data', () => {
+  const builder = new TerrainMeshBuilder();
+
+  function hillyMap(): GameMap {
+    const w = 40;
+    const h = 36;
+    const heights = new Float32Array((w + 1) * (h + 1)).map((_, i) => ((i * 7919) % 13) / 4);
+    const tiles = new Uint8Array(w * h).map((_, i) => i % 4);
+    return new GameMap(w, h, 3, heights, tiles);
+  }
+
+  it('gives the same geometry from chunk data as build does', () => {
+    const map = hillyMap();
+    const direct = meshes(builder.build(map));
+    const data = builder.buildData(map);
+    const copied = data.map((c) => ({ positions: c.positions.slice(), colors: c.colors.slice(), normals: c.normals.slice() }));
+    const viaData = meshes(builder.fromData(copied));
+    expect(viaData).toHaveLength(direct.length);
+    for (let i = 0; i < direct.length; i++) {
+      for (const name of ['position', 'color', 'normal']) {
+        expect(Array.from(viaData[i].geometry.getAttribute(name).array)).toEqual(
+          Array.from(direct[i].geometry.getAttribute(name).array),
+        );
+      }
+    }
+  });
+
+  it('builds plain typed arrays, one chunk per block, row by row', () => {
+    const data = builder.buildData(hillyMap());
+    expect(data).toHaveLength(4);
+    for (const chunk of data) {
+      expect(chunk.positions).toBeInstanceOf(Float32Array);
+      expect(chunk.normals.length).toBe(chunk.positions.length);
+      expect(chunk.colors.length).toBe(chunk.positions.length);
+    }
+    expect(data[1].positions[0]).toBe(32);
+  });
+});
