@@ -25,6 +25,9 @@ const TOWER_SIZES = {
 } as const;
 const COURSE_SALT = 0x7b1;
 
+/** Height above the floor of the parapet top a walker on the tower stands on. */
+export const TOWER_TOP = TOWER_SIZES.bandTop;
+
 export class TowerShape implements BuildingShape {
   /** Creates a new Tower model (see `BuildingShape.build`). */
   public build(): THREE.Mesh {

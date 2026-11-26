@@ -70,7 +70,7 @@ export class PeasantLayer implements WorldLayer {
   }
 
   private draw(world: World, peasant: PeasantView, tickFraction: number, time: number): void {
-    let heading = this.tracks.place(world.map, peasant, tickFraction, this.position);
+    let heading = this.tracks.place(world, peasant, tickFraction, this.position);
     const tree = peasant.state === 'chopping' && peasant.treeId !== null ? world.objectById(peasant.treeId) : undefined;
     if (tree) heading = Math.atan2(tree.tx + 0.5 - this.position.x, tree.ty + 0.5 - this.position.z);
     peasantPose(

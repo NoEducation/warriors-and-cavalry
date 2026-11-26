@@ -1,8 +1,8 @@
 // Where each peasant stood at the last two simulation ticks, so it can be drawn one tick behind and move every frame.
 import * as THREE from 'three';
-import type { GameMap } from '../sim/GameMap';
 import type { PeasantView } from '../sim/PeasantView';
 import type { World } from '../sim/World';
+import { walkHeight } from './walkHeight';
 
 /** One peasant's positions at the previous and the latest tick, and the way it last walked. */
 interface Track {
@@ -33,11 +33,11 @@ export class PeasantTracks {
     for (const peasant of world.peasants()) {
       const track = this.tracks.get(peasant.id);
       if (!track) {
-        this.start(world.map, peasant);
+        this.start(world, peasant);
         continue;
       }
       track.previous.copy(track.current);
-      tickPosition(world.map, peasant, track.current);
+      tickPosition(world, peasant, track.current);
       track.seenTick = this.tick;
       const dx = track.current.x - track.previous.x;
       const dz = track.current.z - track.previous.z;
@@ -52,8 +52,8 @@ export class PeasantTracks {
    * Sets `out` to where `peasant` is drawn `tickFraction` of the way from its previous to its latest tick position,
    * and returns its heading. A peasant `refresh` has not seen yet is drawn where it stands now.
    */
-  public place(map: GameMap, peasant: PeasantView, tickFraction: number, out: THREE.Vector3): number {
-    const track = this.tracks.get(peasant.id) ?? this.start(map, peasant);
+  public place(world: World, peasant: PeasantView, tickFraction: number, out: THREE.Vector3): number {
+    const track = this.tracks.get(peasant.id) ?? this.start(world, peasant);
     out.lerpVectors(track.previous, track.current, tickFraction);
     return track.heading;
   }
@@ -76,8 +76,8 @@ export class PeasantTracks {
   }
 
   /** A new track for `peasant` that starts (and stays, until the next tick) where it stands now. */
-  private start(map: GameMap, peasant: PeasantView): Track {
-    const current = tickPosition(map, peasant, new THREE.Vector3());
+  private start(world: World, peasant: PeasantView): Track {
+    const current = tickPosition(world, peasant, new THREE.Vector3());
     const heading = peasant.stepTicks > 0 ? Math.atan2(peasant.nextTx - peasant.tx, peasant.nextTy - peasant.ty) : 0;
     const track: Track = { previous: current.clone(), current, heading, previousDistance: 0, distance: 0, seenTick: this.tick };
     this.tracks.set(peasant.id, track);
@@ -85,10 +85,14 @@ export class PeasantTracks {
   }
 }
 
-/** Sets `out` to where `peasant` stands at the end of the latest tick: its tile centre moved along its step. */
-function tickPosition(map: GameMap, peasant: PeasantView, out: THREE.Vector3): THREE.Vector3 {
+/**
+ * Sets `out` to where `peasant` stands at the end of the latest tick: its tile centre moved along its step, at the
+ * walk height of the tiles it steps between (up on the wall walk on walls and towers).
+ */
+function tickPosition(world: World, peasant: PeasantView, out: THREE.Vector3): THREE.Vector3 {
   const { tx, ty, nextTx, nextTy, stepTicks } = peasant;
   const t = stepTicks > 0 ? peasant.stepProgress / stepTicks : 0;
-  const height = map.tileHeight(tx, ty) + (map.tileHeight(nextTx, nextTy) - map.tileHeight(tx, ty)) * t;
+  const from = walkHeight(world, tx, ty);
+  const height = from + (walkHeight(world, nextTx, nextTy) - from) * t;
   return out.set(tx + 0.5 + (nextTx - tx) * t, height, ty + 0.5 + (nextTy - ty) * t);
 }
