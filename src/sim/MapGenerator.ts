@@ -80,7 +80,7 @@ export class MapGenerator {
     for (let ty = 0; ty < height; ty++) {
       for (let tx = 0; tx < width; tx++) tiles[ty * width + tx] = classify(tx, ty);
     }
-    this.quarrySites.mark(tiles, width, sites);
+    this.quarrySites.mark(tiles, sites);
     return new GameMap(width, height, seed, heights, tiles);
   }
 

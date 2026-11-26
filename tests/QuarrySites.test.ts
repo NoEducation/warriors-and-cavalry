@@ -1,24 +1,42 @@
 import { describe, expect, it } from 'vitest';
+import type { GameMap } from '../src/sim/GameMap';
 import { MapGenerator } from '../src/sim/MapGenerator';
 import { ObjectKind } from '../src/sim/ObjectKind';
 import { QUARRY_CONFIG } from '../src/sim/QuarrySites';
 import { TileType } from '../src/sim/tiles';
-import type { World } from '../src/sim/World';
 
 const generator = new MapGenerator();
 
-/** Top-left tiles of every quarry site: Quarry tiles whose left and upper neighbours are not Quarry. */
-function siteCorners(world: World): { tx: number; ty: number }[] {
-  const { map } = world;
-  const corners: { tx: number; ty: number }[] = [];
-  for (let ty = 0; ty < map.height; ty++) {
-    for (let tx = 0; tx < map.width; tx++) {
-      if (map.tileAt(tx, ty) !== TileType.Quarry) continue;
-      if (map.tileAt(tx - 1, ty) === TileType.Quarry || map.tileAt(tx, ty - 1) === TileType.Quarry) continue;
-      corners.push({ tx, ty });
+interface Tile {
+  readonly tx: number;
+  readonly ty: number;
+}
+
+/** Every 4-connected patch of quarry ground, in row-major order of its first tile. */
+function sitesOf(map: GameMap): Tile[][] {
+  const seen = new Uint8Array(map.width * map.height);
+  const sites: Tile[][] = [];
+  for (let i = 0; i < seen.length; i++) {
+    if (seen[i] || map.tiles[i] !== TileType.Quarry) continue;
+    const site: Tile[] = [];
+    const stack = [i];
+    seen[i] = 1;
+    while (stack.length > 0) {
+      const j = stack.pop()!;
+      const tx = j % map.width;
+      const ty = Math.floor(j / map.width);
+      site.push({ tx, ty });
+      for (const [x, y] of [[tx - 1, ty], [tx + 1, ty], [tx, ty - 1], [tx, ty + 1]]) {
+        const k = y * map.width + x;
+        if (map.tileAt(x, y) === TileType.Quarry && !seen[k]) {
+          seen[k] = 1;
+          stack.push(k);
+        }
+      }
     }
+    sites.push(site);
   }
-  return corners;
+  return sites;
 }
 
 describe('QuarrySites', () => {
@@ -26,48 +44,50 @@ describe('QuarrySites', () => {
     describe(`seed ${seed} at 512 x 512`, () => {
       const world = generator.generate({ seed, width: 512, height: 512 });
       const { map } = world;
-      const sites = siteCorners(world);
-      const size = QUARRY_CONFIG.siteSize;
+      const sites = sitesOf(map);
 
-      it('has several quarry sites, each a full square of quarry ground', () => {
+      it('has several separate quarry sites', () => {
         expect(sites.length).toBeGreaterThanOrEqual(4);
         expect(sites.length).toBeLessThanOrEqual(QUARRY_CONFIG.maxSites);
-        let quarryTiles = 0;
-        for (const t of map.tiles) if (t === TileType.Quarry) quarryTiles++;
-        expect(quarryTiles).toBe(sites.length * size * size);
+      });
+
+      it('gives every site room for a quarry', () => {
+        for (const site of sites) {
+          const fits = site.some(({ tx, ty }) => world.canPlace(ObjectKind.Quarry, tx, ty).ok);
+          expect(fits, `site at ${site[0].tx}, ${site[0].ty}`).toBe(true);
+        }
+      });
+
+      it('grows irregular sites, not squares', () => {
+        const core = QUARRY_CONFIG.coreSize * QUARRY_CONFIG.coreSize;
+        let irregular = 0;
+        for (const site of sites) {
+          expect(site.length).toBeGreaterThanOrEqual(core);
+          const xs = site.map((t) => t.tx);
+          const ys = site.map((t) => t.ty);
+          const box = (Math.max(...xs) - Math.min(...xs) + 1) * (Math.max(...ys) - Math.min(...ys) + 1);
+          if (site.length > core && site.length < box) irregular++;
+        }
+        expect(irregular).toBeGreaterThanOrEqual(Math.ceil(sites.length * 0.75));
       });
 
       it('puts every site at the foot of a mountain', () => {
-        for (const { tx, ty } of sites) {
-          const base = map.tileHeight(tx + 2, ty + 2);
-          let mountainRock = 0;
-          for (let y = ty - 2; y < ty + size + 2; y++) {
-            for (let x = tx - 2; x < tx + size + 2; x++) {
-              if (map.tileAt(x, y) === TileType.Rock && map.tileHeight(x, y) >= base + 1) mountainRock++;
+        for (const site of sites) {
+          const base = Math.min(...site.map((t) => map.tileHeight(t.tx, t.ty)));
+          const nearMountain = site.some(({ tx, ty }) => {
+            for (let y = ty - 2; y <= ty + 2; y++) {
+              for (let x = tx - 2; x <= tx + 2; x++) {
+                if (map.tileAt(x, y) === TileType.Rock && map.tileHeight(x, y) >= base + 1) return true;
+              }
             }
-          }
-          expect(mountainRock, `site at ${tx}, ${ty}`).toBeGreaterThan(0);
+            return false;
+          });
+          expect(nearMountain, `site at ${site[0].tx}, ${site[0].ty}`).toBe(true);
         }
       });
 
-      it('keeps sites apart and free of trees', () => {
-        for (const a of sites) {
-          for (const b of sites) {
-            if (a === b) continue;
-            expect(Math.max(Math.abs(a.tx - b.tx), Math.abs(a.ty - b.ty))).toBeGreaterThanOrEqual(QUARRY_CONFIG.minSpacing);
-          }
-          for (let y = a.ty; y < a.ty + size; y++) for (let x = a.tx; x < a.tx + size; x++) expect(world.objectAt(x, y)).toBeUndefined();
-        }
-      });
-
-      it('lets a quarry stand anywhere on a site', () => {
-        for (const { tx, ty } of sites) {
-          for (let dy = 0; dy <= size - 3; dy++) {
-            for (let dx = 0; dx <= size - 3; dx++) {
-              expect(world.canPlace(ObjectKind.Quarry, tx + dx, ty + dy), `quarry at ${tx + dx}, ${ty + dy}`).toEqual({ ok: true });
-            }
-          }
-        }
+      it('keeps trees off quarry ground', () => {
+        for (const site of sites) for (const { tx, ty } of site) expect(world.objectAt(tx, ty)).toBeUndefined();
       });
     });
   }

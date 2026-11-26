@@ -113,7 +113,7 @@ describe('worldChecksum', () => {
     // ridged mountains (was 3863915074 before that), and again when it gained quarry ground (was 3247290596 before
     // that).
     // Tree looks are render-only, so changing them must not change this value.
-    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(902134377);
+    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(1557280754);
   });
 
   it('differs for different seeds', () => {
