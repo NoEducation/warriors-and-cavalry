@@ -189,7 +189,7 @@ describe('Jobs and the supply chain', () => {
     const { world, hut } = camp();
     world.spawn(ObjectKind.Tree, 15, 8);
     const other = place(world, ObjectKind.WoodcutterHut, 12, 4);
-    tickUntil(world, () => first(world)?.state === 'working');
+    tickUntil(world, () => first(world)?.state === 'working', 4000);
     expect(peasant(world).workplaceId).toBe(hut.id);
     expect(status(world, other.id)).toBe('noWorker');
     world.apply({ type: 'demolish', objectId: hut.id });
@@ -257,7 +257,7 @@ describe('Jobs and the supply chain', () => {
     tickUntil(world, () => {
       entered.push(`${peasant(world).tx},${peasant(world).ty}`);
       return peasant(world).state === 'working';
-    });
+    }, 4000);
     expect(entered).not.toContain(`${next.tx},${next.ty}`);
     expect(onAccess(world, hut.id, peasant(world))).toBe(true);
   });
@@ -301,7 +301,7 @@ describe('Jobs and the supply chain', () => {
     expect(p.state).toBe('toWork');
     place(world, ObjectKind.Hovel, p.tx, p.ty);
     expect(world.isWalkable(p.tx, p.ty)).toBe(false);
-    tickUntil(world, () => first(world)?.state === 'working');
+    tickUntil(world, () => first(world)?.state === 'working', 4000);
     expect(onAccess(world, hut.id, peasant(world))).toBe(true);
   });
 });

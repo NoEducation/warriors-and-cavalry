@@ -12,4 +12,6 @@ export interface PopulationHost {
   objectById(id: number): MapObject | undefined;
   objectAt(tx: number, ty: number): MapObject | undefined;
   objects(): Iterable<MapObject>;
+  /** Rounds of wood already taken from the standing tree `objectId`; 0 for an untouched tree. */
+  treeChopsTaken(objectId: number): number;
 }

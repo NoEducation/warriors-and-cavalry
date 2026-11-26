@@ -42,7 +42,7 @@ export class World {
     const followers = { index, economy: economyState, production, population, stumps, listeners };
     this.lifecycle = new ObjectLifecycle(map, followers);
     this.walls = new WallBuilder(this.lifecycle, economyState);
-    this.felling = new TreeFelling(index, this.lifecycle, stumps);
+    this.felling = new TreeFelling(index, this.lifecycle, stumps, listeners);
   }
 
   /** Read-only view of `economyState`: resource amounts and capacities, changed only through `apply` and `tick`. */
@@ -57,18 +57,24 @@ export class World {
 
   /**
    * Advances the world by one simulation tick: peasants, then production, whose batches the workers pick up (the
-   * trees woodcutters finished chopping fall and leave stumps), then stumps whose time is up are cleared away.
+   * trees woodcutters finished a round on give it up, the last round fells them into stumps), then stumps whose time
+   * is up are cleared away.
    */
   public tick(): void {
     this.ticks++;
     this.populace.tick();
-    this.felling.fell(this.populace.collect(this.production.tick((id) => this.populace.isWorking(id))));
+    this.felling.chop(this.populace.collect(this.production.tick((id) => this.populace.isWorking(id))));
     this.felling.tick();
   }
 
   /** Ticks before the stump `objectId` is cleared away; 0 when it is not a stump. */
   public stumpTicksLeft(objectId: number): number {
     return this.stumps.ticksLeft(objectId);
+  }
+
+  /** Rounds of wood already taken from the standing tree `objectId`; 0 for an untouched tree or any other id. */
+  public treeChopsTaken(objectId: number): number {
+    return this.felling.chopsTaken(objectId);
   }
 
   /** All peasants in ascending id order. */
@@ -167,7 +173,7 @@ export class World {
     return this.lifecycle.spawn(kind, tx, ty);
   }
 
-  /** Calls `listener` for every object added or removed from now on. Returns a function that unsubscribes it. */
+  /** Calls `listener` for every object added or removed, and every tree chopped, from now on. Returns a function that unsubscribes it. */
   public onChange(listener: (change: WorldChange) => void): () => void {
     return this.listeners.add(listener);
   }

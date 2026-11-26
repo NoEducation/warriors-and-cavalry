@@ -60,7 +60,8 @@ export type CommandResult = ObjectCommandSuccess | WallLineSuccess | CommandFail
 
 /** Delivered to World listeners for every object added or removed. */
 export interface WorldChange {
-  readonly type: 'added' | 'removed';
+  /** `chopped`: a round of wood was taken from the tree `object`, which still stands. */
+  readonly type: 'added' | 'removed' | 'chopped';
   readonly object: MapObject;
 }
 

@@ -1,4 +1,5 @@
-// The woodcutter's part of a trip: picking the nearest free tree in reach of its hut, walking there and chopping.
+// The woodcutter's part of a trip: picking the nearest free tree in reach of its hut (started trees first), walking
+// there and chopping.
 import type { MapObject } from './MapObject';
 import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import { PATH_CONFIG } from './pathConfig';
@@ -87,19 +88,26 @@ export class WoodcutterTrips {
   }
 
   /**
-   * Releases `p`'s tree, then one search toward every free tree in reach, bounded by `treeSearchMaxExpanded`;
-   * claims the one the path ends next to.
+   * Releases `p`'s tree, then searches toward the free started trees in reach (so trees get finished), and when none
+   * can be reached toward every free tree in reach; each search bounded by `treeSearchMaxExpanded`. Claims the tree
+   * the path ends next to.
    */
   private pickTree(p: Peasant): PickResult {
     this.release(p);
     const candidates = this.candidates(p.workplaceId);
     if (candidates.length === 0) return 'none';
-    if (!this.walker.walkTo(p, targetTiles(candidates), PATH_CONFIG.treeSearchMaxExpanded)) return 'unreachable';
-    const tree = targetAtWalkEnd(p, candidates);
+    const started = candidates.filter((c) => this.world.treeChopsTaken(c.id) > 0);
+    const tree = (started.length > 0 ? this.headFor(p, started) : null) ?? this.headFor(p, candidates);
     if (!tree) return 'unreachable';
     this.claims.claim(tree.id, p.id);
     p.headToTree(tree.id);
     return 'heading';
+  }
+
+  /** Sets `p` walking to the nearest reachable tree of `trees` and returns it; null when none can be reached. */
+  private headFor(p: Peasant, trees: readonly PathTarget[]): PathTarget | null {
+    if (!this.walker.walkTo(p, targetTiles(trees), PATH_CONFIG.treeSearchMaxExpanded)) return null;
+    return targetAtWalkEnd(p, trees) ?? null;
   }
 
   /** The unclaimed trees within the tree radius of hut `hutId` (Chebyshev from its footprint), row by row. */
