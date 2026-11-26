@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GAME_CONFIG } from '../src/game/GameConfig';
-import { parseSeed, randomSeed } from '../src/game/seed';
+import { parseSeed, parseSeedText, randomSeed } from '../src/game/seed';
 
 describe('parseSeed', () => {
   it('defaults to seed 1', () => {
@@ -29,5 +29,17 @@ describe('randomSeed', () => {
       expect(seed).toBeGreaterThanOrEqual(0);
       expect(seed).toBeLessThanOrEqual(4294967295);
     }
+  });
+});
+
+describe('parseSeedText', () => {
+  it('reads typed seeds, ignoring surrounding spaces', () => {
+    expect(parseSeedText('42')).toBe(42);
+    expect(parseSeedText('  7 ')).toBe(7);
+    expect(parseSeedText('4294967295')).toBe(4294967295);
+  });
+
+  it.each(['', ' ', 'abc', '-5', '1.5', '4294967296', '1e3', '0x10'])('rejects %j', (text) => {
+    expect(parseSeedText(text)).toBeNull();
   });
 });

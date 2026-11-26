@@ -7,7 +7,7 @@ import { disposeObject } from './disposeObject';
 import { FarmCrops } from './FarmCrops';
 import { PeasantLayer } from './PeasantLayer';
 import { StockpileStacks } from './StockpileStacks';
-import { TerrainMeshBuilder } from './TerrainMeshBuilder';
+import { type TerrainChunkData, TerrainMeshBuilder } from './TerrainMeshBuilder';
 import { StumpLayer } from './StumpLayer';
 import { TreeLayer } from './TreeLayer';
 import { TreeShadowLayer } from './TreeShadowLayer';
@@ -35,12 +35,13 @@ export class WorldView {
 
   /**
    * Replaces everything shown with meshes for `world`: terrain, water, trees and stumps, and buildings, stockpile stacks, crops
-   * and peasants (which then follow the world passed to `update`). Call on every world load.
+   * and peasants (which then follow the world passed to `update`). Call on every world load. `terrain` is the map's
+   * chunk data from `TerrainMeshBuilder.buildData` when already computed (e.g. in a worker); without it it is built here.
    */
-  public showWorld(world: World): void {
+  public showWorld(world: World, terrain?: readonly TerrainChunkData[]): void {
     const { map } = world;
     this.clearWorld();
-    this.terrainChunks = this.terrainBuilder.build(map);
+    this.terrainChunks = terrain ? this.terrainBuilder.fromData(terrain) : this.terrainBuilder.build(map);
     this.scene.add(this.terrainChunks);
     this.layers.push(
       new WaterLayer(map),

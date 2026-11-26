@@ -8,16 +8,17 @@ import { TileHighlight } from '../render/TileHighlight';
 import { WallLineGhost } from '../render/WallLineGhost';
 import { WorldView } from '../render/WorldView';
 import { TICKS_PER_SECOND } from '../sim/gameTime';
-import { MapGenerator } from '../sim/MapGenerator';
 import type { World } from '../sim/World';
 import { Hud } from '../ui/Hud';
 import { ResourceBar } from '../ui/ResourceBar';
 import { FpsDisplay } from './FpsDisplay';
+import type { GameElements, WorldSource } from './GameElements';
 import { GAME_CONFIG } from './GameConfig';
 import { GameInput } from './GameInput';
-import { parseSeed, randomSeed } from './seed';
+import { randomSeed, writeSeedToUrl } from './seed';
 import { SimulationRunner } from './SimulationRunner';
 import { StatusDisplay } from './StatusDisplay';
+import type { LoadedWorld } from './WorldAssembler';
 
 /** The status widgets the frame loop refreshes. */
 interface GameWidgets {
@@ -26,7 +27,6 @@ interface GameWidgets {
 }
 
 export class Game {
-  private readonly mapGenerator = new MapGenerator();
   private readonly worldView = new WorldView();
   private readonly highlight = new TileHighlight();
   private readonly ghostFactory = new BuildingMeshFactory();
@@ -41,22 +41,27 @@ export class Game {
   /** The world currently shown. Game is its only owner and passes it to whoever needs it; `loadMap` replaces it. */
   private world: World;
   private lastFrameTime: number | null = null;
+  /** True while a new map is being loaded; "New map" is ignored meanwhile. */
+  private loading = false;
 
-  /** Builds the scene, HUD, resource bar, build bar and input for the URL's `seed`. Throws without WebGL. */
+  /**
+   * Builds the scene, HUD, resource bar, build bar and input, showing `first`; later maps come from `loadWorld`.
+   * Throws without WebGL.
+   */
   public constructor(
-    canvas: HTMLCanvasElement,
-    hudRoot: HTMLElement,
-    resourceRoot: HTMLElement,
-    buildBarRoot: HTMLElement,
+    elements: GameElements,
+    first: LoadedWorld,
+    private readonly loadWorld: WorldSource,
   ) {
+    const { canvas, hudRoot, resourceRoot, buildBarRoot } = elements;
     this.pixelRenderer = new PixelRenderer(canvas, GAME_CONFIG.pixelScale);
-    this.world = this.generateWorld(parseSeed(location.search));
+    this.world = first.world;
     this.hud = new Hud(hudRoot, () => this.onNewMap());
     this.input = this.createInput(canvas, buildBarRoot);
     this.widgets = this.createWidgets(resourceRoot);
     // The hover outline and the ghosts stay in the scene across maps.
     this.worldView.scene.add(this.highlight.object, this.ghost.object, this.wallGhost.object);
-    this.showWorld();
+    this.showWorld(first);
   }
 
   /** Sizes the renderer, follows window resizes and starts the frame loop. Call once after construction. */
@@ -68,14 +73,22 @@ export class Game {
   }
 
   /**
-   * Generates the world for `seed` and shows it, replacing the current one. Build tool, pause and speed are kept; a
-   * wall drag in progress is dropped.
+   * Loads the world for `seed` through the world source and shows it, replacing the current one, which keeps running
+   * until then. Build tool, pause and speed are kept; a wall drag in progress is dropped. Ignored while a load runs.
    */
-  public loadMap(seed: number): void {
-    this.world = this.generateWorld(seed);
-    this.input.resetForNewMap();
-    this.runner.reset();
-    this.showWorld();
+  public async loadMap(seed: number): Promise<void> {
+    if (this.loading) return;
+    this.loading = true;
+    try {
+      await this.loadWorld(seed, (loaded) => {
+        this.world = loaded.world;
+        this.input.resetForNewMap();
+        this.runner.reset();
+        this.showWorld(loaded);
+      });
+    } finally {
+      this.loading = false;
+    }
   }
 
   /** Creates the keyboard, pointer and canvas input, acting on the HUD, hover outline, ghosts, camera and runner. */
@@ -93,13 +106,9 @@ export class Game {
     };
   }
 
-  private generateWorld(seed: number): World {
-    return this.mapGenerator.generate({ seed, width: GAME_CONFIG.mapSize, height: GAME_CONFIG.mapSize });
-  }
-
-  /** Shows `this.world` in the scene and its seed on the HUD. */
-  private showWorld(): void {
-    this.worldView.showWorld(this.world);
+  /** Shows `this.world`, with the terrain data `loaded` came with, in the scene and its seed on the HUD. */
+  private showWorld(loaded: LoadedWorld): void {
+    this.worldView.showWorld(this.world, loaded.terrain);
     this.highlight.hide();
     this.hud.setSeed(this.world.map.seed);
   }
@@ -117,11 +126,10 @@ export class Game {
   }
 
   private onNewMap(): void {
+    if (this.loading) return;
     const seed = randomSeed();
-    const url = new URL(location.href);
-    url.searchParams.set('seed', String(seed));
-    history.replaceState(null, '', url);
-    this.loadMap(seed);
+    writeSeedToUrl(seed);
+    void this.loadMap(seed);
   }
 
   private readonly onFrame = (time: number): void => {
