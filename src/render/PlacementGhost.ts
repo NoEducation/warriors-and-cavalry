@@ -5,11 +5,8 @@ import type { PlacementPreview } from '../sim/PlacementPreview';
 import type { World } from '../sim/World';
 import type { BuildingMeshFactory, GatePassage } from './BuildingMeshFactory';
 import { floorHeight } from './floorHeight';
+import { GHOST_CONFIG } from './ghostConfig';
 import { gatePassage } from './gatePassage';
-
-const OK_COLOR = 0x44ff66;
-const BLOCKED_COLOR = 0xff4444;
-const OPACITY = 0.5;
 
 export class PlacementGhost {
   /** Add this to the scene once; holds the ghost building while one is shown. */
@@ -20,7 +17,7 @@ export class PlacementGhost {
    */
   private readonly material = new THREE.MeshLambertMaterial({
     transparent: true,
-    opacity: OPACITY,
+    opacity: GHOST_CONFIG.opacity,
     depthWrite: false,
     flatShading: true,
   });
@@ -43,7 +40,7 @@ export class PlacementGhost {
     const passage = preview.kind === ObjectKind.Gate ? gatePassage(world, preview.tx, preview.ty) : null;
     if (this.modelKind !== preview.kind || this.modelPassage !== passage) this.rebuild(preview.kind, passage);
     if (this.tintedOk !== preview.ok) {
-      this.material.color.setHex(preview.ok ? OK_COLOR : BLOCKED_COLOR);
+      this.material.color.setHex(preview.ok ? GHOST_CONFIG.okColor : GHOST_CONFIG.blockedColor);
       this.tintedOk = preview.ok;
     }
     this.object.position.set(preview.tx, floorHeight(world.map, preview.kind, preview.tx, preview.ty), preview.ty);

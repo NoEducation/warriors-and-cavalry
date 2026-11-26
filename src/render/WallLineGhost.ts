@@ -6,10 +6,7 @@ import { WALL_LINE_MAX_TILES } from '../sim/wallLine';
 import type { World } from '../sim/World';
 import type { BuildingMeshFactory } from './BuildingMeshFactory';
 import { floorHeight } from './floorHeight';
-
-const OK_COLOR = 0x44ff66;
-const BLOCKED_COLOR = 0xff4444;
-const OPACITY = 0.5;
+import { GHOST_CONFIG } from './ghostConfig';
 
 export class WallLineGhost {
   /** Add this to the scene once; shows the pieces of the line while one is shown. */
@@ -24,8 +21,8 @@ export class WallLineGhost {
     const model = factory.create(ObjectKind.Wall);
     (model.material as THREE.Material).dispose();
     this.geometry = model.geometry;
-    this.okPieces = this.createPieces(OK_COLOR);
-    this.blockedPieces = this.createPieces(BLOCKED_COLOR);
+    this.okPieces = this.createPieces(GHOST_CONFIG.okColor);
+    this.blockedPieces = this.createPieces(GHOST_CONFIG.blockedColor);
     this.object.add(this.okPieces, this.blockedPieces);
     this.object.visible = false;
   }
@@ -69,7 +66,7 @@ export class WallLineGhost {
     const material = new THREE.MeshLambertMaterial({
       color,
       transparent: true,
-      opacity: OPACITY,
+      opacity: GHOST_CONFIG.opacity,
       depthWrite: false,
       flatShading: true,
     });
