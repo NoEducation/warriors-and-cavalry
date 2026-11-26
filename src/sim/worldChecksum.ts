@@ -54,7 +54,7 @@ export function worldChecksum(world: World): number {
  * Everything a later tick reads of peasant `p`: id, state index, tx, ty, nextTx, nextTy, step progress, step ticks,
  * load resource (-1 for none) and amount, workplace id (0 for none), delivery target id (0 for none), tree id (0 for none),
  * wait ticks,
- * path index, the tiles still ahead on its path (count, then each tx and ty) and its stand's tx and ty (-1, -1 for
+ * path index, the tiles still ahead on its path (count, then each tx and ty), its walk mode and its stand's tx and ty (-1, -1 for
  * none).
  */
 function feedPeasant(hash: number, p: PeasantView): number {
@@ -74,6 +74,7 @@ function feedPeasant(hash: number, p: PeasantView): number {
   hash = feedInt32(hash, p.waitTicks);
   hash = feedInt32(hash, p.pathIndex);
   hash = feedTiles(hash, p.path, p.pathIndex);
+  hash = feedInt32(hash, p.walkMode);
   hash = feedInt32(hash, p.stand ? p.stand.tx : -1);
   return feedInt32(hash, p.stand ? p.stand.ty : -1);
 }

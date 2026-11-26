@@ -1,7 +1,10 @@
-// Deterministic multi-goal A* over the tile grid, 8 directions without corner cutting.
+// Deterministic multi-goal A* over the tile grid, 8 directions, each step allowed by the walk rules (no corner cutting
+// on the ground; the wall walk only by stairs).
 import { MinHeap } from './MinHeap';
+import { PathGoals } from './PathGoals';
 import { PATH_CONFIG } from './pathConfig';
 import type { TileCoord } from './TileCoord';
+import { canStep, WalkClass, type WalkClassOf, WalkMode } from './walkRules';
 
 /** Whether a walker may stand on tile (tx, ty). Only called for tiles inside the grid. */
 export type IsWalkable = (tx: number, ty: number) => boolean;
@@ -17,15 +20,12 @@ export class PathFinder {
   private readonly seen: Uint32Array;
   /** Search generation in which a tile was expanded. */
   private readonly closed: Uint32Array;
-  /** Search generation in which a tile was marked as a goal. */
-  private readonly goal: Uint32Array;
   private readonly open = new MinHeap();
-  /** Walkability of the 8 neighbours of the tile being expanded, in `STEP_DX`/`STEP_DY` order. */
-  private readonly free = new Uint8Array(8);
-  /** Goal coordinates for the heuristic; replaced by larger arrays when a search has more goals. */
-  private goalX: Int32Array;
-  private goalY: Int32Array;
-  private goalCount = 0;
+  /** Walk class of each tile reached in the current search, read once when it is first relaxed. */
+  private readonly walkClass: Uint8Array;
+  /** Walk classes of the 8 neighbours of the tile being expanded, in `STEP_DX`/`STEP_DY` order. */
+  private readonly around = new Uint8Array(8);
+  private readonly goals: PathGoals;
   private generation = 0;
   private expanded = 0;
 
@@ -36,9 +36,8 @@ export class PathFinder {
     this.parent = new Int32Array(size);
     this.seen = new Uint32Array(size);
     this.closed = new Uint32Array(size);
-    this.goal = new Uint32Array(size);
-    this.goalX = new Int32Array(64);
-    this.goalY = new Int32Array(64);
+    this.walkClass = new Uint8Array(size);
+    this.goals = new PathGoals(width, height);
   }
 
   /** Tiles expanded by the last `find`. */
@@ -47,10 +46,8 @@ export class PathFinder {
   }
 
   /**
-   * The tiles to walk from `start` to the nearest reachable goal, excluding `start` and ending on that goal; `[]` when
-   * `start` is a goal; null when `goals` is empty, no goal is reachable or the search exceeds `maxExpanded` expansions.
-   * Repeated goals count once. The start tile need not be walkable. Among equal f the larger cost so far comes first,
-   * then the smaller tile index, so it is deterministic.
+   * The tiles to walk from `start` to the nearest reachable goal over the tiles `isWalkable` allows, on the ground
+   * only; see `findWith`. For searches that do not know about the wall walk.
    */
   public find(
     start: TileCoord,
@@ -58,44 +55,65 @@ export class PathFinder {
     isWalkable: IsWalkable,
     maxExpanded: number = PATH_CONFIG.maxExpanded,
   ): TileCoord[] | null {
+    const walkClassOf: WalkClassOf = (tx, ty) => (isWalkable(tx, ty) ? WalkClass.Ground : WalkClass.Blocked);
+    return this.findWith(start, goals, walkClassOf, WalkMode.Ground, maxExpanded);
+  }
+
+  /**
+   * The tiles to walk from `start` to the nearest reachable goal, excluding `start` and ending on that goal, taking
+   * only steps `canStep` allows in `mode` between the classes `walkClassOf` gives; `[]` when `start` is a goal; null
+   * when `goals` is empty, no goal is reachable or the search exceeds `maxExpanded` expansions. Repeated goals count
+   * once. The start tile need not be walkable. Among equal f the larger cost so far comes first, then the smaller tile
+   * index, so it is deterministic. `walkClassOf` is asked once per tile reached and once per neighbour looked at.
+   */
+  public findWith(
+    start: TileCoord,
+    goals: readonly TileCoord[],
+    walkClassOf: WalkClassOf,
+    mode: WalkMode,
+    maxExpanded: number = PATH_CONFIG.maxExpanded,
+  ): TileCoord[] | null {
     this.expanded = 0;
-    if (!this.inGrid(start.tx, start.ty) || !this.markGoals(goals)) return null;
+    if (!this.inGrid(start.tx, start.ty) || !this.goals.set(goals, ++this.generation)) return null;
     const gen = this.generation;
     const startIndex = start.ty * this.width + start.tx;
     this.open.clear();
     this.seen[startIndex] = gen;
     this.cost[startIndex] = 0;
     this.parent[startIndex] = -1;
-    this.open.push(startIndex, this.heuristic(start.tx, start.ty));
+    this.walkClass[startIndex] = walkClassOf(start.tx, start.ty);
+    this.open.push(startIndex, this.goals.estimate(start.tx, start.ty));
     for (let index = this.open.pop(); index !== -1; index = this.open.pop()) {
       if (this.closed[index] === gen) continue;
-      if (this.goal[index] === gen) return this.pathTo(index);
+      if (this.goals.has(index, gen)) return this.pathTo(index);
       if (this.expanded >= maxExpanded) return null;
       this.expanded++;
       this.closed[index] = gen;
-      this.expand(index, isWalkable);
+      this.expand(index, walkClassOf, mode);
     }
     return null;
   }
 
-  /** Relaxes every walkable neighbour of `index` reachable without cutting a corner. */
-  private expand(index: number, isWalkable: IsWalkable): void {
+  /** Relaxes every neighbour of `index` that the walk rules let it step to in `mode`. */
+  private expand(index: number, walkClassOf: WalkClassOf, mode: WalkMode): void {
     const gen = this.generation;
     const x = index % this.width;
     const y = (index - x) / this.width;
-    const free = this.free;
+    const around = this.around;
     for (let d = 0; d < 8; d++) {
       const nx = x + STEP_DX[d];
       const ny = y + STEP_DY[d];
-      free[d] = this.inGrid(nx, ny) && isWalkable(nx, ny) ? 1 : 0;
+      around[d] = this.inGrid(nx, ny) ? walkClassOf(nx, ny) : WalkClass.Blocked;
     }
+    const from = this.walkClass[index] as WalkClass;
     for (let d = 0; d < 8; d++) {
-      if (free[d] === 0) continue;
       const dx = STEP_DX[d];
       const dy = STEP_DY[d];
       const diagonal = d >= 4;
       // The side tiles of a diagonal step are the straight steps (dx, 0) and (0, dy): indices 1/2 and 0/3.
-      if (diagonal && (free[dx < 0 ? 1 : 2] === 0 || free[dy < 0 ? 0 : 3] === 0)) continue;
+      const sideA = around[dx < 0 ? 1 : 2] as WalkClass;
+      const sideB = around[dy < 0 ? 0 : 3] as WalkClass;
+      if (!canStep(from, around[d] as WalkClass, diagonal, sideA, sideB, mode)) continue;
       const nx = x + dx;
       const ny = y + dy;
       const next = ny * this.width + nx;
@@ -105,40 +123,10 @@ export class PathFinder {
       this.seen[next] = gen;
       this.cost[next] = cost;
       this.parent[next] = index;
+      this.walkClass[next] = around[d];
       // Equal f: the larger cost so far (deeper node) first, then the smaller tile index.
-      this.open.push(next, cost + this.heuristic(nx, ny), -cost);
+      this.open.push(next, cost + this.goals.estimate(nx, ny), -cost);
     }
-  }
-
-  /** Starts a new generation and marks the in-grid goals, each once; false when there are none. */
-  private markGoals(goals: readonly TileCoord[]): boolean {
-    this.generation++;
-    if (goals.length > this.goalX.length) {
-      this.goalX = new Int32Array(goals.length);
-      this.goalY = new Int32Array(goals.length);
-    }
-    this.goalCount = 0;
-    for (const { tx, ty } of goals) {
-      if (!this.inGrid(tx, ty) || this.goal[ty * this.width + tx] === this.generation) continue;
-      this.goal[ty * this.width + tx] = this.generation;
-      this.goalX[this.goalCount] = tx;
-      this.goalY[this.goalCount] = ty;
-      this.goalCount++;
-    }
-    return this.goalCount > 0;
-  }
-
-  /** Smallest octile distance from (x, y) to any goal, in step-cost units. */
-  private heuristic(x: number, y: number): number {
-    let best = 0x7fffffff;
-    for (let i = 0; i < this.goalCount; i++) {
-      const dx = Math.abs(this.goalX[i] - x);
-      const dy = Math.abs(this.goalY[i] - y);
-      const diagonal = Math.min(dx, dy);
-      const h = diagonal * PATH_CONFIG.diagonalCost + (Math.max(dx, dy) - diagonal) * PATH_CONFIG.straightCost;
-      if (h < best) best = h;
-    }
-    return best;
   }
 
   /** The tiles from just after the start up to `index`, following parents back. */

@@ -2,6 +2,7 @@
 import { POPULATION_CONFIG } from './populationConfig';
 import type { TileCoord } from './TileCoord';
 import type { Load, PeasantState, PeasantView } from './PeasantView';
+import { WalkMode } from './walkRules';
 
 const NO_TILES: readonly TileCoord[] = Object.freeze([]);
 
@@ -24,6 +25,7 @@ export class Peasant implements PeasantView {
   private _waitTicks = 0;
   private _path = NO_TILES;
   private _pathIndex = 0;
+  private _walkMode: WalkMode = WalkMode.Ground;
   private _stand: TileCoord | null = null;
 
   /** A new, idle peasant standing on tile (tx, ty). */
@@ -46,6 +48,7 @@ export class Peasant implements PeasantView {
   public get waitTicks(): number { return this._waitTicks; }
   public get path(): readonly TileCoord[] { return this._path; }
   public get pathIndex(): number { return this._pathIndex; }
+  public get walkMode(): WalkMode { return this._walkMode; }
   public get stand(): TileCoord | null { return this._stand; }
 
   /** idle -> toWork: takes the job at building `buildingId` and heads there, giving up its stand and any wait. */
@@ -134,10 +137,11 @@ export class Peasant implements PeasantView {
     return --this._waitTicks === 0;
   }
 
-  /** Replaces the current walk with `path` (empty to stop after the current step). */
-  public startWalk(path: readonly TileCoord[]): void {
+  /** Replaces the current walk with `path` (empty to stop after the current step), walked in `mode`. */
+  public startWalk(path: readonly TileCoord[], mode: WalkMode = WalkMode.Ground): void {
     this._path = path;
     this._pathIndex = 0;
+    this._walkMode = mode;
   }
 
   /** Starts the step onto the next tile of its walk, taking `ticks` ticks. Call only between steps, with tiles left. */

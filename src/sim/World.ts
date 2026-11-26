@@ -12,6 +12,7 @@ import { Production, type ProductionState } from './Production';
 import { Stumps } from './Stumps';
 import { TreeFelling } from './TreeFelling';
 import type { TileCoord } from './TileCoord';
+import type { WalkClass } from './walkRules';
 import { WallBuilder, type WallLinePreview } from './WallBuilder';
 import {
   type CommandResult,
@@ -122,9 +123,14 @@ export class World {
     return this.index.objectAt(tx, ty);
   }
 
-  /** Whether a walker may stand on tile (tx, ty): inside the map, not water, and free, a tree or a gate. */
+  /** Whether a walker on the ground may stand on tile (tx, ty): inside the map, not water, and free or under a tree, stump, gate or stairs. */
   public isWalkable(tx: number, ty: number): boolean {
     return this.index.isWalkable(tx, ty);
+  }
+
+  /** What tile (tx, ty) is to a walker: blocked, ground, stairs or a wall-walk top (see `canStep`). */
+  public walkClass(tx: number, ty: number): WalkClass {
+    return this.index.walkClass(tx, ty);
   }
 
   /** The walkable tiles sharing an edge with object `objectId`, row by row; [] for an unknown id. */

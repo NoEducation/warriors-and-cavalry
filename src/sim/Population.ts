@@ -11,6 +11,7 @@ import type { PopulationHost } from './PopulationHost';
 import type { ProductionOutput, ProductionState } from './Production';
 import { StoragePlaces } from './StoragePlaces';
 import { WoodcutterTrips } from './WoodcutterTrips';
+import type { WalkClass } from './walkRules';
 import { WorkerTrips } from './WorkerTrips';
 
 /** Population totals for the UI. */
@@ -33,8 +34,8 @@ export class Population {
 
   /** Peasants living in `world`, paying for arrivals from `economy` and delivering their work into it. */
   public constructor(world: PopulationHost, economy: Economy) {
-    const isWalkable = (tx: number, ty: number): boolean => world.isWalkable(tx, ty);
-    const walker = new PeasantWalker(world.map.width, world.map.height, isWalkable);
+    const walkClass = (tx: number, ty: number): WalkClass => world.walkClass(tx, ty);
+    const walker = new PeasantWalker(world.map.width, world.map.height, walkClass);
     this.arrivals = new Arrivals(world, economy);
     this.stores = new StoragePlaces(world);
     this.woodcutters = new WoodcutterTrips(world, walker);

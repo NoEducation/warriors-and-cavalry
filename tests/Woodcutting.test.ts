@@ -7,6 +7,7 @@ import { PATH_CONFIG } from '../src/sim/pathConfig';
 import type { PeasantView } from '../src/sim/PeasantView';
 import { ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
+import type { WalkClass } from '../src/sim/walkRules';
 import { World } from '../src/sim/World';
 
 /** Ticks until `done` holds (at most `max` ticks); throws when it never does. */
@@ -200,12 +201,12 @@ describe('Woodcutters', () => {
     place(world, ObjectKind.Keep, 100, 100);
     place(world, ObjectKind.Stockpile, 110, 110);
     const hut = place(world, ObjectKind.WoodcutterHut, 124, 104);
-    // Path searches ask the world which tiles are walkable; count those questions per tick as the measure of work.
+    // Path searches ask the world what each tile is to a walker; count those questions per tick as the measure of work.
     let asked = 0;
-    const isWalkable = world.isWalkable.bind(world);
-    world.isWalkable = (tx: number, ty: number): boolean => {
+    const walkClass = world.walkClass.bind(world);
+    world.walkClass = (tx: number, ty: number): WalkClass => {
       asked++;
-      return isWalkable(tx, ty);
+      return walkClass(tx, ty);
     };
     let worst = 0;
     let cannotReach = false;
