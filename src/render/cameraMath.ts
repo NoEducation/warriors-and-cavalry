@@ -13,6 +13,8 @@ export const CAMERA_CONFIG = {
   rotateSpeedDeg: 90,
   zoomStep: 1.1,
   maxDt: 0.1,
+  /** How fast the focus height follows the ground, per second; higher snaps sooner. */
+  groundFollowRate: 6,
 } as const;
 
 export function clamp(v: number, lo: number, hi: number): number {

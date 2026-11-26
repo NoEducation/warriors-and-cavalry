@@ -1,18 +1,16 @@
-// Flat-shaded terrain built from a GameMap's corner heights and tile types, split into square chunks.
+// Flat-shaded terrain built from a GameMap's corner heights and tile types, split into square chunks; colours come
+// from terrainColor per corner, with a per-triangle speckle.
 import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
 import { hash2 } from '../sim/rng';
 import { TileType } from '../sim/tiles';
+import { terrainVertexColor } from './terrainColor';
 
 /** Tiles per chunk side. Chunks let three.js skip the parts of the map outside the view. */
 export const TERRAIN_CHUNK_SIZE = 32;
 
-const TILE_COLORS: Record<TileType, number> = {
-  [TileType.Water]: 0x8a7f5c, // seabed
-  [TileType.Sand]: 0xd9c98a,
-  [TileType.Grass]: 0x5d9c3f,
-  [TileType.Rock]: 0x8c8c88,
-};
+/** Brightness swing of the per-triangle speckle that gives the flat-shaded ground its pixel texture. */
+const SPECKLE = 0.07;
 
 const VERTS_PER_TILE = 6;
 
@@ -52,24 +50,24 @@ export class TerrainMeshBuilder {
     const tileCount = rect.width * rect.height;
     const positions = new Float32Array(tileCount * VERTS_PER_TILE * 3);
     const colors = new Float32Array(tileCount * VERTS_PER_TILE * 3);
-    const color = new THREE.Color();
+    const corner = [new THREE.Color(), new THREE.Color(), new THREE.Color(), new THREE.Color()];
     let i = 0;
 
     for (let ty = rect.y0; ty < rect.y0 + rect.height; ty++) {
       for (let tx = rect.x0; tx < rect.x0 + rect.width; tx++) {
         const type = map.tileAt(tx, ty) ?? TileType.Water;
-        color.set(TILE_COLORS[type]).multiplyScalar(0.94 + 0.12 * hash2(map.seed, tx, ty));
-
-        const a = [tx, map.heightAt(tx, ty), ty];
-        const b = [tx + 1, map.heightAt(tx + 1, ty), ty];
-        const c = [tx, map.heightAt(tx, ty + 1), ty + 1];
-        const d = [tx + 1, map.heightAt(tx + 1, ty + 1), ty + 1];
-        // Split along the b-c diagonal; heightfieldRaycast tests the same two triangles.
-        for (const v of [a, c, b, b, c, d]) {
-          positions.set(v, i * 3);
-          colors[i * 3] = color.r;
-          colors[i * 3 + 1] = color.g;
-          colors[i * 3 + 2] = color.b;
+        const cx = [tx, tx + 1, tx, tx + 1];
+        const cy = [ty, ty, ty + 1, ty + 1];
+        for (let k = 0; k < 4; k++) terrainVertexColor(map, type, cx[k], cy[k], corner[k]);
+        // Corners a, b, c, d; split along the b-c diagonal, which heightfieldRaycast tests too.
+        for (const [n, k] of [0, 2, 1, 1, 2, 3].entries()) {
+          const speckle = 1 + SPECKLE * 2 * (hash2(map.seed, tx * 2 + (n < 3 ? 0 : 1), ty) - 0.5);
+          positions[i * 3] = cx[k];
+          positions[i * 3 + 1] = map.heightAt(cx[k], cy[k]);
+          positions[i * 3 + 2] = cy[k];
+          colors[i * 3] = corner[k].r * speckle;
+          colors[i * 3 + 1] = corner[k].g * speckle;
+          colors[i * 3 + 2] = corner[k].b * speckle;
           i++;
         }
       }

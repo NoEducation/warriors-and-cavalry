@@ -106,9 +106,11 @@ describe('raycastHeightfield', () => {
   it('agrees with brute force on a generated map', () => {
     const { map } = new MapGenerator().generate({ seed: 1, width: 32, height: 32 });
     const rand = mulberry32(12345);
+    // Rays start above the highest peak: a ray starting inside the terrain has no meaningful first hit.
+    const top = map.heights.reduce((max, h) => Math.max(max, h), -Infinity);
     let hits = 0;
     for (let i = 0; i < 300; i++) {
-      const origin = { x: rand() * 40 - 4, y: 10 + rand() * 15, z: rand() * 40 - 4 };
+      const origin = { x: rand() * 40 - 4, y: top + 1 + rand() * 8, z: rand() * 40 - 4 };
       const direction = { x: rand() * 2 - 1, y: -(0.6 + rand() * 1.4), z: rand() * 2 - 1 };
       const expected = bruteForce(map, origin, direction);
       const hit = raycastHeightfield(map, origin, direction, MAX);

@@ -83,4 +83,24 @@ describe('CameraRig', () => {
     rig.rotateBy(NaN);
     expect(rig.camera.position.distanceTo(before)).toBeCloseTo(0);
   });
+
+  it('raises its focus to the ground under it, easing there over several frames', () => {
+    const rig = new CameraRig(MAP, MAP);
+    const ground = (): number => 12;
+    rig.followGround(ground, 0.05);
+    const target = (): THREE.Vector3 =>
+      rig.camera.position.clone().add(rig.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(60));
+    const firstY = rig.camera.position.y;
+    expect(firstY).toBeGreaterThan(offset(new CameraRig(MAP, MAP)).y);
+    for (let i = 0; i < 100; i++) rig.followGround(ground, 0.1);
+    expect(rig.camera.position.y - offset(new CameraRig(MAP, MAP)).y).toBeCloseTo(12, 2);
+    expect(target().y).toBeCloseTo(12, 0);
+  });
+
+  it('never lowers its focus below sea level', () => {
+    const rig = new CameraRig(MAP, MAP);
+    const startY = rig.camera.position.y;
+    for (let i = 0; i < 50; i++) rig.followGround(() => -5, 0.1);
+    expect(rig.camera.position.y).toBeCloseTo(startY, 6);
+  });
 });

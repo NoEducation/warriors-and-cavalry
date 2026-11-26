@@ -1,5 +1,6 @@
 // RTS camera: orbits a focus point on the ground; keys pan and rotate, the wheel zooms, mouse drags rotate and tilt.
 import * as THREE from 'three';
+import { MAPGEN_CONFIG } from '../sim/MapGenerator';
 import { CAMERA_CONFIG, clamp, clampDt, clampPitch, orbitOffset, panDelta, zoomDistance } from './cameraMath';
 
 /** Anything that can tell whether a key (by `KeyboardEvent.code`) is held. */
@@ -68,6 +69,17 @@ export class CameraRig {
   /** Zooms out for a positive wheel delta and in for a negative one. Call from the wheel handler. */
   public zoom(wheelDeltaY: number): void {
     this.distance = zoomDistance(this.distance, wheelDeltaY);
+    this.place();
+  }
+
+  /**
+   * Eases the focus height towards the ground at the focus, given by `groundHeight(x, z)` (never below sea level), so
+   * the camera rises over mountains instead of sinking into them. Call once per frame, after `update`.
+   */
+  public followGround(groundHeight: (x: number, z: number) => number, dtSeconds: number): void {
+    const target = Math.max(MAPGEN_CONFIG.seaLevel, groundHeight(this.focus.x, this.focus.z));
+    const blend = 1 - Math.exp(-CAMERA_CONFIG.groundFollowRate * clampDt(dtSeconds));
+    this.focus.y += (target - this.focus.y) * blend;
     this.place();
   }
 

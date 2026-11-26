@@ -59,6 +59,22 @@ describe('MapGenerator', () => {
     });
   }
 
+  for (const seed of [1, 2, 3]) {
+    it(`seed ${seed} at 512 x 512: rugged peaks rise well above the hills, with steep faces`, () => {
+      const { map } = generator.generate({ seed, width: 512, height: 512 });
+      let max = -Infinity;
+      for (const h of map.heights) max = Math.max(max, h);
+      expect(max).toBeGreaterThanOrEqual(12);
+      let steep = 0;
+      for (let ty = 0; ty < map.height; ty++) {
+        for (let tx = 0; tx < map.width; tx++) {
+          if (Math.abs(map.heightAt(tx + 1, ty) - map.heightAt(tx, ty)) > 1.2) steep++;
+        }
+      }
+      expect(steep, 'tiles with a steep face').toBeGreaterThan(300);
+    });
+  }
+
   it('generates a 512 x 512 world (terrain and trees) quickly', () => {
     const start = performance.now();
     generator.generate({ seed: 9, width: 512, height: 512 });
