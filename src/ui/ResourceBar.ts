@@ -1,34 +1,29 @@
-// HTML bar showing the camp's resources and people: `Wood 100/250 · Stone 40/250 · Food 50/100 · Peasants 3/8`.
+// HTML bar showing the camp's resources and people as icon slots: [log] 100/250 [stone] 40/250 [sheaf] 50/100 [peasant] 3/8.
 import type { EconomyView } from '../sim/Economy';
 import type { PopulationSummary } from '../sim/Population';
 import { RESOURCE_KINDS, RESOURCE_NAMES, type ResourceKind } from '../sim/ResourceKind';
-import { populationText } from './statusText';
+import { type IconName, RESOURCE_ICONS, iconSvg } from './icons';
+import { peasantCountText } from './statusText';
 
-/** One resource's element and what it last showed. */
-interface ResourceEntry {
-  readonly kind: ResourceKind;
-  readonly label: string;
+/** One slot's elements and what it last showed. */
+interface Slot {
   readonly element: HTMLSpanElement;
+  readonly value: HTMLSpanElement;
   text: string;
   full: boolean;
 }
 
 export class ResourceBar {
-  private readonly entries: ResourceEntry[] = [];
-  private readonly populationElement: HTMLSpanElement;
-  private populationShown = '';
+  private readonly resources = new Map<ResourceKind, Slot>();
+  private readonly peasants: Slot;
 
-  /** Builds one element per resource and one for the population inside `root`. Create once at setup. */
-  public constructor(root: HTMLElement) {
-    RESOURCE_KINDS.forEach((kind, i) => {
-      if (i > 0) root.appendChild(document.createTextNode(' · '));
-      const element = root.appendChild(document.createElement('span'));
+  /** Builds one slot per resource and one for the peasants inside `root`. Create once at setup. */
+  public constructor(private readonly root: HTMLElement) {
+    for (const kind of RESOURCE_KINDS) {
       const name = RESOURCE_NAMES[kind];
-      const label = name.charAt(0).toUpperCase() + name.slice(1);
-      this.entries.push({ kind, label, element, text: '', full: false });
-    });
-    root.appendChild(document.createTextNode(' · '));
-    this.populationElement = root.appendChild(document.createElement('span'));
+      this.resources.set(kind, this.addSlot(RESOURCE_ICONS[kind], name.charAt(0).toUpperCase() + name.slice(1)));
+    }
+    this.peasants = this.addSlot('peasant', 'Peasants');
   }
 
   /**
@@ -36,24 +31,31 @@ export class ResourceBar {
    * Cheap to call every frame: the DOM changes only when a value does.
    */
   public update(economy: EconomyView, population: PopulationSummary): void {
-    const text = populationText(population);
-    if (text !== this.populationShown) {
-      this.populationShown = text;
-      this.populationElement.textContent = text;
+    for (const [kind, slot] of this.resources) {
+      const amount = economy.amount(kind);
+      const capacity = economy.capacity(kind);
+      this.show(slot, `${amount}/${capacity}`, amount >= capacity);
     }
-    for (const entry of this.entries) {
-      const amount = economy.amount(entry.kind);
-      const capacity = economy.capacity(entry.kind);
-      const text = `${entry.label} ${amount}/${capacity}`;
-      if (text !== entry.text) {
-        entry.text = text;
-        entry.element.textContent = text;
-      }
-      const full = amount >= capacity;
-      if (full !== entry.full) {
-        entry.full = full;
-        entry.element.classList.toggle('full', full);
-      }
+    this.show(this.peasants, peasantCountText(population), false);
+  }
+
+  private addSlot(icon: IconName, title: string): Slot {
+    const element = this.root.appendChild(document.createElement('span'));
+    element.className = 'slot';
+    element.title = title;
+    element.insertAdjacentHTML('beforeend', iconSvg(icon));
+    const value = element.appendChild(document.createElement('span'));
+    return { element, value, text: '', full: false };
+  }
+
+  private show(slot: Slot, text: string, full: boolean): void {
+    if (text !== slot.text) {
+      slot.text = text;
+      slot.value.textContent = text;
+    }
+    if (full !== slot.full) {
+      slot.full = full;
+      slot.element.classList.toggle('full', full);
     }
   }
 }

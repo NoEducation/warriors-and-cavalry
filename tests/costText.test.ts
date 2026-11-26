@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { NO_RESOURCES, resources } from '../src/sim/ResourceKind';
-import { costText, shortCostText, wallLineText } from '../src/ui/costText';
+import { NO_RESOURCES, ResourceKind, resources } from '../src/sim/ResourceKind';
+import { costParts, costText, wallLineText } from '../src/ui/costText';
 
 describe('costText', () => {
   it('lists every non-zero amount in resource order', () => {
@@ -17,11 +17,17 @@ describe('costText', () => {
   });
 });
 
-describe('shortCostText', () => {
-  it('abbreviates each non-zero amount to its first letter, or says free', () => {
-    expect(shortCostText(resources(50, 40, 0))).toBe('50w 40s');
-    expect(shortCostText(resources(0, 0, 3))).toBe('3f');
-    expect(shortCostText(NO_RESOURCES)).toBe('free');
+describe('costParts', () => {
+  it('lists every non-zero amount with its resource, in resource order', () => {
+    expect(costParts(resources(50, 40, 0))).toEqual([
+      { kind: ResourceKind.Wood, amount: 50 },
+      { kind: ResourceKind.Stone, amount: 40 },
+    ]);
+    expect(costParts(resources(0, 0, 3))).toEqual([{ kind: ResourceKind.Food, amount: 3 }]);
+  });
+
+  it('is empty when nothing is charged', () => {
+    expect(costParts(NO_RESOURCES)).toEqual([]);
   });
 });
 

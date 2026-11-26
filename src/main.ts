@@ -1,4 +1,5 @@
 // Entry point: finds the page elements, creates the Game and starts it.
+import './ui/ui.css';
 import { Game } from './game/Game';
 
 function showError(message: string): void {

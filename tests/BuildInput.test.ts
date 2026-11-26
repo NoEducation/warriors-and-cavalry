@@ -22,11 +22,15 @@ class FakeElement extends EventTarget {
   public title = '';
   public className = '';
   public type = '';
-  public readonly classList = { toggle: (): void => {}, contains: (): boolean => false };
+  public hidden = false;
+  public readonly childElementCount = 0;
+  public readonly classList = { add: (): void => {}, toggle: (): void => {}, contains: (): boolean => false };
 
   public appendChild<T>(child: T): T {
     return child;
   }
+
+  public insertAdjacentHTML(): void {}
 
   public blur(): void {}
 }
