@@ -11,6 +11,8 @@ import type { PopulationHost } from './PopulationHost';
 import type { ProductionOutput, ProductionState } from './Production';
 import { StoragePlaces } from './StoragePlaces';
 import { WoodcutterTrips } from './WoodcutterTrips';
+import type { WalkClass } from './walkRules';
+import { isWallWalkPiece, WallLookouts } from './WallLookouts';
 import { WorkerTrips } from './WorkerTrips';
 
 /** Population totals for the UI. */
@@ -29,17 +31,19 @@ export class Population {
   private readonly trips: WorkerTrips;
   private readonly woodcutters: WoodcutterTrips;
   private readonly stands: IdleStands;
+  private readonly lookouts: WallLookouts;
   private nextId = 1;
 
   /** Peasants living in `world`, paying for arrivals from `economy` and delivering their work into it. */
   public constructor(world: PopulationHost, economy: Economy) {
-    const isWalkable = (tx: number, ty: number): boolean => world.isWalkable(tx, ty);
-    const walker = new PeasantWalker(world.map.width, world.map.height, isWalkable);
+    const walkClass = (tx: number, ty: number): WalkClass => world.walkClass(tx, ty);
+    const walker = new PeasantWalker(world.map.width, world.map.height, walkClass);
     this.arrivals = new Arrivals(world, economy);
     this.stores = new StoragePlaces(world);
     this.woodcutters = new WoodcutterTrips(world, walker);
     this.trips = new WorkerTrips(world, this.stores, economy, this.jobs, walker, this.woodcutters);
-    this.stands = new IdleStands(world, walker, this.byId, () => this.arrivals.keep);
+    this.lookouts = new WallLookouts(world, walker);
+    this.stands = new IdleStands(world, walker, this.byId, () => this.arrivals.keep, this.lookouts);
   }
 
   /** Number of peasants. */
@@ -72,6 +76,8 @@ export class Population {
     this.arrivals.buildingAdded(object);
     this.jobs.buildingAdded(object);
     this.stores.buildingAdded(object);
+    this.lookouts.added(object);
+    if (isWallWalkPiece(object.kind)) this.stands.castleChanged(null);
   }
 
   /**
@@ -83,6 +89,8 @@ export class Population {
     const worker = this.jobs.buildingRemoved(object);
     if (worker) this.trips.stop(worker);
     this.stores.buildingRemoved(object);
+    this.lookouts.removed(object);
+    if (isWallWalkPiece(object.kind)) this.stands.castleChanged(object);
     this.leaveUntilHoused();
   }
 

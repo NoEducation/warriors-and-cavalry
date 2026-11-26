@@ -1,6 +1,7 @@
 // What render, UI and game code may read of a peasant, and the values it is described by.
 import type { ResourceKind } from './ResourceKind';
 import type { TileCoord } from './TileCoord';
+import type { WalkMode } from './walkRules';
 
 /** Every peasant state, in checksum order (a state's index is what the checksum covers). */
 export const PEASANT_STATES = Object.freeze(['idle', 'toWork', 'working', 'toStore', 'toWorkBack', 'toTree', 'chopping'] as const);
@@ -43,6 +44,8 @@ export interface PeasantView {
   /** The tiles of the current walk; `path[pathIndex]` is the next one to step onto. */
   readonly path: readonly TileCoord[];
   readonly pathIndex: number;
+  /** How its current walk may use the wall walk (see `WalkMode`). */
+  readonly walkMode: WalkMode;
   /** The tile near the Keep an idle peasant stands on or heads for; null when it has none. */
   readonly stand: TileCoord | null;
 }

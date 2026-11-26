@@ -22,6 +22,7 @@ export type IconName =
   | 'wall'
   | 'gate'
   | 'tower'
+  | 'stairs'
   | 'demolish';
 
 /** Each icon's inner SVG markup on a `0 0 16 16` view box. */
@@ -106,6 +107,11 @@ export const ICONS: Readonly<Record<IconName, string>> = Object.freeze({
     rect(3, 5, 10, 1, C.stoneDark) +
     rect(7.5, 7, 1, 3, C.dark) +
     rect(6, 12, 4, 3, C.woodDark),
+  stairs:
+    rect(10, 3, 5, 12, C.stone) +
+    crenels(10, 1, 2, C.stone) +
+    [0, 1, 2, 3].map((i) => rect(2 + i * 2, 13 - i * 3, 2, 2 + i * 3, i % 2 === 0 ? C.stoneLight : C.stone)).join('') +
+    rect(1, 14.25, 14, 0.75, C.stoneDark),
   demolish: HAMMER + line(2, 2, 7, 7, 2, C.red) + line(7, 2, 2, 7, 2, C.red),
 });
 

@@ -16,6 +16,16 @@ function flatWorld(): World {
 }
 
 describe('BuildingLayer', () => {
+  it('sets each building on an earth bank of its own', () => {
+    const world = flatWorld();
+    world.apply({ type: 'placeBuilding', kind: ObjectKind.Hovel, tx: 4, ty: 4 });
+    const layer = new BuildingLayer(world, new BuildingMeshFactory());
+    const [building] = layer.object.children;
+    const bank = building.children.find((child) => child instanceof THREE.Mesh && child.geometry.getAttribute('color'));
+    expect(bank).toBeDefined();
+    layer.dispose();
+  });
+
   it('follows buildings placed and demolished in the world', () => {
     const world = flatWorld();
     world.spawn(ObjectKind.Tree, 1, 1);

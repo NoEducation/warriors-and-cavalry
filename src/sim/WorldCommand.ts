@@ -3,7 +3,7 @@ import type { MapObject } from './MapObject';
 import type { ObjectKind } from './ObjectKind';
 
 /** Why an object cannot be placed at a position. */
-export type PlacementFailure = 'NotBuildable' | 'OutOfBounds' | 'BadTerrain' | 'Occupied' | 'TooSteep' | 'NeedsQuarryGround';
+export type PlacementFailure = 'NotBuildable' | 'OutOfBounds' | 'BadTerrain' | 'Occupied' | 'TooSteep' | 'NeedsQuarryGround' | 'NeedsWall';
 
 export type PlacementCheck = { readonly ok: true } | { readonly ok: false; readonly reason: PlacementFailure };
 
@@ -60,7 +60,8 @@ export type CommandResult = ObjectCommandSuccess | WallLineSuccess | CommandFail
 
 /** Delivered to World listeners for every object added or removed. */
 export interface WorldChange {
-  readonly type: 'added' | 'removed';
+  /** `chopped`: a round of wood was taken from the tree `object`, which still stands. */
+  readonly type: 'added' | 'removed' | 'chopped';
   readonly object: MapObject;
 }
 

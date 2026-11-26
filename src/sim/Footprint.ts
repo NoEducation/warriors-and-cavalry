@@ -31,6 +31,11 @@ export class Footprint {
   }
 
   /** Every tile of the footprint, row by row. */
+  /** True when tile (tx, ty) is one of the footprint's tiles. */
+  public covers(tx: number, ty: number): boolean {
+    return tx >= this.tx && ty >= this.ty && tx < this.tx + this.width && ty < this.ty + this.height;
+  }
+
   public *tiles(): Iterable<TileCoord> {
     for (let ty = this.ty; ty < this.ty + this.height; ty++) {
       for (let tx = this.tx; tx < this.tx + this.width; tx++) yield { tx, ty };

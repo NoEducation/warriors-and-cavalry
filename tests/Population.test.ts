@@ -52,6 +52,7 @@ describe('POPULATION_CONFIG', () => {
       straightStepTicks: 4,
       diagonalStepTicks: 6,
       stumpTicks: 600,
+      treeChops: 4,
     });
     expect(Object.isFrozen(POPULATION_CONFIG)).toBe(true);
   });

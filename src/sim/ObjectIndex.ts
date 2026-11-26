@@ -5,6 +5,7 @@ import type { MapObject } from './MapObject';
 import { ObjectKind } from './ObjectKind';
 import type { TileCoord } from './TileCoord';
 import { TileType } from './tiles';
+import { isGroundLevel, WalkClass } from './walkRules';
 
 export class ObjectIndex {
   /** Object id per tile (index ty*width+tx); 0 means free. */
@@ -39,13 +40,24 @@ export class ObjectIndex {
     return this.byId.values();
   }
 
-  /** Whether a walker may stand on tile (tx, ty): inside the map, not water, and free, a tree, a stump or a gate. */
+  /** Whether a walker on the ground may stand on tile (tx, ty): its walk class is Ground or Stairs. */
   public isWalkable(tx: number, ty: number): boolean {
+    return isGroundLevel(this.walkClass(tx, ty));
+  }
+
+  /**
+   * What tile (tx, ty) is to a walker: Blocked outside the map, on water and under most buildings; Ground when free or
+   * under a tree, stump or gate; Stairs under stairs; Top (the wall walk) under a wall or tower.
+   */
+  public walkClass(tx: number, ty: number): WalkClass {
     const tile = this.map.tileAt(tx, ty);
-    if (tile === undefined || tile === TileType.Water) return false;
-    const object = this.objectAt(tx, ty);
-    if (object === undefined) return true;
-    return object.kind === ObjectKind.Tree || object.kind === ObjectKind.Stump || object.kind === ObjectKind.Gate;
+    if (tile === undefined || tile === TileType.Water) return WalkClass.Blocked;
+    const kind = this.objectAt(tx, ty)?.kind;
+    if (kind === undefined || kind === ObjectKind.Tree || kind === ObjectKind.Stump || kind === ObjectKind.Gate) {
+      return WalkClass.Ground;
+    }
+    if (kind === ObjectKind.Stairs) return WalkClass.Stairs;
+    return kind === ObjectKind.Wall || kind === ObjectKind.Tower ? WalkClass.Top : WalkClass.Blocked;
   }
 
   /** The walkable tiles sharing an edge with object `objectId`, row by row; [] for an unknown id. */

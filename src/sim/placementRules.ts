@@ -1,7 +1,7 @@
 // The rules for where a building may stand: buildable kind, map bounds, quarry ground, terrain, free tiles, slope.
 import { Footprint } from './Footprint';
 import type { GameMap } from './GameMap';
-import { OBJECT_KINDS, type ObjectKind, type ObjectKindInfo } from './ObjectKind';
+import { OBJECT_KINDS, ObjectKind, type ObjectKindInfo } from './ObjectKind';
 import { TileType } from './tiles';
 import type { PlacementCheck } from './WorldCommand';
 
@@ -17,8 +17,9 @@ const SLOPE_TOLERANCE = 1e-5;
 
 /**
  * Whether a building of `kind` may stand with its footprint starting at (tx, ty) on `map`, where `isFree` says
- * whether an in-bounds footprint is unoccupied. Checks, first failure wins: NotBuildable (also for an unknown kind),
- * OutOfBounds, NeedsQuarryGround (quarry-only kinds), BadTerrain, Occupied, TooSteep. Does not look at resources.
+ * whether an in-bounds footprint is unoccupied and `kindAt` what kind of object covers a tile. Checks, first failure
+ * wins: NotBuildable (also for an unknown kind), OutOfBounds, NeedsQuarryGround (quarry-only kinds), BadTerrain,
+ * Occupied, NeedsWall (kinds that lean on a wall), TooSteep. Does not look at resources.
  */
 export function checkPlacement(
   map: GameMap,
@@ -26,6 +27,7 @@ export function checkPlacement(
   tx: number,
   ty: number,
   isFree: (footprint: Footprint) => boolean,
+  kindAt: (tx: number, ty: number) => ObjectKind | undefined,
 ): PlacementCheck {
   const info: ObjectKindInfo | undefined = OBJECT_KINDS[kind];
   if (!info?.buildable) return { ok: false, reason: 'NotBuildable' };
@@ -34,6 +36,7 @@ export function checkPlacement(
   if (info.quarryOnly && !allQuarryGround(map, footprint)) return { ok: false, reason: 'NeedsQuarryGround' };
   if (!info.quarryOnly && !terrainAllows(map, info, footprint)) return { ok: false, reason: 'BadTerrain' };
   if (!isFree(footprint)) return { ok: false, reason: 'Occupied' };
+  if (info.needsWall && !besideWall(footprint, kindAt)) return { ok: false, reason: 'NeedsWall' };
   const range = footprint.cornerHeightRange(map);
   const limit = Math.max(PLACEMENT_CONFIG.minSlopeLimit, PLACEMENT_CONFIG.slopePerTile * Math.max(info.width, info.height));
   if (!range || range.max - range.min > limit + SLOPE_TOLERANCE) return { ok: false, reason: 'TooSteep' };
@@ -60,4 +63,13 @@ function allQuarryGround(map: GameMap, footprint: Footprint): boolean {
     if (map.tileAt(tile.tx, tile.ty) !== TileType.Quarry) return false;
   }
   return true;
+}
+
+/** True when a tile sharing an edge with the footprint is covered by a Wall or Tower. */
+function besideWall(footprint: Footprint, kindAt: (tx: number, ty: number) => ObjectKind | undefined): boolean {
+  for (const tile of footprint.edgeNeighbours()) {
+    const kind = kindAt(tile.tx, tile.ty);
+    if (kind === ObjectKind.Wall || kind === ObjectKind.Tower) return true;
+  }
+  return false;
 }

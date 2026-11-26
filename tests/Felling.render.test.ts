@@ -31,7 +31,7 @@ function camp(): World {
 
 function tickUntilFelled(world: World): void {
   for (let n = 0; world.objectAt(24, 7)?.kind !== ObjectKind.Stump; n++) {
-    if (n > 3000) throw new Error('never felled');
+    if (n > 8000) throw new Error('never felled');
     world.tick();
   }
 }
@@ -59,8 +59,39 @@ function matrixOf({ mesh, index }: { mesh: THREE.InstancedMesh; index: number })
 
 const tilt = (m: THREE.Matrix4): number => new THREE.Vector3(0, 1, 0).transformDirection(m).angleTo(new THREE.Vector3(0, 1, 0));
 const scaleOf = (m: THREE.Matrix4): number => new THREE.Vector3().setFromMatrixScale(m).length();
+const widthOf = (m: THREE.Matrix4): number => new THREE.Vector3().setFromMatrixScale(m).x;
+
+function tickUntilChops(world: World, treeId: number, chops: number): void {
+  for (let n = 0; world.treeChopsTaken(treeId) !== chops; n++) {
+    if (n > 8000) throw new Error('never chopped');
+    world.tick();
+  }
+}
 
 describe('felling, as drawn', () => {
+  it('draws a chopped tree, and its shadow, smaller after each round', () => {
+    const world = camp();
+    const trees = new TreeLayer(world);
+    const shadows = new TreeShadowLayer(world);
+    const tree = instanceNear(trees.object, 24.5, 7.5);
+    const shadow = instanceNear(shadows.object, 24.5, 7.5);
+    const full = widthOf(matrixOf(tree));
+    const fullShadow = widthOf(matrixOf(shadow));
+    const treeId = world.objectAt(24, 7)!.id;
+    tickUntilChops(world, treeId, 1);
+    trees.update(world, 0);
+    shadows.update(world);
+    expect(widthOf(matrixOf(tree))).toBeCloseTo(full * 0.85, 5);
+    expect(widthOf(matrixOf(shadow))).toBeCloseTo(fullShadow * 0.85, 5);
+    tickUntilChops(world, treeId, 3);
+    trees.update(world, 0);
+    shadows.update(world);
+    expect(widthOf(matrixOf(tree))).toBeCloseTo(full * 0.55, 5);
+    expect(widthOf(matrixOf(shadow))).toBeCloseTo(fullShadow * 0.55, 5);
+    trees.dispose();
+    shadows.dispose();
+  });
+
   it('tips a felled tree over and sinks it, then hides it; the other tree stays', () => {
     const world = camp();
     const layer = new TreeLayer(world);
@@ -86,7 +117,7 @@ describe('felling, as drawn', () => {
     const layer = new TreeShadowLayer(world);
     const slot = instanceNear(layer.object, 24.5, 7.5);
     tickUntilFelled(world);
-    layer.update();
+    layer.update(world);
     expect(scaleOf(matrixOf(slot))).toBe(0);
     layer.dispose();
   });

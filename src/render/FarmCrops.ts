@@ -53,7 +53,7 @@ export class FarmCrops implements WorldLayer {
   public update(world: World): void {
     this.changes.drain((change) => {
       if (change.type === 'added') this.add(world, change.object);
-      else this.remove(change.object.id);
+      else if (change.type === 'removed') this.remove(change.object.id);
     });
     for (const [id, crop] of this.crops) {
       const progress = world.productionProgress(id);

@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { Peasant } from '../src/sim/Peasant';
 import { PeasantWalker } from '../src/sim/PeasantWalker';
 import type { TileCoord } from '../src/sim/TileCoord';
+import { WalkClass } from '../src/sim/walkRules';
 
 const SIZE = 16;
 
 /** A walker on an open 16 x 16 map whose `blocked` tiles are not walkable, and a peasant standing on (0, 4). */
 function setup(): { walker: PeasantWalker; blocked: Set<number>; peasant: Peasant } {
   const blocked = new Set<number>();
-  const isWalkable = (tx: number, ty: number): boolean =>
-    tx >= 0 && ty >= 0 && tx < SIZE && ty < SIZE && !blocked.has(ty * SIZE + tx);
-  return { walker: new PeasantWalker(SIZE, SIZE, isWalkable), blocked, peasant: new Peasant(1, 0, 4) };
+  const walkClass = (tx: number, ty: number): WalkClass =>
+    tx >= 0 && ty >= 0 && tx < SIZE && ty < SIZE && !blocked.has(ty * SIZE + tx) ? WalkClass.Ground : WalkClass.Blocked;
+  return { walker: new PeasantWalker(SIZE, SIZE, walkClass), blocked, peasant: new Peasant(1, 0, 4) };
 }
 
 function ticks(walker: PeasantWalker, peasant: Peasant, n: number): void {

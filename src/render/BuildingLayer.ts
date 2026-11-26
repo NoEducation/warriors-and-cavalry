@@ -1,12 +1,14 @@
-// Meshes for every building in a world, kept in step with the world's changes.
+// Meshes for every building in a world, each on its earth bank, kept in step with the world's changes.
 import * as THREE from 'three';
 import type { MapObject } from '../sim/MapObject';
 import { OBJECT_KINDS, ObjectKind } from '../sim/ObjectKind';
 import type { World } from '../sim/World';
 import type { BuildingMeshFactory } from './BuildingMeshFactory';
+import { bankMesh } from './buildingBank';
 import { disposeObject } from './disposeObject';
 import { floorHeight } from './floorHeight';
 import { gatePassage } from './gatePassage';
+import { stairsFacing } from './stairsFacing';
 import { WorldChangeQueue } from './WorldChangeQueue';
 import type { WorldLayer } from './WorldLayer';
 
@@ -34,7 +36,7 @@ export class BuildingLayer implements WorldLayer {
   public update(world: World): void {
     this.changes.drain((change) => {
       if (change.type === 'added') this.add(world, change.object);
-      else this.remove(change.object);
+      else if (change.type === 'removed') this.remove(change.object);
     });
   }
 
@@ -52,10 +54,14 @@ export class BuildingLayer implements WorldLayer {
   private add(world: World, object: MapObject): void {
     const info = OBJECT_KINDS[object.kind];
     if (!info.buildable) return;
-    // A gate's passage is decided once, when its mesh is made.
+    // A gate's passage and a stair's facing are decided once, when the mesh is made.
     const passage = object.kind === ObjectKind.Gate ? gatePassage(world, object.tx, object.ty) : undefined;
-    const mesh = this.factory.create(object.kind, passage);
-    mesh.position.set(object.tx, floorHeight(world.map, object.kind, object.tx, object.ty), object.ty);
+    const facing = object.kind === ObjectKind.Stairs ? stairsFacing(world, object.tx, object.ty) : undefined;
+    const mesh = this.factory.create(object.kind, passage, facing);
+    const floor = floorHeight(world.map, object.kind, object.tx, object.ty);
+    mesh.position.set(object.tx, floor, object.ty);
+    // The earth bank is a child, so it moves and is disposed with the building.
+    mesh.add(bankMesh(world.map, object.kind, object.tx, object.ty, floor));
     this.meshes.set(object.id, mesh);
     this.object.add(mesh);
   }

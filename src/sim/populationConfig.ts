@@ -18,4 +18,6 @@ export const POPULATION_CONFIG = Object.freeze({
   diagonalStepTicks: 6,
   /** Ticks a felled tree's stump stands before it is cleared away. */
   stumpTicks: 600,
+  /** Rounds of wood (one woodcutter batch each) a tree gives; it falls on the last. */
+  treeChops: 4,
 });
