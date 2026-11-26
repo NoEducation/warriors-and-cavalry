@@ -16,4 +16,6 @@ export const POPULATION_CONFIG = Object.freeze({
   straightStepTicks: 4,
   /** Ticks for one step to a diagonal neighbour. */
   diagonalStepTicks: 6,
+  /** Ticks a felled tree's stump stands before it is cleared away. */
+  stumpTicks: 600,
 });

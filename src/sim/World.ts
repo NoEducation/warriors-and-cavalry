@@ -9,6 +9,7 @@ import { ObjectLifecycle } from './ObjectLifecycle';
 import type { PeasantView } from './PeasantView';
 import { Population, type PopulationSummary } from './Population';
 import { Production, type ProductionState } from './Production';
+import { Stumps } from './Stumps';
 import type { TileCoord } from './TileCoord';
 import { WallBuilder, type WallLinePreview } from './WallBuilder';
 import {
@@ -27,6 +28,7 @@ export class World {
   private readonly populace: Population;
   private readonly lifecycle: ObjectLifecycle;
   private readonly walls: WallBuilder;
+  private readonly stumps = new Stumps();
   private ticks = 0;
 
   /** Creates a world with no objects on `map`, holding `economyState` (by default the usual start amounts). */
@@ -34,8 +36,9 @@ export class World {
     this.index = new ObjectIndex(map);
     this.production = new Production(map, economyState, (tx, ty) => this.objectAt(tx, ty)?.kind === ObjectKind.Tree);
     this.populace = new Population(this, economyState);
-    const { index, production, populace: population, listeners } = this;
-    this.lifecycle = new ObjectLifecycle(map, { index, economy: economyState, production, population, listeners });
+    const { index, production, populace: population, stumps, listeners } = this;
+    const followers = { index, economy: economyState, production, population, stumps, listeners };
+    this.lifecycle = new ObjectLifecycle(map, followers);
     this.walls = new WallBuilder(this.lifecycle, economyState);
   }
 
@@ -49,11 +52,23 @@ export class World {
     return this.ticks;
   }
 
-  /** Advances the world by one simulation tick: peasants, then production, whose batches the workers pick up. */
+  /**
+   * Advances the world by one simulation tick: peasants, then production, whose batches the workers pick up, then
+   * stumps whose time is up are cleared away.
+   */
   public tick(): void {
     this.ticks++;
     this.populace.tick();
     this.populace.collect(this.production.tick((id) => this.populace.isWorking(id)));
+    for (const id of this.stumps.tick()) {
+      const stump = this.index.objectById(id);
+      if (stump) this.lifecycle.remove(stump);
+    }
+  }
+
+  /** Ticks before the stump `objectId` is cleared away; 0 when it is not a stump. */
+  public stumpTicksLeft(objectId: number): number {
+    return this.stumps.ticksLeft(objectId);
   }
 
   /** All peasants in ascending id order. */

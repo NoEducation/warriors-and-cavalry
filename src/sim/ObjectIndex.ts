@@ -39,12 +39,13 @@ export class ObjectIndex {
     return this.byId.values();
   }
 
-  /** Whether a walker may stand on tile (tx, ty): inside the map, not water, and free, a tree or a gate. */
+  /** Whether a walker may stand on tile (tx, ty): inside the map, not water, and free, a tree, a stump or a gate. */
   public isWalkable(tx: number, ty: number): boolean {
     const tile = this.map.tileAt(tx, ty);
     if (tile === undefined || tile === TileType.Water) return false;
     const object = this.objectAt(tx, ty);
-    return object === undefined || object.kind === ObjectKind.Tree || object.kind === ObjectKind.Gate;
+    if (object === undefined) return true;
+    return object.kind === ObjectKind.Tree || object.kind === ObjectKind.Stump || object.kind === ObjectKind.Gate;
   }
 
   /** The walkable tiles sharing an edge with object `objectId`, row by row; [] for an unknown id. */

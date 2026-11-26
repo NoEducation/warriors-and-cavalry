@@ -51,6 +51,7 @@ describe('POPULATION_CONFIG', () => {
       unreachableSkipTicks: 200,
       straightStepTicks: 4,
       diagonalStepTicks: 6,
+      stumpTicks: 600,
     });
     expect(Object.isFrozen(POPULATION_CONFIG)).toBe(true);
   });

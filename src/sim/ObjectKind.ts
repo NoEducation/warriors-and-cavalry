@@ -13,6 +13,7 @@ export const ObjectKind = {
   Wall: 9,
   Gate: 10,
   Tower: 11,
+  Stump: 12,
 } as const;
 export type ObjectKind = (typeof ObjectKind)[keyof typeof ObjectKind];
 
@@ -139,4 +140,5 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   [ObjectKind.Wall]: { ...CASTLE, name: 'Wall', width: 1, height: 1, cost: resources(0, 2, 0) },
   [ObjectKind.Gate]: { ...CASTLE, name: 'Gate', width: 1, height: 1, cost: resources(0, 6, 0) },
   [ObjectKind.Tower]: { ...CASTLE, name: 'Tower', width: 2, height: 2, cost: resources(0, 20, 0) },
+  [ObjectKind.Stump]: { ...PLAIN, name: 'Stump', width: 1, height: 1, buildable: false, cost: NO_RESOURCES },
 });

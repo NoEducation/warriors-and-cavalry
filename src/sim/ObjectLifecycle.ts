@@ -10,6 +10,7 @@ import type { ObjectIndex } from './ObjectIndex';
 import { checkPlacement } from './placementRules';
 import type { Population } from './Population';
 import type { Production } from './Production';
+import type { Stumps } from './Stumps';
 import type { WallSite } from './WallBuilder';
 import type { ObjectCommandResult, PlacementCheck, WorldChange } from './WorldCommand';
 
@@ -19,6 +20,7 @@ export interface ObjectFollowers {
   readonly economy: Economy;
   readonly production: Production;
   readonly population: Population;
+  readonly stumps: Stumps;
   readonly listeners: Listeners<WorldChange>;
 }
 
@@ -46,19 +48,16 @@ export class ObjectLifecycle implements WallSite {
 
   /** Removes a building, then refunds part of its cost into the capacity that remains. Call for `demolish`. */
   public demolish(objectId: number): ObjectCommandResult {
-    const { index, economy, production, population, listeners } = this.parts;
-    const object = index.objectById(objectId);
+    const object = this.parts.index.objectById(objectId);
     if (!object) return { ok: false, reason: 'UnknownObject' };
-    const info = OBJECT_KINDS[object.kind];
-    if (!info.buildable) return { ok: false, reason: 'NotDemolishable' };
-    // Fixed order: occupancy -> capacity (and refund) -> production -> population -> listeners (who see the end state).
-    index.remove(object);
-    economy.removeCapacity(info.storage);
-    economy.refund(info.cost);
-    production.removed(object);
-    population.buildingRemoved(object);
-    listeners.notify({ type: 'removed', object });
+    if (!OBJECT_KINDS[object.kind].buildable) return { ok: false, reason: 'NotDemolishable' };
+    this.detach(object, true);
     return { ok: true, object };
+  }
+
+  /** Removes `object` without any rule or refund: a felled tree, a cleared stump. Call from `World.tick` only. */
+  public remove(object: MapObject): void {
+    this.detach(object, false);
   }
 
   /** Adds an object without building rules or cost; see `World.spawn`. Throws a RangeError where it cannot stand. */
@@ -74,14 +73,31 @@ export class ObjectLifecycle implements WallSite {
    * and pays nothing: the callers have done both, or (the map generator) skip them on purpose.
    */
   public add(kind: ObjectKind, tx: number, ty: number): MapObject {
-    const { index, economy, production, population, listeners } = this.parts;
+    const { index, economy, production, population, stumps, listeners } = this.parts;
     const object: MapObject = Object.freeze({ id: this.nextId++, kind, tx, ty });
-    // Fixed order: occupancy -> capacity -> production -> population -> listeners (who see the end state).
+    // Fixed order: occupancy -> capacity -> production -> population -> stumps -> listeners (who see the end state).
     index.insert(object);
     economy.addCapacity(OBJECT_KINDS[kind].storage);
     production.added(object);
     population.buildingAdded(object);
+    stumps.added(object);
     listeners.notify({ type: 'added', object });
     return object;
+  }
+
+  /**
+   * Fixed order: occupancy -> capacity (and, with `refund`, half the cost back) -> production -> population ->
+   * stumps -> listeners (who see the end state).
+   */
+  private detach(object: MapObject, refund: boolean): void {
+    const { index, economy, production, population, stumps, listeners } = this.parts;
+    const info = OBJECT_KINDS[object.kind];
+    index.remove(object);
+    economy.removeCapacity(info.storage);
+    if (refund) economy.refund(info.cost);
+    production.removed(object);
+    population.buildingRemoved(object);
+    stumps.removed(object);
+    listeners.notify({ type: 'removed', object });
   }
 }
