@@ -10,6 +10,7 @@ import { PeasantWalker } from './PeasantWalker';
 import type { PopulationHost } from './PopulationHost';
 import type { ProductionOutput, ProductionState } from './Production';
 import { StoragePlaces } from './StoragePlaces';
+import { WoodcutterTrips } from './WoodcutterTrips';
 import { WorkerTrips } from './WorkerTrips';
 
 /** Population totals for the UI. */
@@ -26,6 +27,7 @@ export class Population {
   private readonly jobs = new Jobs();
   private readonly stores: StoragePlaces;
   private readonly trips: WorkerTrips;
+  private readonly woodcutters: WoodcutterTrips;
   private readonly stands: IdleStands;
   private nextId = 1;
 
@@ -35,7 +37,8 @@ export class Population {
     const walker = new PeasantWalker(world.map.width, world.map.height, isWalkable);
     this.arrivals = new Arrivals(world, economy);
     this.stores = new StoragePlaces(world);
-    this.trips = new WorkerTrips(world, this.stores, economy, this.jobs, walker);
+    this.woodcutters = new WoodcutterTrips(world, walker);
+    this.trips = new WorkerTrips(world, this.stores, economy, this.jobs, walker, this.woodcutters);
     this.stands = new IdleStands(world, walker, this.byId, () => this.arrivals.keep);
   }
 
@@ -108,7 +111,7 @@ export class Population {
   public isWorking(buildingId: number): boolean {
     const worker = this.jobs.worker(buildingId);
     if (!worker) return false;
-    return worker.state === 'chopping' || (worker.state === 'working' && !this.trips.isWoodcutter(worker));
+    return worker.state === 'chopping' || (worker.state === 'working' && !this.woodcutters.isWoodcutter(worker));
   }
 
   /**
@@ -134,7 +137,7 @@ export class Population {
     if (!own) return null;
     const worker = this.jobs.worker(buildingId);
     if (worker && this.trips.isStranded(worker)) return { ...own, status: 'workerCannotReach' };
-    if (worker?.state === 'working' && this.trips.isWoodcutter(worker)) return { ...own, status: 'noTrees' };
+    if (worker?.state === 'working' && this.woodcutters.isWoodcutter(worker)) return { ...own, status: 'noTrees' };
     return { ...own, status: this.jobs.status(buildingId, own.status) };
   }
 

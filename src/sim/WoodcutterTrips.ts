@@ -4,15 +4,9 @@ import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import { PATH_CONFIG } from './pathConfig';
 import type { Peasant } from './Peasant';
 import type { PeasantWalker } from './PeasantWalker';
+import { type PathTarget, targetAtWalkEnd, targetTiles } from './pathTargets';
 import type { PopulationHost } from './PopulationHost';
-import type { TileCoord } from './TileCoord';
 import { TreeClaims } from './TreeClaims';
-
-/** A tree a woodcutter may pick and the walkable tiles it can chop it from. */
-interface Candidate {
-  readonly id: number;
-  readonly tiles: readonly TileCoord[];
-}
 
 /** What picking a tree came to: heading for one, none free in reach, or free ones none of which it can reach. */
 type PickResult = 'heading' | 'none' | 'unreachable';
@@ -33,25 +27,45 @@ export class WoodcutterTrips {
   }
 
   /**
-   * `p` stands at its hut: heads for the nearest free tree in reach, or waits there when there is none. False when
-   * free trees exist but none can be reached (the caller gives the job up).
+   * `p` has reached its workplace: starts working there, or (a woodcutter) heads for the nearest free tree in reach.
+   * False when it is a woodcutter whose free trees are all out of reach (the caller gives the job up).
    */
-  public atHut(p: Peasant): boolean {
+  public arriveAtWork(p: Peasant): boolean {
+    if (this.isWoodcutter(p)) return this.atHut(p);
+    p.startWorking();
+    return true;
+  }
+
+  /**
+   * One tick of a woodcutter's own part of its trip: walking to its tree, or waiting at the hut for a free one. Other
+   * workers and states are left alone. False when it can no longer pick a tree (the caller gives the job up).
+   */
+  public tick(p: Peasant): boolean {
+    if (p.state === 'toTree') return this.tickToTree(p);
+    if (p.state === 'working' && p.waitTicks > 0) return this.tickWaiting(p);
+    return true;
+  }
+
+  /**
+   * `p` stands at its hut: heads for the nearest free tree in reach, or waits there when there is none. False when
+   * free trees exist but none can be reached.
+   */
+  private atHut(p: Peasant): boolean {
     const result = this.pickTree(p);
     if (result === 'none') p.waitAtWork();
     return result !== 'unreachable';
   }
 
   /** One tick of a wait at the hut; when it ends, looks for a tree again. False as for `atHut`. */
-  public tickWaiting(p: Peasant): boolean {
+  private tickWaiting(p: Peasant): boolean {
     return !p.countDownWait() || this.atHut(p);
   }
 
   /**
    * One tick of walking to its tree: picks again when the tree is gone or the way is blocked, starts chopping on
-   * arrival. False when no tree can be picked any more (the caller gives the job up).
+   * arrival. False when no tree can be picked any more.
    */
-  public tickToTree(p: Peasant): boolean {
+  private tickToTree(p: Peasant): boolean {
     const tree = p.treeId === null ? undefined : this.world.objectById(p.treeId);
     if ((tree?.kind !== ObjectKind.Tree || this.walker.isNextStepBlocked(p)) && this.pickTree(p) !== 'heading') {
       return false;
@@ -80,11 +94,8 @@ export class WoodcutterTrips {
     this.release(p);
     const candidates = this.candidates(p.workplaceId);
     if (candidates.length === 0) return 'none';
-    const goals: TileCoord[] = [];
-    for (const candidate of candidates) goals.push(...candidate.tiles);
-    if (!this.walker.walkTo(p, goals, PATH_CONFIG.treeSearchMaxExpanded)) return 'unreachable';
-    const end = p.path.length > 0 ? p.path[p.path.length - 1] : { tx: p.nextTx, ty: p.nextTy };
-    const tree = candidates.find(({ tiles }) => tiles.some((t) => t.tx === end.tx && t.ty === end.ty));
+    if (!this.walker.walkTo(p, targetTiles(candidates), PATH_CONFIG.treeSearchMaxExpanded)) return 'unreachable';
+    const tree = targetAtWalkEnd(p, candidates);
     if (!tree) return 'unreachable';
     this.claims.claim(tree.id, p.id);
     p.headToTree(tree.id);
@@ -92,13 +103,13 @@ export class WoodcutterTrips {
   }
 
   /** The unclaimed trees within the tree radius of hut `hutId` (Chebyshev from its footprint), row by row. */
-  private candidates(hutId: number | null): Candidate[] {
+  private candidates(hutId: number | null): PathTarget[] {
     const hut = hutId === null ? undefined : this.world.objectById(hutId);
     const info = hut ? OBJECT_KINDS[hut.kind] : undefined;
     const r = info?.production?.treeRadius;
     if (!hut || !info || r == null) return [];
     const { map } = this.world;
-    const found: Candidate[] = [];
+    const found: PathTarget[] = [];
     for (let ty = Math.max(0, hut.ty - r); ty <= Math.min(map.height - 1, hut.ty + info.height - 1 + r); ty++) {
       for (let tx = Math.max(0, hut.tx - r); tx <= Math.min(map.width - 1, hut.tx + info.width - 1 + r); tx++) {
         const object = this.world.objectAt(tx, ty);

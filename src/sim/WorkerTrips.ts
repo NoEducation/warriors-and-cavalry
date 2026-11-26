@@ -2,21 +2,19 @@
 // woodcutter's walks to its trees are `WoodcutterTrips`' part.
 import type { Economy } from './Economy';
 import type { Jobs } from './Jobs';
-
 import type { Peasant } from './Peasant';
 import type { PeasantWalker } from './PeasantWalker';
 import type { Load } from './PeasantView';
 import type { PopulationHost } from './PopulationHost';
+import { targetAtWalkEnd, targetTiles } from './pathTargets';
 import type { StoragePlaces } from './StoragePlaces';
-import type { TileCoord } from './TileCoord';
-import { WoodcutterTrips } from './WoodcutterTrips';
+import type { WoodcutterTrips } from './WoodcutterTrips';
 
 export class WorkerTrips {
-  private readonly woodcutters: WoodcutterTrips;
-
   /**
    * Trips in `world` to the storage places `stores`, delivering into `economy`; `jobs` is told when a worker
-   * gives its job up. A carrier whose target storage place is removed re-targets on its next tick.
+   * gives its job up, and `woodcutters` takes the woodcutters' walks to their trees. A carrier whose target storage
+   * place is removed re-targets on its next tick.
    */
   public constructor(
     private readonly world: PopulationHost,
@@ -24,14 +22,8 @@ export class WorkerTrips {
     private readonly economy: Economy,
     private readonly jobs: Jobs,
     private readonly walker: PeasantWalker,
-  ) {
-    this.woodcutters = new WoodcutterTrips(world, walker);
-  }
-
-  /** True when `p` works at a building that needs trees (a woodcutter's hut). */
-  public isWoodcutter(p: Peasant): boolean {
-    return this.woodcutters.isWoodcutter(p);
-  }
+    private readonly woodcutters: WoodcutterTrips,
+  ) {}
 
   /** Gives the idle `p` the vacant job at `buildingId` and sends it there; with no path it gives the job up. */
   public startWork(p: Peasant, buildingId: number): void {
@@ -76,10 +68,8 @@ export class WorkerTrips {
       case 'chopping': // production hands it the wood when the tree falls (see `carry`)
         break;
       case 'working': // stands at work (production hands it each batch), or a woodcutter waits for a free tree
-        if (p.waitTicks > 0 && !this.woodcutters.tickWaiting(p)) this.giveUpJob(p);
-        break;
       case 'toTree':
-        if (!this.woodcutters.tickToTree(p)) this.giveUpJob(p);
+        if (!this.woodcutters.tick(p)) this.giveUpJob(p);
         break;
       case 'toWork':
       case 'toWorkBack':
@@ -99,13 +89,8 @@ export class WorkerTrips {
     }
     this.walker.tick(p);
     if (!this.isWalkDone(p)) return;
-    if (!this.isAt(p, p.workplaceId)) {
-      if (!this.planWorkWalk(p)) this.giveUpJob(p);
-    } else if (!this.woodcutters.isWoodcutter(p)) {
-      p.startWorking();
-    } else if (!this.woodcutters.atHut(p)) {
-      this.giveUpJob(p);
-    }
+    const arrived = this.isAt(p, p.workplaceId);
+    if (!(arrived ? this.woodcutters.arriveAtWork(p) : this.planWorkWalk(p))) this.giveUpJob(p);
   }
 
   /** Carrying a load: waits out a failed search, re-routes when needed, delivers on arrival. */
@@ -157,16 +142,9 @@ export class WorkerTrips {
    */
   private planDelivery(p: Peasant): void {
     const candidates = p.load ? this.stores.candidatesFor(p.load.resource) : [];
-    const goals: TileCoord[] = [];
-    for (const candidate of candidates) goals.push(...candidate.tiles);
     p.setTarget(null);
-    if (!this.walker.walkTo(p, goals)) {
-      p.waitToRetry();
-      return;
-    }
-    const end = p.path.length > 0 ? p.path[p.path.length - 1] : { tx: p.nextTx, ty: p.nextTy };
-    const target = candidates.find(({ tiles }) => tiles.some((t) => t.tx === end.tx && t.ty === end.ty));
-    p.setTarget(target ? target.id : null);
+    if (this.walker.walkTo(p, targetTiles(candidates))) p.setTarget(targetAtWalkEnd(p, candidates)?.id ?? null);
+    else p.waitToRetry();
   }
 
   /** True when `p` stands on an access tile of the building `objectId`. */
