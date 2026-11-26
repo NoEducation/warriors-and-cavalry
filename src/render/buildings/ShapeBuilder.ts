@@ -9,6 +9,7 @@ import {
   FOUNDATION_LIFT,
   SHAPE_COLORS,
 } from './shapeParts';
+import { shadeVariant } from './shadeVariant';
 
 /** The attributes every part keeps; merging needs the same set on every part. */
 const KEPT_ATTRIBUTES: readonly string[] = ['position', 'normal'];
@@ -35,6 +36,18 @@ export class ShapeBuilder {
   /** Adds a box filling `spec`, painted in `color`. Returns this builder. */
   public addBox(spec: BoxSpec, color: number): this {
     return this.add(boxGeometry(spec), color);
+  }
+
+  /**
+   * Adds `spec` split into `courses` equal horizontal bands, each a slightly different shade of `color` (fixed by
+   * `salt`), so masonry reads as courses of stone. Returns this builder.
+   */
+  public addCourses(spec: BoxSpec, color: number, courses: number, salt: number): this {
+    const step = (spec.y1 - spec.y0) / courses;
+    for (let i = 0; i < courses; i++) {
+      this.addBox({ ...spec, y0: spec.y0 + i * step, y1: spec.y0 + (i + 1) * step }, shadeVariant(color, salt, i));
+    }
+    return this;
   }
 
   /**

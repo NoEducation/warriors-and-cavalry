@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { SHORE_LOOK_CONFIG, sandColor, seabedColor } from '../src/render/shoreColor';
+import { beachGrassBlend, SHORE_LOOK_CONFIG, sandColor, seabedColor } from '../src/render/shoreColor';
 import { GameMap } from '../src/sim/GameMap';
 
 function flat(height: number, size = 40): GameMap {
@@ -40,5 +40,25 @@ describe('seabedColor', () => {
     const shallow = seabedColor(flat(-0.2), 10, 10, new THREE.Color());
     const deep = seabedColor(flat(-5), 10, 10, new THREE.Color());
     expect(brightness(deep)).toBeLessThan(brightness(shallow) * 0.6);
+  });
+});
+
+describe('beachGrassBlend', () => {
+  it('is pure beach low on the shore and pure grass above it', () => {
+    expect(beachGrassBlend(flat(0.05), 10, 10)).toBe(0);
+    expect(beachGrassBlend(flat(1.2), 10, 10)).toBe(1);
+  });
+
+  it('wobbles the edge with noise, so one height mixes differently across the map', () => {
+    const map = flat(0.5);
+    const values: number[] = [];
+    for (let cy = 0; cy <= 40; cy++) for (let cx = 0; cx <= 40; cx++) values.push(beachGrassBlend(map, cx, cy));
+    expect(values.some((v) => v > 0 && v < 1)).toBe(true);
+    expect(new Set(values.map((v) => Math.round(v * 100))).size).toBeGreaterThan(5);
+  });
+
+  it('gives the same value for the same corner', () => {
+    const map = flat(0.5);
+    expect(beachGrassBlend(map, 7, 3)).toBe(beachGrassBlend(map, 7, 3));
   });
 });

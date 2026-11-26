@@ -1,11 +1,20 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { BuildingMeshFactory } from '../src/render/BuildingMeshFactory';
+import { StockpileShape } from '../src/render/buildings/StockpileShape';
+import { WheatFarmShape } from '../src/render/buildings/WheatFarmShape';
 import { OBJECT_KINDS, ObjectKind } from '../src/sim/ObjectKind';
 
 /** Float32 rounding slack for shapes that fill their footprint exactly (walls and gates). */
 const EPSILON = 1e-6;
 const BUILDABLE_KINDS = Object.values(ObjectKind).filter((kind) => OBJECT_KINDS[kind].buildable);
+
+/** Most triangles a building may have: walls get built by the hundred, so they stay lean. */
+function triangleBudget(kind: ObjectKind): number {
+  if (kind === ObjectKind.Wall) return 150;
+  if (kind === ObjectKind.Gate) return 400;
+  return 1500;
+}
 
 function meshCount(group: THREE.Object3D): number {
   let count = 0;
@@ -42,12 +51,12 @@ describe('BuildingMeshFactory', () => {
     expect(BUILDABLE_KINDS).toHaveLength(10);
   });
 
-  it('creates a non-empty, low-poly group within the footprint for every buildable kind', () => {
+  it('creates a non-empty group within its triangle budget and within the footprint for every buildable kind', () => {
     for (const kind of BUILDABLE_KINDS) {
       const info = OBJECT_KINDS[kind];
       const group = factory.create(kind);
       expect(meshCount(group), info.name).toBeGreaterThan(0);
-      expect(triangleCount(group), info.name).toBeLessThan(150);
+      expect(triangleCount(group), info.name).toBeLessThanOrEqual(triangleBudget(kind));
       const box = new THREE.Box3().setFromObject(group);
       expect(box.min.x, info.name).toBeGreaterThanOrEqual(-EPSILON);
       expect(box.min.z, info.name).toBeGreaterThanOrEqual(-EPSILON);
@@ -127,5 +136,51 @@ describe('BuildingMeshFactory', () => {
     const granary = size(ObjectKind.Granary);
     expect(farm.x).toBeGreaterThan(granary.x);
     expect(farm.z).toBeGreaterThan(granary.z);
+  });
+});
+
+/** Fewest triangles each building must have, so none stays a handful of plain boxes. */
+const DETAIL_FLOOR: ReadonlyArray<readonly [ObjectKind, number]> = [
+  [ObjectKind.Hovel, 300],
+  [ObjectKind.WoodcutterHut, 300],
+  [ObjectKind.Granary, 300],
+  [ObjectKind.Stockpile, 150],
+  [ObjectKind.Keep, 600],
+  [ObjectKind.Wall, 90],
+  [ObjectKind.Gate, 200],
+  [ObjectKind.Tower, 400],
+  [ObjectKind.Quarry, 300],
+  [ObjectKind.WheatFarm, 200],
+];
+
+describe('building detail', () => {
+  for (const [kind, floor] of DETAIL_FLOOR) {
+    it(`gives the ${OBJECT_KINDS[kind].name} at least ${floor} triangles of detail`, () => {
+      expect(triangleCount(new BuildingMeshFactory().create(kind))).toBeGreaterThanOrEqual(floor);
+    });
+  }
+
+  it('keeps the Stockpile deck flat at its stated top for the stacks', () => {
+    const mesh = new BuildingMeshFactory().create(ObjectKind.Stockpile);
+    mesh.updateMatrixWorld();
+    const hit = new THREE.Raycaster(new THREE.Vector3(1.5, 5, 1.5), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)[0];
+    expect(hit.point.y).toBeCloseTo(StockpileShape.deckTop);
+  });
+
+  it('keeps a Gate passage open high up, under the arch, both ways', () => {
+    const factory = new BuildingMeshFactory();
+    const eastWest = factory.create(ObjectKind.Gate, 'eastWest');
+    const northSouth = factory.create(ObjectKind.Gate, 'northSouth');
+    expect(hits(eastWest, new THREE.Vector3(-1, 0.8, 0.5), new THREE.Vector3(1, 0, 0))).toBe(false);
+    expect(hits(northSouth, new THREE.Vector3(0.5, 0.8, -1), new THREE.Vector3(0, 0, 1))).toBe(false);
+  });
+
+  it('keeps the Wheat farm field clear at its soil top for the crop', () => {
+    const mesh = new BuildingMeshFactory().create(ObjectKind.WheatFarm);
+    mesh.updateMatrixWorld();
+    for (const [x, z] of [[2, 2], [0.6, 0.6], [3.4, 3.4]]) {
+      const hit = new THREE.Raycaster(new THREE.Vector3(x, 5, z), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)[0];
+      expect(hit.point.y, `${x}, ${z}`).toBeCloseTo(WheatFarmShape.soilTop);
+    }
   });
 });
