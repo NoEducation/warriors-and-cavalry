@@ -101,27 +101,40 @@ export class Population {
     }
   }
 
-  /** Whether the worker of building `buildingId` is at work there now. Production advances only then. */
+  /**
+   * Whether the worker of building `buildingId` is at work now: chopping its tree, or (any other worker) standing at
+   * the building. Production advances only then.
+   */
   public isWorking(buildingId: number): boolean {
-    return this.jobs.worker(buildingId)?.state === 'working';
+    const worker = this.jobs.worker(buildingId);
+    if (!worker) return false;
+    return worker.state === 'chopping' || (worker.state === 'working' && !this.trips.isWoodcutter(worker));
   }
 
-  /** Hands each finished batch to its building's worker, who carries it to storage. Call after production ticks. */
-  public collect(outputs: readonly ProductionOutput[]): void {
+  /**
+   * Hands each finished batch to its building's worker, who carries it to storage. Call after production ticks.
+   * Returns the trees felled by woodcutters whose batch this was, in the order of `outputs`, for the world to remove.
+   */
+  public collect(outputs: readonly ProductionOutput[]): number[] {
+    const felled: number[] = [];
     for (const { buildingId, resource, amount } of outputs) {
       const worker = this.jobs.worker(buildingId);
-      if (worker) this.trips.carry(worker, { resource, amount });
+      const tree = worker ? this.trips.carry(worker, { resource, amount }) : null;
+      if (tree !== null) felled.push(tree);
     }
+    return felled;
   }
 
   /**
    * `own` (a building's production state) with the status its job adds; null stays null. A building whose carrier
-   * cannot reach any storage place for its load shows `workerCannotReach`.
+   * cannot reach any storage place for its load shows `workerCannotReach`; a woodcutter waiting at its hut for a
+   * free tree shows `noTrees`.
    */
   public withJobStatus(buildingId: number, own: ProductionState | null): ProductionState | null {
     if (!own) return null;
     const worker = this.jobs.worker(buildingId);
     if (worker && this.trips.isStranded(worker)) return { ...own, status: 'workerCannotReach' };
+    if (worker?.state === 'working' && this.trips.isWoodcutter(worker)) return { ...own, status: 'noTrees' };
     return { ...own, status: this.jobs.status(buildingId, own.status) };
   }
 
@@ -149,7 +162,7 @@ export class Population {
     const idle = newestFirst.filter((p) => p.state === 'idle');
     const idleFirst = [...idle, ...newestFirst.filter((p) => p.state !== 'idle')];
     for (const p of idleFirst.slice(0, excess)) {
-      this.jobs.release(p, false);
+      this.trips.stop(p); // frees its job and any tree it has claimed
       this.byId.delete(p.id);
     }
   }

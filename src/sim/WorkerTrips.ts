@@ -1,4 +1,5 @@
-// A worker's trips: walking to work, carrying each batch to the nearest storage place, and walking back.
+// A worker's trips: walking to work, carrying each batch to the nearest storage place, and walking back; a
+// woodcutter's walks to its trees are `WoodcutterTrips`' part.
 import type { Economy } from './Economy';
 import type { Jobs } from './Jobs';
 
@@ -8,8 +9,11 @@ import type { Load } from './PeasantView';
 import type { PopulationHost } from './PopulationHost';
 import type { StoragePlaces } from './StoragePlaces';
 import type { TileCoord } from './TileCoord';
+import { WoodcutterTrips } from './WoodcutterTrips';
 
 export class WorkerTrips {
+  private readonly woodcutters: WoodcutterTrips;
+
   /**
    * Trips in `world` to the storage places `stores`, delivering into `economy`; `jobs` is told when a worker
    * gives its job up. A carrier whose target storage place is removed re-targets on its next tick.
@@ -20,7 +24,14 @@ export class WorkerTrips {
     private readonly economy: Economy,
     private readonly jobs: Jobs,
     private readonly walker: PeasantWalker,
-  ) {}
+  ) {
+    this.woodcutters = new WoodcutterTrips(world, walker);
+  }
+
+  /** True when `p` works at a building that needs trees (a woodcutter's hut). */
+  public isWoodcutter(p: Peasant): boolean {
+    return this.woodcutters.isWoodcutter(p);
+  }
 
   /** Gives the idle `p` the vacant job at `buildingId` and sends it there; with no path it gives the job up. */
   public startWork(p: Peasant, buildingId: number): void {
@@ -28,14 +39,21 @@ export class WorkerTrips {
     if (!this.planWorkWalk(p)) this.giveUpJob(p);
   }
 
-  /** Hands the working `p` its building's finished batch and sends it to the nearest storage place for it. */
-  public carry(p: Peasant, load: Load): void {
+  /**
+   * Hands the working `p` its building's finished batch and sends it to the nearest storage place for it. Returns
+   * the tree a chopping woodcutter has just felled (for the caller to remove), else null.
+   */
+  public carry(p: Peasant, load: Load): number | null {
+    const felled = p.state === 'chopping' ? p.treeId : null;
+    this.woodcutters.release(p);
     p.pickUp(load);
     this.planDelivery(p);
+    return felled;
   }
 
   /** Makes `p` idle where it stands, dropping its load and freeing its job; fine when its workplace is already gone. */
   public stop(p: Peasant): void {
+    this.woodcutters.release(p);
     this.jobs.release(p, false);
     p.goIdle();
   }
@@ -55,7 +73,13 @@ export class WorkerTrips {
   public tick(p: Peasant): void {
     switch (p.state) {
       case 'idle': // see IdleStands
-      case 'working': // stands at work; production hands it each finished batch (see `carry`)
+      case 'chopping': // production hands it the wood when the tree falls (see `carry`)
+        break;
+      case 'working': // stands at work (production hands it each batch), or a woodcutter waits for a free tree
+        if (p.waitTicks > 0 && !this.woodcutters.tickWaiting(p)) this.giveUpJob(p);
+        break;
+      case 'toTree':
+        if (!this.woodcutters.tickToTree(p)) this.giveUpJob(p);
         break;
       case 'toWork':
       case 'toWorkBack':
@@ -75,8 +99,13 @@ export class WorkerTrips {
     }
     this.walker.tick(p);
     if (!this.isWalkDone(p)) return;
-    if (this.isAt(p, p.workplaceId)) p.startWorking();
-    else if (!this.planWorkWalk(p)) this.giveUpJob(p);
+    if (!this.isAt(p, p.workplaceId)) {
+      if (!this.planWorkWalk(p)) this.giveUpJob(p);
+    } else if (!this.woodcutters.isWoodcutter(p)) {
+      p.startWorking();
+    } else if (!this.woodcutters.atHut(p)) {
+      this.giveUpJob(p);
+    }
   }
 
   /** Carrying a load: waits out a failed search, re-routes when needed, delivers on arrival. */
@@ -102,6 +131,7 @@ export class WorkerTrips {
 
   /** Frees `p`'s job, skipping its building for a while, and makes it idle where it stands. */
   private giveUpJob(p: Peasant): void {
+    this.woodcutters.release(p);
     this.jobs.release(p, true);
     p.goIdle();
   }

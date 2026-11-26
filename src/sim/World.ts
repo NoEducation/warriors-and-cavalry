@@ -10,6 +10,7 @@ import type { PeasantView } from './PeasantView';
 import { Population, type PopulationSummary } from './Population';
 import { Production, type ProductionState } from './Production';
 import { Stumps } from './Stumps';
+import { TreeFelling } from './TreeFelling';
 import type { TileCoord } from './TileCoord';
 import { WallBuilder, type WallLinePreview } from './WallBuilder';
 import {
@@ -29,6 +30,7 @@ export class World {
   private readonly lifecycle: ObjectLifecycle;
   private readonly walls: WallBuilder;
   private readonly stumps = new Stumps();
+  private readonly felling: TreeFelling;
   private ticks = 0;
 
   /** Creates a world with no objects on `map`, holding `economyState` (by default the usual start amounts). */
@@ -40,6 +42,7 @@ export class World {
     const followers = { index, economy: economyState, production, population, stumps, listeners };
     this.lifecycle = new ObjectLifecycle(map, followers);
     this.walls = new WallBuilder(this.lifecycle, economyState);
+    this.felling = new TreeFelling(index, this.lifecycle, stumps);
   }
 
   /** Read-only view of `economyState`: resource amounts and capacities, changed only through `apply` and `tick`. */
@@ -53,17 +56,14 @@ export class World {
   }
 
   /**
-   * Advances the world by one simulation tick: peasants, then production, whose batches the workers pick up, then
-   * stumps whose time is up are cleared away.
+   * Advances the world by one simulation tick: peasants, then production, whose batches the workers pick up (the
+   * trees woodcutters finished chopping fall and leave stumps), then stumps whose time is up are cleared away.
    */
   public tick(): void {
     this.ticks++;
     this.populace.tick();
-    this.populace.collect(this.production.tick((id) => this.populace.isWorking(id)));
-    for (const id of this.stumps.tick()) {
-      const stump = this.index.objectById(id);
-      if (stump) this.lifecycle.remove(stump);
-    }
+    this.felling.fell(this.populace.collect(this.production.tick((id) => this.populace.isWorking(id))));
+    this.felling.tick();
   }
 
   /** Ticks before the stump `objectId` is cleared away; 0 when it is not a stump. */
