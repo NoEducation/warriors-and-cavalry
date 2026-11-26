@@ -5,7 +5,13 @@ import type { GameMap } from '../sim/GameMap';
 import { TileType } from '../sim/tiles';
 import { terrainVertexColor } from './terrainColor';
 
-/** Writes into `out` the colour of corner (cx, cy) of a tile of `type` and returns it. Pure; call once per vertex. */
+/** No tile: outside the map. */
+const NONE = -1;
+
+/**
+ * Writes into `out` the colour of corner (cx, cy) of a tile of `type` and returns it; `scratch` is overwritten. Pure,
+ * and allocation-free away from quarry ground, as it runs for every terrain vertex.
+ */
 export function terrainCornerColor(
   map: GameMap,
   type: TileType,
@@ -14,13 +20,23 @@ export function terrainCornerColor(
   out: THREE.Color,
   scratch: THREE.Color,
 ): THREE.Color {
-  const around: TileType[] = [];
-  for (const [tx, ty] of [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]]) {
-    const t = map.tileAt(tx, ty);
-    if (t !== undefined) around.push(t);
-  }
-  if (!around.includes(TileType.Quarry)) return terrainVertexColor(map, type, cx, cy, out);
+  const a = tileOrNone(map, cx - 1, cy - 1);
+  const b = tileOrNone(map, cx, cy - 1);
+  const c = tileOrNone(map, cx - 1, cy);
+  const d = tileOrNone(map, cx, cy);
+  const q = TileType.Quarry;
+  if (a !== q && b !== q && c !== q && d !== q) return terrainVertexColor(map, type, cx, cy, out);
   out.setRGB(0, 0, 0);
-  for (const t of around) out.add(terrainVertexColor(map, t, cx, cy, scratch));
-  return out.multiplyScalar(1 / around.length);
+  let count = 0;
+  for (const t of [a, b, c, d]) {
+    if (t === NONE) continue;
+    out.add(terrainVertexColor(map, t as TileType, cx, cy, scratch));
+    count++;
+  }
+  return out.multiplyScalar(1 / count);
+}
+
+function tileOrNone(map: GameMap, tx: number, ty: number): number {
+  if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return NONE;
+  return map.tiles[ty * map.width + tx];
 }
