@@ -1,0 +1,43 @@
+/* Every colour of the HTML interface, in one place: index.html and ui.css use only these variables.
+   Translucent shades are mixed from the base colours, so changing a base colour changes its shades too.
+   (Icon colours live in iconShapes.ts and scene colours in the render layer: they are drawn from code, not CSS.) */
+:root {
+  --black: #000;
+  --white: #fff;
+
+  /* Wood of the panels, darkest to lightest. */
+  --oak-darkest: #1e1209;
+  --oak-dark: #2b1a0e;
+  --oak: #4a2e17;
+  --oak-light: #6b4423;
+
+  /* Plaques (tool and menu buttons): the top and bottom of their gradient, plain and active. */
+  --plaque-top: #5a3a1d;
+  --plaque-bottom: #3a2410;
+  --plaque-active-top: #7a5326;
+  --plaque-active-bottom: #4e3014;
+  --plaque-sheen: rgba(255, 220, 160, 0.2);
+
+  /* Trim and text. */
+  --bronze: #8a6a32;
+  --gold: #e0b450;
+  --parchment: #f1e2bd;
+  --parchment-dim: #c9b68c;
+  --danger: #ff7a5c;
+
+  /* The start menu's night sky behind the panel. */
+  --sky: #2a3b4a;
+  --sky-dark: #0b1016;
+
+  /* Translucent shades. */
+  --gold-sheen: color-mix(in srgb, var(--gold) 35%, transparent);
+  --gold-glow: color-mix(in srgb, var(--gold) 60%, transparent);
+  --bronze-faint: color-mix(in srgb, var(--bronze) 50%, transparent);
+  --sky-haze: rgba(27, 42, 56, 0.55);
+  --shadow-25: color-mix(in srgb, var(--black) 25%, transparent);
+  --shadow-45: color-mix(in srgb, var(--black) 45%, transparent);
+  --shadow-50: color-mix(in srgb, var(--black) 50%, transparent);
+  --shadow-60: color-mix(in srgb, var(--black) 60%, transparent);
+  --shadow-80: color-mix(in srgb, var(--black) 80%, transparent);
+  --shadow-85: color-mix(in srgb, var(--black) 85%, transparent);
+}
