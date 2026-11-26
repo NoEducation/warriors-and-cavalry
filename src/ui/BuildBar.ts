@@ -2,7 +2,7 @@
 import { BUILD_TOOLS, type BuildTool, keyLabel, sameTool } from './BuildTool';
 import type { EconomyView } from '../sim/Economy';
 import { OBJECT_KINDS } from '../sim/ObjectKind';
-import { costText, shortCostText } from './costText';
+import { costText } from './costText';
 
 export class BuildBar {
   private readonly buttons: HTMLButtonElement[] = [];
@@ -18,7 +18,7 @@ export class BuildBar {
         const cost = OBJECT_KINDS[entry.tool.kind].cost;
         const costLine = button.appendChild(document.createElement('span'));
         costLine.className = 'cost';
-        costLine.textContent = shortCostText(cost);
+        costLine.textContent = costText(cost);
         button.title = `${OBJECT_KINDS[entry.tool.kind].name}: ${costText(cost)}`;
       }
       button.addEventListener('click', () => {
