@@ -26,14 +26,14 @@ export const TERRAIN_LOOK_CONFIG = Object.freeze({
   /** Brightness swing of the fine mottling. */
   detailWeight: 0.14,
   /** Slope (height change per tile) where rock starts to turn to cliff, and where it is fully cliff. */
-  cliffSlope: [0.3, 0.95],
+  cliffSlope: [0.55, 1.7],
   /** Height above which flat rock turns to snow; noise moves the line by up to snowJitter. */
-  snowLine: 7.9,
-  snowJitter: 0.6,
-  snowMaxSlope: 0.7,
+  snowLine: 11.8,
+  snowJitter: 0.9,
+  snowMaxSlope: 1.5,
   /** Fine noise that frays the snow edge into patches: its frequency per tile and how far it moves the line. */
   snowPatchScale: 1 / 3,
-  snowPatchJitter: 0.35,
+  snowPatchJitter: 0.5,
   /** Dark lichen and weathering patches on rock: noise frequency per tile and how far they darken towards cliff. */
   lichenScale: 1 / 7,
   lichenWeight: 0.4,
