@@ -1,7 +1,8 @@
 // Deterministic world generator: fbm hills on an island whose coastline wobbles with low-frequency noise, ridged
-// mountains on the high ground, then forests.
+// mountains on the high ground, quarry ground at their feet, then forests.
 import { GameMap } from './GameMap';
 import { mountainLift } from './mountainLift';
+import { QuarrySites } from './QuarrySites';
 import { fbm2 } from './noise';
 import { TileType } from './tiles';
 import { TreePlacer } from './TreePlacer';
@@ -50,6 +51,7 @@ interface IslandShape extends MapParams {
 
 export class MapGenerator {
   private readonly treePlacer = new TreePlacer();
+  private readonly quarrySites = new QuarrySites();
 
   /** Builds a new world (terrain, then trees) for `params`; the same params always give the same world. The seed is taken as unsigned 32-bit. */
   public generate(params: MapParams): World {
@@ -69,18 +71,16 @@ export class MapGenerator {
         heights[cy * stride + cx] = this.cornerHeight(shape, cx, cy);
       }
     }
+    const classify = (tx: number, ty: number): TileType => {
+      const i = ty * stride + tx;
+      return this.classifyTile([heights[i], heights[i + 1], heights[i + stride], heights[i + stride + 1]]);
+    };
+    const sites = this.quarrySites.carve({ heights, width, height }, seed, classify);
     const tiles = new Uint8Array(width * height);
     for (let ty = 0; ty < height; ty++) {
-      for (let tx = 0; tx < width; tx++) {
-        const i = ty * stride + tx;
-        tiles[ty * width + tx] = this.classifyTile([
-          heights[i],
-          heights[i + 1],
-          heights[i + stride],
-          heights[i + stride + 1],
-        ]);
-      }
+      for (let tx = 0; tx < width; tx++) tiles[ty * width + tx] = classify(tx, ty);
     }
+    this.quarrySites.mark(tiles, width, sites);
     return new GameMap(width, height, seed, heights, tiles);
   }
 

@@ -19,8 +19,9 @@ expect stone: at the foot of a mountain, on a small, nearly flat shelf, and that
    Quarry. Trees grow only on Grass, so quarry ground stays clear.
 
 **Placement.** `ObjectKindInfo.needsRock` is replaced by `quarryOnly`: every footprint tile of a Quarry must be quarry
-ground, and no other building may use quarry ground. A Quarry placed elsewhere fails with `BadTerrain`; the build bar
-says "needs quarry ground". The `NeedsRock` check and reason go away.
+ground, and no other building may use quarry ground (they fail with `BadTerrain` there). A Quarry placed elsewhere
+fails with the new `NeedsQuarryGround` reason, and the build bar says "needs quarry ground". The `NeedsRock` check and
+reason go away. Each 512 x 512 map gets up to 14 sites, at least 34 tiles apart.
 
 **Look.** Pale, warm limestone cut into blocks: per-tile light and dark slabs with darker seams at the site's edge,
 clearly different from the grey-brown mountain rock and from sand. The hover readout names it "Quarry ground".
