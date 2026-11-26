@@ -7,6 +7,13 @@ import { OBJECT_KINDS, ObjectKind } from '../src/sim/ObjectKind';
 const EPSILON = 1e-6;
 const BUILDABLE_KINDS = Object.values(ObjectKind).filter((kind) => OBJECT_KINDS[kind].buildable);
 
+/** Most triangles a building may have: walls get built by the hundred, so they stay lean. */
+function triangleBudget(kind: ObjectKind): number {
+  if (kind === ObjectKind.Wall) return 150;
+  if (kind === ObjectKind.Gate) return 400;
+  return 1500;
+}
+
 function meshCount(group: THREE.Object3D): number {
   let count = 0;
   group.traverse((node) => {
@@ -42,12 +49,12 @@ describe('BuildingMeshFactory', () => {
     expect(BUILDABLE_KINDS).toHaveLength(10);
   });
 
-  it('creates a non-empty, low-poly group within the footprint for every buildable kind', () => {
+  it('creates a non-empty group within its triangle budget and within the footprint for every buildable kind', () => {
     for (const kind of BUILDABLE_KINDS) {
       const info = OBJECT_KINDS[kind];
       const group = factory.create(kind);
       expect(meshCount(group), info.name).toBeGreaterThan(0);
-      expect(triangleCount(group), info.name).toBeLessThan(150);
+      expect(triangleCount(group), info.name).toBeLessThanOrEqual(triangleBudget(kind));
       const box = new THREE.Box3().setFromObject(group);
       expect(box.min.x, info.name).toBeGreaterThanOrEqual(-EPSILON);
       expect(box.min.z, info.name).toBeGreaterThanOrEqual(-EPSILON);

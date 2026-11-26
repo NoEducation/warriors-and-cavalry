@@ -3,7 +3,8 @@ import type * as THREE from 'three';
 import { OBJECT_KINDS, ObjectKind } from '../../sim/ObjectKind';
 import type { BuildingShape } from './BuildingShape';
 import { ShapeBuilder } from './ShapeBuilder';
-import { type BoxSpec, gableRoofGeometry, SHAPE_COLORS } from './shapeParts';
+import { gableRoofGeometry } from './roofParts';
+import { type BoxSpec, SHAPE_COLORS } from './shapeParts';
 
 /** Height of the store's floor above the building's floor. */
 const STILT_HEIGHT = 0.6;

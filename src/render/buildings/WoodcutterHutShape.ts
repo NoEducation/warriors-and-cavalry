@@ -3,7 +3,8 @@ import type * as THREE from 'three';
 import { OBJECT_KINDS, ObjectKind } from '../../sim/ObjectKind';
 import type { BuildingShape } from './BuildingShape';
 import { ShapeBuilder } from './ShapeBuilder';
-import { type BoxSpec, FOOTPRINT_MARGIN, gableRoofGeometry, SHAPE_COLORS } from './shapeParts';
+import { gableRoofGeometry } from './roofParts';
+import { type BoxSpec, FOOTPRINT_MARGIN, SHAPE_COLORS } from './shapeParts';
 
 export class WoodcutterHutShape implements BuildingShape {
   /** Creates a new Woodcutter's hut model (see `BuildingShape.build`). */
