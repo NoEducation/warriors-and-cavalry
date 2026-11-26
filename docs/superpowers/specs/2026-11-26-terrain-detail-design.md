@@ -30,3 +30,11 @@ Render-only: the simulation, map generation and tile picking are untouched.
    A soft dark disc under every tree grounds it on the terrain.
 
 All variation is a pure function of the map seed and position, so a map still looks the same every time.
+
+## Follow-up: steeper peaks
+
+Colour alone could not hide that the highest ground was a gentle dome (peaks near 8.5). Map generation now adds a
+ridged mountain lift (`src/sim/mountainLift.ts`) on top of the hills wherever they are already high, so crests reach
+about 16 with steep faces, while rock stays within the 15 % cap so buildable land is kept. This changes every seed's
+map and the pinned world checksum. The camera focus now eases to the ground height so it rises over the mountains
+instead of sinking into them; snow and cliff colours are retuned for the new heights.
