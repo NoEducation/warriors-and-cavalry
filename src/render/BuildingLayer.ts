@@ -1,13 +1,16 @@
 // Meshes for every building in a world, kept in step with the world's changes.
 import * as THREE from 'three';
 import type { MapObject } from '../sim/MapObject';
-import { OBJECT_KINDS } from '../sim/ObjectKind';
+import { OBJECT_KINDS, ObjectKind } from '../sim/ObjectKind';
 import type { World } from '../sim/World';
 import type { WorldChange } from '../sim/WorldCommand';
-import type { BuildingMeshFactory } from './BuildingMeshFactory';
+import type { BuildingMeshFactory, GatePassage } from './BuildingMeshFactory';
 import { disposeObject } from './disposeObject';
 import { floorHeight } from './floorHeight';
 import type { WorldLayer } from './WorldLayer';
+
+/** Kinds that make up a castle wall line; a gate next to one of them is turned to pass through the line. */
+const WALL_LINE_KINDS: readonly ObjectKind[] = [ObjectKind.Wall, ObjectKind.Gate, ObjectKind.Tower];
 
 export class BuildingLayer implements WorldLayer {
   /** Add this to the scene; holds one child per building. */
@@ -51,10 +54,23 @@ export class BuildingLayer implements WorldLayer {
   private add(object: MapObject): void {
     const info = OBJECT_KINDS[object.kind];
     if (!info.buildable) return;
-    const mesh = this.factory.create(object.kind);
+    const passage = object.kind === ObjectKind.Gate ? this.gatePassage(object) : undefined;
+    const mesh = this.factory.create(object.kind, passage);
     mesh.position.set(object.tx, floorHeight(this.world.map, object.kind, object.tx, object.ty), object.ty);
     this.meshes.set(object.id, mesh);
     this.object.add(mesh);
+  }
+
+  /**
+   * The passage of a newly shown gate: north–south when a wall piece stands west or east of it (the wall runs east–west),
+   * otherwise east–west. Decided once, when the mesh is made.
+   */
+  private gatePassage(gate: MapObject): GatePassage {
+    const besideWall = [gate.tx - 1, gate.tx + 1].some((tx) => {
+      const neighbour = this.world.objectAt(tx, gate.ty);
+      return neighbour !== undefined && WALL_LINE_KINDS.includes(neighbour.kind);
+    });
+    return besideWall ? 'northSouth' : 'eastWest';
   }
 
   private remove(object: MapObject): void {

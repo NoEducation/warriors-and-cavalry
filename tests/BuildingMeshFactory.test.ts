@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { BuildingMeshFactory } from '../src/render/BuildingMeshFactory';
 import { OBJECT_KINDS, ObjectKind } from '../src/sim/ObjectKind';
 
+/** Float32 rounding slack for shapes that fill their footprint exactly (walls and gates). */
+const EPSILON = 1e-6;
 const BUILDABLE_KINDS = Object.values(ObjectKind).filter((kind) => OBJECT_KINDS[kind].buildable);
 
 function meshCount(group: THREE.Object3D): number {
@@ -27,6 +29,12 @@ function size(kind: ObjectKind): THREE.Vector3 {
   return new THREE.Box3().setFromObject(new BuildingMeshFactory().create(kind)).getSize(new THREE.Vector3());
 }
 
+/** Whether a ray from `origin` along `direction` hits `mesh`. */
+function hits(mesh: THREE.Mesh, origin: THREE.Vector3, direction: THREE.Vector3): boolean {
+  mesh.updateMatrixWorld();
+  return new THREE.Raycaster(origin, direction).intersectObject(mesh).length > 0;
+}
+
 describe('BuildingMeshFactory', () => {
   const factory = new BuildingMeshFactory();
 
@@ -41,10 +49,10 @@ describe('BuildingMeshFactory', () => {
       expect(meshCount(group), info.name).toBeGreaterThan(0);
       expect(triangleCount(group), info.name).toBeLessThan(150);
       const box = new THREE.Box3().setFromObject(group);
-      expect(box.min.x, info.name).toBeGreaterThanOrEqual(0);
-      expect(box.min.z, info.name).toBeGreaterThanOrEqual(0);
-      expect(box.max.x, info.name).toBeLessThanOrEqual(info.width);
-      expect(box.max.z, info.name).toBeLessThanOrEqual(info.height);
+      expect(box.min.x, info.name).toBeGreaterThanOrEqual(-EPSILON);
+      expect(box.min.z, info.name).toBeGreaterThanOrEqual(-EPSILON);
+      expect(box.max.x, info.name).toBeLessThanOrEqual(info.width + EPSILON);
+      expect(box.max.z, info.name).toBeLessThanOrEqual(info.height + EPSILON);
     }
   });
 
@@ -83,6 +91,35 @@ describe('BuildingMeshFactory', () => {
     const hovel = size(ObjectKind.Hovel);
     expect(keep.x).toBeGreaterThan(hovel.x);
     expect(keep.z).toBeGreaterThan(hovel.z);
+  });
+
+  it('fills the whole tile with a Wall so neighbouring pieces join', () => {
+    const box = new THREE.Box3().setFromObject(factory.create(ObjectKind.Wall));
+    expect(box.min.x).toBeCloseTo(0);
+    expect(box.min.z).toBeCloseTo(0);
+    expect(box.max.x).toBeCloseTo(1);
+    expect(box.max.z).toBeCloseTo(1);
+  });
+
+  it('makes the Tower taller than the Wall', () => {
+    expect(size(ObjectKind.Tower).y).toBeGreaterThan(size(ObjectKind.Wall).y);
+  });
+
+  it('opens an east-west Gate along x and closes it along z at mid-height', () => {
+    const gate = factory.create(ObjectKind.Gate, 'eastWest');
+    expect(hits(gate, new THREE.Vector3(-1, 0.5, 0.5), new THREE.Vector3(1, 0, 0))).toBe(false);
+    expect(hits(gate, new THREE.Vector3(0.5, 0.5, -1), new THREE.Vector3(0, 0, 1))).toBe(true);
+  });
+
+  it('opens a north-south Gate along z and closes it along x at mid-height', () => {
+    const gate = factory.create(ObjectKind.Gate, 'northSouth');
+    expect(hits(gate, new THREE.Vector3(0.5, 0.5, -1), new THREE.Vector3(0, 0, 1))).toBe(false);
+    expect(hits(gate, new THREE.Vector3(-1, 0.5, 0.5), new THREE.Vector3(1, 0, 0))).toBe(true);
+  });
+
+  it('opens a Gate east-west when no passage is given', () => {
+    const gate = factory.create(ObjectKind.Gate);
+    expect(hits(gate, new THREE.Vector3(-1, 0.5, 0.5), new THREE.Vector3(1, 0, 0))).toBe(false);
   });
 
   it('makes the Wheat farm wider than the Granary', () => {
