@@ -66,9 +66,10 @@ export class Game {
     requestAnimationFrame(this.onFrame);
   }
 
-  /** Generates the world for `seed` and shows it, replacing the current one. Build tool, pause and speed are kept. */
+  /** Generates the world for `seed` and shows it, replacing the current one. Build tool, pause and speed are kept; a wall drag in progress is dropped. */
   public loadMap(seed: number): void {
     this.world = this.generateWorld(seed);
+    this.input.resetForNewMap();
     this.runner.reset();
     this.showWorld();
   }

@@ -52,6 +52,7 @@ function setup(): Recorded {
   pointer.onPress((button) => events.push(`press ${button}`));
   pointer.onRelease((button) => events.push(`release ${button}`));
   pointer.onClick((button) => events.push(`click ${button}`));
+  pointer.onCancel(() => events.push('cancel'));
   return { canvas, events };
 }
 
@@ -91,6 +92,61 @@ describe('Pointer press and release', () => {
     canvas.dispatchEvent(pointerEvent('pointermove', { button: RIGHT, buttons: 3, x: 50, y: 50 }));
     canvas.dispatchEvent(pointerEvent('pointermove', { button: RIGHT, buttons: 1, x: 50, y: 50 }));
     canvas.dispatchEvent(pointerEvent('pointerup', { button: LEFT, buttons: 0, x: 50, y: 50 }));
-    expect(events).toEqual(['press 0', 'press 2', 'release 2', 'release 0', 'click 0']);
+    // A release seen only as a move is reported as a cancel, never as a release.
+    expect(events).toEqual(['press 0', 'press 2', 'cancel', 'release 0', 'click 0']);
+  });
+});
+
+describe('Pointer cancel', () => {
+  const press = (canvas: FakeCanvas): void => {
+    canvas.dispatchEvent(pointerEvent('pointerdown', { button: LEFT, buttons: 1, x: 50, y: 50 }));
+  };
+
+  it('reports pointercancel as a cancel, with no click after it', () => {
+    const { canvas, events } = setup();
+    press(canvas);
+    canvas.dispatchEvent(pointerEvent('pointercancel', { button: -1, buttons: 0, x: 50, y: 50 }));
+    canvas.dispatchEvent(pointerEvent('pointerup', { button: LEFT, buttons: 0, x: 50, y: 50 }));
+    expect(events).toEqual(['press 0', 'cancel', 'release 0']);
+  });
+
+  it('reports a lost pointer capture while a button is held as a cancel', () => {
+    const { canvas, events } = setup();
+    press(canvas);
+    canvas.dispatchEvent(pointerEvent('lostpointercapture', { button: -1, buttons: 1, x: 50, y: 50 }));
+    expect(events).toEqual(['press 0', 'cancel']);
+  });
+
+  it('does not report the capture lost after a pointerup as a cancel', () => {
+    const { canvas, events } = setup();
+    press(canvas);
+    canvas.dispatchEvent(pointerEvent('pointerup', { button: LEFT, buttons: 0, x: 50, y: 50 }));
+    canvas.dispatchEvent(pointerEvent('lostpointercapture', { button: -1, buttons: 0, x: 50, y: 50 }));
+    expect(events).toEqual(['press 0', 'release 0', 'click 0']);
+  });
+
+  it('reports leaving the canvas with a button held and no capture as a cancel', () => {
+    const { canvas, events } = setup();
+    press(canvas);
+    canvas.captured.clear(); // capture failed or was never active
+    canvas.dispatchEvent(pointerEvent('pointerleave', { button: -1, buttons: 1, x: 150, y: 50 }));
+    expect(events).toEqual(['press 0', 'cancel']);
+  });
+
+  it('does not cancel when the cursor leaves the canvas with nothing held', () => {
+    const { canvas, events } = setup();
+    canvas.dispatchEvent(pointerEvent('pointermove', { button: -1, buttons: 0, x: 50, y: 50 }));
+    canvas.dispatchEvent(pointerEvent('pointerleave', { button: -1, buttons: 0, x: 150, y: 50 }));
+    expect(events).toEqual([]);
+  });
+
+  it('reports a release noticed only on a later move as a cancel, and the next press works again', () => {
+    const { canvas, events } = setup();
+    press(canvas);
+    // The pointerup was lost: the next move shows no button held.
+    canvas.dispatchEvent(pointerEvent('pointermove', { button: -1, buttons: 0, x: 60, y: 50 }));
+    canvas.dispatchEvent(pointerEvent('pointerdown', { button: LEFT, buttons: 1, x: 60, y: 50 }));
+    canvas.dispatchEvent(pointerEvent('pointerup', { button: LEFT, buttons: 0, x: 60, y: 50 }));
+    expect(events).toEqual(['press 0', 'cancel', 'press 0', 'release 0', 'click 0']);
   });
 });

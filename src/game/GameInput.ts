@@ -53,6 +53,11 @@ export class GameInput {
     this.listenToCanvas(canvas);
   }
 
+  /** Drops input state that belongs to the old map (a wall drag in progress). Call when a new map is loaded. */
+  public resetForNewMap(): void {
+    this.buildInput.resetForNewMap();
+  }
+
   /** Mouse wheel zooms; the browser's context menu is suppressed so right-click can deselect the build tool. */
   private listenToCanvas(canvas: HTMLCanvasElement): void {
     canvas.addEventListener('wheel', this.onWheel, { passive: false });

@@ -38,6 +38,12 @@ export class BuildInput {
     pointer.onPress(this.onPress);
     pointer.onRelease(this.onRelease);
     pointer.onClick(this.onClick);
+    pointer.onCancel(() => this.builder.cancelWallDrag());
+  }
+
+  /** Drops a wall drag in progress, which belongs to the old map. Call when a new map is loaded. */
+  public resetForNewMap(): void {
+    this.builder.cancelWallDrag();
   }
 
   /** Dims the build bar buttons whose cost `economy` cannot pay. Cheap; call every frame. */
@@ -74,7 +80,7 @@ export class BuildInput {
     }
   };
 
-  /** A left release builds the wall drag in progress, if any, up to the tile under the cursor. */
+  /** A left release builds the wall drag in progress, if any, up to the tile under the cursor or the last one seen. */
   private readonly onRelease = (button: number): void => {
     if (button !== LEFT_BUTTON) return;
     const { world, tile } = this.clickTarget();

@@ -199,7 +199,7 @@ describe('BuildController wall drags', () => {
     const preview = controller.wallDragPreview(world, END);
     expect(preview?.placedCount).toBe(5);
     expect(preview?.cost).toEqual(resources(0, 10, 0));
-    expect(controller.wallDragPreview(world, null)).toBeNull();
+    expect(controller.wallDragPreview(world, null)?.placedCount).toBe(5); // off the map: still the line to END
     expect(world.objectCount).toBe(0);
     const result = controller.finishWallDrag(world, END);
     expect(result).toEqual({ ok: true, placed: 5, skipped: 0, unpaid: 0 });
@@ -236,12 +236,47 @@ describe('BuildController wall drags', () => {
     expect(world.objectCount).toBe(0);
   });
 
-  it('builds a single piece at the start when the release has no tile', () => {
+  it('builds a single piece at the start when the drag never left the start tile and the release has no tile', () => {
     const { world, controller } = stoneSetup();
     controller.startWallDrag(world, START);
+    expect(controller.wallDragPreview(world, null)?.tiles).toEqual([START]);
     expect(controller.finishWallDrag(world, null)).toEqual({ ok: true, placed: 1, skipped: 0, unpaid: 0 });
     expect(world.objectAt(5, 5)?.kind).toBe(ObjectKind.Wall);
     expect(world.objectCount).toBe(1);
+  });
+
+  it('builds the line to the last tile seen when the release is off the map', () => {
+    const { world, controller } = stoneSetup();
+    controller.startWallDrag(world, START);
+    controller.wallDragPreview(world, { tx: 7, ty: 5 });
+    controller.wallDragPreview(world, END);
+    controller.wallDragPreview(world, null);
+    expect(controller.finishWallDrag(world, null)).toEqual({ ok: true, placed: 5, skipped: 0, unpaid: 0 });
+    expect(world.objectCount).toBe(5);
+  });
+
+  it('forgets the last tile seen when a new drag starts', () => {
+    const { world, controller } = stoneSetup();
+    controller.startWallDrag(world, START);
+    controller.wallDragPreview(world, END);
+    controller.cancelWallDrag();
+    controller.startWallDrag(world, { tx: 2, ty: 2 });
+    expect(controller.finishWallDrag(world, null)).toEqual({ ok: true, placed: 1, skipped: 0, unpaid: 0 });
+    expect(world.objectAt(2, 2)?.kind).toBe(ObjectKind.Wall);
+  });
+
+  it('says how many pieces of a partly paid line were built', () => {
+    const { world, controller, messages } = stoneSetup(6);
+    controller.startWallDrag(world, START);
+    expect(controller.finishWallDrag(world, END)).toEqual({ ok: true, placed: 3, skipped: 0, unpaid: 2 });
+    expect(messages).toEqual(['Wall: 3 of 5 built, not enough stone']);
+  });
+
+  it('says nothing when the whole line was paid', () => {
+    const { world, controller, messages } = stoneSetup(10);
+    controller.startWallDrag(world, START);
+    controller.finishWallDrag(world, END);
+    expect(messages).toEqual([]);
   });
 
   it('names the missing stone when nothing can be paid', () => {

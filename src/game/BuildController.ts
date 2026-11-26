@@ -28,6 +28,8 @@ export class BuildController {
   private currentTool: BuildTool = null;
   /** Where the wall drag in progress started, or null when none is. */
   private wallStart: TileCoord | null = null;
+  /** The last tile the drag's end was over; the line ends there while the cursor is off the map. */
+  private wallEnd: TileCoord | null = null;
 
   /**
    * Holds no world: `preview` and `click` get the world to act on with every call.
@@ -48,7 +50,7 @@ export class BuildController {
   /** Selects `tool`; null deselects. Cancels a wall drag. Call from the build bar, tool keys, Escape or right-click. */
   public selectTool(tool: BuildTool): void {
     this.currentTool = tool;
-    this.wallStart = null;
+    this.cancelWallDrag();
   }
 
   /**
@@ -56,32 +58,40 @@ export class BuildController {
    * is taken like in the other drag calls, though starting reads nothing from it yet.
    */
   public startWallDrag(world: World, tile: TileCoord | null): void {
-    if (tile && this.isWallTool()) this.wallStart = { tx: tile.tx, ty: tile.ty };
-  }
-
-  /** What the wall drag would build if released over `tile`; null without a drag or tile. Call per frame. */
-  public wallDragPreview(world: World, tile: TileCoord | null): WallLinePreview | null {
-    if (!this.wallStart || !tile) return null;
-    return world.previewWallLine(this.wallStart, tile);
+    if (!tile || !this.isWallTool()) return;
+    this.wallStart = { tx: tile.tx, ty: tile.ty };
+    this.wallEnd = null;
   }
 
   /**
-   * Ends the wall drag by building the line from its start to `tile` (just the start piece when `tile` is null);
-   * null when no drag was in progress. Reports failures through `onMessage`. Call on a left release.
+   * What the wall drag would build if released over `tile`; with `tile` null (cursor off the map), the line to the
+   * last tile seen, else just the start piece. Null without a drag. Call per frame.
+   */
+  public wallDragPreview(world: World, tile: TileCoord | null): WallLinePreview | null {
+    if (!this.wallStart) return null;
+    if (tile) this.wallEnd = { tx: tile.tx, ty: tile.ty };
+    return world.previewWallLine(this.wallStart, this.wallEnd ?? this.wallStart);
+  }
+
+  /**
+   * Ends the wall drag by building the line from its start to `tile`; with `tile` null, to the last tile
+   * `wallDragPreview` saw, else just the start piece. Null when no drag was in progress. Reports failures and a line
+   * the stone did not cover through `onMessage`. Call on a left release.
    */
   public finishWallDrag(world: World, tile: TileCoord | null): CommandResult | null {
     const start = this.wallStart;
     if (!start) return null;
-    this.wallStart = null;
-    const end = tile ?? start;
+    const end = tile ?? this.wallEnd ?? start;
+    this.cancelWallDrag();
     const result = world.apply({ type: 'placeWallLine', fromTx: start.tx, fromTy: start.ty, toTx: end.tx, toTy: end.ty });
-    if (!result.ok) this.onMessage(`Cannot build: ${this.buildFailureText(world, ObjectKind.Wall, result.reason)}`);
+    this.reportWallLine(world, result);
     return result;
   }
 
   /** Drops the wall drag in progress without building. Call on Escape or a right click during a drag. */
   public cancelWallDrag(): void {
     this.wallStart = null;
+    this.wallEnd = null;
   }
 
   /**
@@ -113,6 +123,16 @@ export class BuildController {
       : { ok: false, reason: 'UnknownObject' };
     if (!result.ok) this.onMessage(`Cannot demolish: ${REASON_TEXT[result.reason]}`);
     return result;
+  }
+
+  /** Tells the player why a wall line failed, or how much of it the stone covered when it was not all built. */
+  private reportWallLine(world: World, result: CommandResult): void {
+    if (!result.ok) {
+      this.onMessage(`Cannot build: ${this.buildFailureText(world, ObjectKind.Wall, result.reason)}`);
+    } else if ('unpaid' in result && result.unpaid > 0) {
+      const shortfall = this.buildFailureText(world, ObjectKind.Wall, 'NotEnoughResources');
+      this.onMessage(`Wall: ${result.placed} of ${result.placed + result.unpaid} built, ${shortfall}`);
+    }
   }
 
   private isWallTool(): boolean {

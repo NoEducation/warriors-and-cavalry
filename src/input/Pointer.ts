@@ -22,6 +22,7 @@ export class Pointer {
   private readonly releaseListeners: ((button: number) => void)[] = [];
   private readonly clickListeners: ((button: number) => void)[] = [];
   private readonly dragListeners: ((drag: PointerDrag) => void)[] = [];
+  private readonly cancelListeners: (() => void)[] = [];
 
   /** Starts tracking the pointer over `canvas`. */
   public constructor(private readonly canvas: HTMLCanvasElement) {
@@ -30,7 +31,7 @@ export class Pointer {
     canvas.addEventListener('pointerdown', this.onPointerDown);
     canvas.addEventListener('pointerup', this.onPointerUp);
     canvas.addEventListener('pointercancel', this.onPointerCancel);
-    canvas.addEventListener('lostpointercapture', this.onPointerCancel);
+    canvas.addEventListener('lostpointercapture', this.onLostCapture);
     canvas.addEventListener('mousedown', this.preventMiddleButton);
     canvas.addEventListener('auxclick', this.preventMiddleButton);
   }
@@ -73,6 +74,15 @@ export class Pointer {
     this.dragListeners.push(listener);
   }
 
+  /**
+   * Calls `listener` whenever a held button is lost without a release on the canvas: `pointercancel`, pointer capture
+   * lost while a button is held, leaving the canvas with a button held and no capture, or a button found let go only on
+   * a later move (its release is never reported). Register once at setup.
+   */
+  public onCancel(listener: () => void): void {
+    this.cancelListeners.push(listener);
+  }
+
   /** Stops tracking the pointer. Call when the pointer is no longer needed. */
   public dispose(): void {
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
@@ -80,13 +90,14 @@ export class Pointer {
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     this.canvas.removeEventListener('pointerup', this.onPointerUp);
     this.canvas.removeEventListener('pointercancel', this.onPointerCancel);
-    this.canvas.removeEventListener('lostpointercapture', this.onPointerCancel);
+    this.canvas.removeEventListener('lostpointercapture', this.onLostCapture);
     this.canvas.removeEventListener('mousedown', this.preventMiddleButton);
     this.canvas.removeEventListener('auxclick', this.preventMiddleButton);
     this.pressListeners.length = 0;
     this.releaseListeners.length = 0;
     this.clickListeners.length = 0;
     this.dragListeners.length = 0;
+    this.cancelListeners.length = 0;
     this.position = null;
     this.tracker.cancel();
   }
@@ -107,10 +118,10 @@ export class Pointer {
     if (drag) for (const listener of this.dragListeners) listener(drag);
   };
 
-  /** Without pointer capture (it can fail), leaving the canvas abandons the press as before. */
+  /** Without pointer capture (it can fail), leaving the canvas abandons the press. */
   private readonly onPointerLeave = (e: PointerEvent): void => {
     this.position = null;
-    if (!this.canvas.hasPointerCapture(e.pointerId)) this.tracker.cancel();
+    if (!this.canvas.hasPointerCapture(e.pointerId)) this.cancelPress();
   };
 
   private readonly onPointerDown = (e: PointerEvent): void => {
@@ -135,23 +146,35 @@ export class Pointer {
     this.notify(this.clickListeners, e.button);
   };
 
-  /** Reports each button whose state in `buttons` differs from the last seen as pressed or released. */
+  /**
+   * Reports each button newly held in `buttons` as pressed, and a button no longer held as a cancel: a release seen
+   * only on a move may be a lost `pointerup`, so it never counts as one.
+   */
   private notifyButtonChanges(buttons: number): void {
     const changed = this.heldButtons ^ buttons;
+    const released = changed & this.heldButtons;
     this.heldButtons = buttons;
-    for (const [button, bit] of BUTTON_BITS) {
-      if (changed & bit) this.notify(buttons & bit ? this.pressListeners : this.releaseListeners, button);
-    }
+    for (const [button, bit] of BUTTON_BITS) if (changed & bit & buttons) this.notify(this.pressListeners, button);
+    if (buttons === 0 && released) this.tracker.cancel();
+    if (released) for (const listener of this.cancelListeners) listener();
   }
 
   private notify(listeners: readonly ((button: number) => void)[], button: number): void {
     for (const listener of listeners) listener(button);
   }
 
-  private readonly onPointerCancel = (): void => {
+  /** Forgets the press and the held buttons, reporting a cancel when a button was held. */
+  private cancelPress(): void {
+    const wasHeld = this.heldButtons !== 0;
     this.tracker.cancel();
     this.heldButtons = 0;
-  };
+    if (wasHeld) for (const listener of this.cancelListeners) listener();
+  }
+
+  private readonly onPointerCancel = (): void => this.cancelPress();
+
+  /** Capture is also lost after every `pointerup`; only a loss while a button is still held is a cancel. */
+  private readonly onLostCapture = (): void => this.cancelPress();
 
   /** Stops the browser's middle-click auto-scroll and middle-click paste/open over the canvas. */
   private readonly preventMiddleButton = (e: MouseEvent): void => {
