@@ -50,7 +50,8 @@ export type ObjectCommandResult = ObjectCommandSuccess | CommandFailure;
 
 /**
  * What a command reports. `NotEnoughResources` means the placement fits but its cost cannot be paid;
- * `UnknownCommand` means the command's `type` is not recognised.
+ * `UnknownCommand` means the command's `type` is not recognised or its fields are malformed (a wall line whose
+ * coordinates are not safe integers).
  */
 export type CommandResult = ObjectCommandSuccess | WallLineSuccess | CommandFailure;
 
@@ -58,4 +59,10 @@ export type CommandResult = ObjectCommandSuccess | WallLineSuccess | CommandFail
 export interface WorldChange {
   readonly type: 'added' | 'removed';
   readonly object: MapObject;
+}
+
+/** Whether all four tile coordinates of a `placeWallLine` command are safe integers (not NaN, missing or huge). */
+export function hasWholeTileCoordinates(command: Extract<WorldCommand, { type: 'placeWallLine' }>): boolean {
+  const { fromTx, fromTy, toTx, toTy } = command;
+  return [fromTx, fromTy, toTx, toTy].every((n) => Number.isSafeInteger(n));
 }

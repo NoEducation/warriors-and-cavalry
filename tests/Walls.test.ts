@@ -156,12 +156,32 @@ describe('placeWallLine', () => {
     expect(preview.placeable).toEqual([false, false, false, false, false, false]); // all built now
   });
 
-  it('rejects a malformed wall line without throwing or changing anything', () => {
-    const world = new World(flatMap(), new Economy(resources(0, 10, 0)));
-    const command = { type: 'placeWallLine', fromTx: 1.5, fromTy: 2 } as unknown as WorldCommand;
-    expect(world.apply(command)).toEqual({ ok: false, reason: 'OutOfBounds' });
-    expect(world.objectCount).toBe(0);
-    expect(world.economy.amount(STONE)).toBe(10);
+  describe('rejects a wall line whose coordinates are not safe integers as UnknownCommand, changing nothing', () => {
+    const malformed: [string, WorldCommand][] = [
+      ['a fractional from', { type: 'placeWallLine', fromTx: 1.5, fromTy: 2, toTx: 4, toTy: 2 }],
+      ['toTx NaN', { type: 'placeWallLine', fromTx: 1, fromTy: 2, toTx: Number.NaN, toTy: 2 }],
+      ['toTy missing', { type: 'placeWallLine', fromTx: 1, fromTy: 2, toTx: 4 } as unknown as WorldCommand],
+      ['fromTx 1e300', { type: 'placeWallLine', fromTx: 1e300, fromTy: 2, toTx: 4, toTy: 2 }],
+    ];
+    for (const [name, command] of malformed) {
+      it(name, () => {
+        const world = new World(flatMap(), new Economy(resources(0, 10, 0)));
+        const changes = recordChanges(world);
+        expect(world.apply(command)).toEqual({ ok: false, reason: 'UnknownCommand' });
+        expect(world.objectCount).toBe(0);
+        expect(world.economy.amount(STONE)).toBe(10);
+        expect(changes).toEqual([]);
+      });
+    }
+  });
+
+  it('does not place a Wall or a Hovel on a Gate tile', () => {
+    const world = new World(flatMap(), new Economy(resources(100, 100, 0)));
+    place(world, ObjectKind.Gate, 5, 5);
+    const command = (kind: ObjectKind): WorldCommand => ({ type: 'placeBuilding', kind, tx: 5, ty: 5 });
+    expect(world.apply(command(ObjectKind.Wall))).toEqual({ ok: false, reason: 'Occupied' });
+    expect(world.apply(command(ObjectKind.Hovel))).toEqual({ ok: false, reason: 'Occupied' });
+    expect(world.objectCount).toBe(1);
   });
 
   it('previews without changing anything', () => {
@@ -237,15 +257,17 @@ describe('walls and peasants', () => {
 
 describe('wall determinism', () => {
   it('gives equal checksums for two worlds given the same wall lines on the same ticks', () => {
+    const lines: Record<number, WorldCommand> = { 0: line(7, 7, 16, 9), 120: line(5, 20, 18, 3), 300: line(30, 30, -5, 18) };
     const run = (): number => {
       const world = new World(flatMap(), new Economy(resources(100, 100, 10)));
       world.spawn(ObjectKind.Keep, 10, 10);
       world.spawn(ObjectKind.Tree, 25, 12);
       world.apply({ type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 22, ty: 10 });
       for (let t = 0; t < 500; t++) {
-        if (t === 0) world.apply(line(7, 7, 16, 9));
-        if (t === 120) world.apply(line(5, 20, 18, 3));
-        if (t === 300) world.apply(line(30, 30, -5, 18));
+        if (lines[t]) {
+          const result = world.apply(lines[t]);
+          expect(result.ok && 'placed' in result ? result.placed : 0, `line on tick ${t}`).toBeGreaterThan(0);
+        }
         world.tick();
       }
       return worldChecksum(world);

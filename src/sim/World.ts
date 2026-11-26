@@ -12,13 +12,14 @@ import { Population, type PopulationSummary } from './Population';
 import { Production, type ProductionState } from './Production';
 import type { TileCoord } from './TileCoord';
 import { WallBuilder, type WallLinePreview } from './WallBuilder';
-import type {
-  CommandResult,
-  ObjectCommand,
-  ObjectCommandResult,
-  PlacementCheck,
-  WorldChange,
-  WorldCommand,
+import {
+  type CommandResult,
+  hasWholeTileCoordinates,
+  type ObjectCommand,
+  type ObjectCommandResult,
+  type PlacementCheck,
+  type WorldChange,
+  type WorldCommand,
 } from './WorldCommand';
 
 export class World {
@@ -145,6 +146,7 @@ export class World {
       }
       case 'demolish': return this.demolish(command.objectId);
       case 'placeWallLine':
+        if (!hasWholeTileCoordinates(command)) return { ok: false, reason: 'UnknownCommand' };
         return this.walls.build({ tx: command.fromTx, ty: command.fromTy }, { tx: command.toTx, ty: command.toTy });
       default: return { ok: false, reason: 'UnknownCommand' };
     }
