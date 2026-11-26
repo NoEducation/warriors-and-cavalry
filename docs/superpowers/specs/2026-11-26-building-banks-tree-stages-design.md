@@ -49,7 +49,7 @@ Tree stages:
   goes up by one; only when it reaches `treeChops` does `TreeFelling` turn it into a stump. So a tree gives 8 wood.
 - The woodcutter releases its claim after each round, so it (or another) picks the nearest free tree again, which is
   usually the same, already-started tree. To keep woodcutters finishing trees rather than starting many, a started
-  tree is preferred over an untouched one at the same distance (my call; nearest still wins).
+  tree in reach is searched for first, and untouched trees only when no started one can be reached (my call).
 - The world exposes `treeChopsTaken(id)`, and tells listeners with a new change `{ type: 'chopped', object }` so the
   renderer can follow without polling. The checksum includes each tree's chops taken, in id order.
 - Render: `TreeLayer` scales a tree's instance by stage (1.0, 0.85, 0.7, 0.55 of its size, tunable) when it hears
