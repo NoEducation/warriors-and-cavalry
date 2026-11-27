@@ -1,13 +1,6 @@
-/* The menus' medieval look: dark oak panels with bronze trim, parchment text and inline SVG icons. */
+/* The menus' medieval look: dark oak panels with bronze trim, parchment text and inline SVG icons.
+   Colours come only from the variables in colors.css. */
 :root {
-  --oak-dark: #2b1a0e;
-  --oak: #4a2e17;
-  --oak-light: #6b4423;
-  --bronze: #8a6a32;
-  --gold: #e0b450;
-  --parchment: #f1e2bd;
-  --parchment-dim: #c9b68c;
-  --danger: #ff7a5c;
   --serif: 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
 }
 
@@ -18,8 +11,8 @@
   left: 0;
   padding: 4px 8px;
   font-family: monospace;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.5);
+  color: var(--white);
+  background: var(--shadow-50);
 }
 /* Below this width the longest tile line could reach the resource bar, so the HUD moves below it. */
 @media (max-width: 1400px) {
@@ -35,9 +28,9 @@
   border: 2px solid var(--bronze);
   box-shadow:
     inset 0 0 0 1px var(--oak-dark),
-    inset 0 1px 0 1px rgba(224, 180, 80, 0.35),
-    0 3px 10px rgba(0, 0, 0, 0.6);
-  text-shadow: 0 1px 0 #000;
+    inset 0 1px 0 1px var(--gold-sheen),
+    0 3px 10px var(--shadow-60);
+  text-shadow: 0 1px 0 var(--black);
   user-select: none;
 }
 .panel button {
@@ -49,7 +42,7 @@
   display: block;
   width: 16px;
   height: 16px;
-  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(0 1px 0 var(--shadow-80));
 }
 
 /* Top: the resource bar. */
@@ -72,8 +65,8 @@
   padding: 2px 10px;
   font-size: 16px;
   font-variant-numeric: tabular-nums;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(138, 106, 50, 0.5);
+  background: var(--shadow-25);
+  border: 1px solid var(--bronze-faint);
   border-radius: 3px;
 }
 #resources .slot .icon {
@@ -110,7 +103,7 @@
   font-size: 14px;
   letter-spacing: 0.03em;
   color: var(--parchment-dim);
-  background: linear-gradient(180deg, var(--oak-dark), #1e1209);
+  background: linear-gradient(180deg, var(--oak-dark), var(--oak-darkest));
   border: 1px solid var(--bronze);
   border-bottom: none;
   border-radius: 6px 6px 0 0;
@@ -134,7 +127,7 @@
   padding: 6px;
   background: var(--oak-light);
   border: 1px solid var(--bronze);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 2px 6px var(--shadow-45);
 }
 
 /* A tool button: an inset wooden plaque with its icon, name, key badge and cost. */
@@ -146,12 +139,12 @@
   gap: 2px;
   min-width: 72px;
   padding: 4px 6px;
-  background: linear-gradient(180deg, #5a3a1d, #3a2410);
+  background: linear-gradient(180deg, var(--plaque-top), var(--plaque-bottom));
   border: 1px solid var(--oak-dark);
   border-radius: 4px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 220, 160, 0.2),
-    0 1px 2px rgba(0, 0, 0, 0.6);
+    inset 0 1px 0 var(--plaque-sheen),
+    0 1px 2px var(--shadow-60);
   white-space: nowrap;
 }
 #buildbar .tool[hidden] {
@@ -202,10 +195,10 @@
 }
 #buildbar .tool.active {
   border-color: var(--gold);
-  background: linear-gradient(180deg, #7a5326, #4e3014);
+  background: linear-gradient(180deg, var(--plaque-active-top), var(--plaque-active-bottom));
   box-shadow:
     0 0 0 1px var(--gold),
-    0 0 10px rgba(224, 180, 80, 0.6);
+    0 0 10px var(--gold-glow);
 }
 /* Demolish sits in the tab strip as a compact plaque. */
 #buildbar .tabs .tool {
@@ -268,10 +261,10 @@ body.in-menu #hud {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, rgba(27, 42, 56, 0.55) 0%, rgba(0, 0, 0, 0.85) 100%);
+  background: radial-gradient(ellipse at center, var(--sky-haze) 0%, var(--shadow-85) 100%);
 }
 #menu {
-  background: radial-gradient(ellipse at center, #2a3b4a 0%, #0b1016 100%);
+  background: radial-gradient(ellipse at center, var(--sky) 0%, var(--sky-dark) 100%);
 }
 #menu[hidden],
 #loading[hidden] {
@@ -315,7 +308,7 @@ body.in-menu #hud {
   background: var(--oak-dark);
   border: 1px solid var(--bronze);
   border-radius: 3px;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 2px 4px var(--shadow-60);
 }
 .menu-panel input:focus-visible {
   outline: 1px solid var(--gold);
@@ -331,10 +324,10 @@ body.in-menu #hud {
 .menu-panel button {
   padding: 5px 14px;
   font-size: 15px;
-  background: linear-gradient(180deg, #5a3a1d, #3a2410);
+  background: linear-gradient(180deg, var(--plaque-top), var(--plaque-bottom));
   border: 1px solid var(--bronze);
   border-radius: 4px;
-  box-shadow: inset 0 1px 0 rgba(255, 220, 160, 0.2);
+  box-shadow: inset 0 1px 0 var(--plaque-sheen);
 }
 .menu-panel button:hover,
 .menu-panel button:focus-visible {
@@ -345,7 +338,7 @@ body.in-menu #hud {
   padding: 8px 34px;
   font-size: 19px;
   color: var(--gold);
-  background: linear-gradient(180deg, #7a5326, #4e3014);
+  background: linear-gradient(180deg, var(--plaque-active-top), var(--plaque-active-bottom));
 }
 
 .loading-panel {
