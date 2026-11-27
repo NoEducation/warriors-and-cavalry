@@ -11,7 +11,7 @@ function setup(): { walker: PeasantWalker; blocked: Set<number>; peasant: Peasan
   const blocked = new Set<number>();
   const walkClass = (tx: number, ty: number): WalkClass =>
     tx >= 0 && ty >= 0 && tx < SIZE && ty < SIZE && !blocked.has(ty * SIZE + tx) ? WalkClass.Ground : WalkClass.Blocked;
-  return { walker: new PeasantWalker(SIZE, SIZE, walkClass), blocked, peasant: new Peasant(1, 0, 4) };
+  return { walker: new PeasantWalker(SIZE, SIZE, walkClass), blocked, peasant: new Peasant(1, 0, 4, 0) };
 }
 
 function ticks(walker: PeasantWalker, peasant: Peasant, n: number): void {

@@ -140,7 +140,7 @@ describe('Woodcutters', () => {
     const chopper = peasants(world).find((p) => p.state === 'chopping')!;
     const hutId = chopper.workplaceId!;
     expect(world.apply({ type: 'demolish', objectId: hutId }).ok).toBe(true);
-    expect(peasants(world).find((p) => p.id === chopper.id)).toMatchObject({ state: 'idle', treeId: null });
+    expect(peasants(world).find((p) => p.id === chopper.id)).toBeUndefined(); // it died with its hut
     expect(world.objectAt(24, 8)).toBe(trees[0]);
     expect(world.treeChopsTaken(trees[0].id)).toBe(2);
     const other = huts.find((h) => h.id !== hutId)!;
@@ -149,7 +149,7 @@ describe('Woodcutters', () => {
     expect(peasants(world).find((p) => p.workplaceId === other.id)).toBeDefined();
   });
 
-  it('free their tree when they leave for lack of housing, so a new woodcutter can fell it', () => {
+  it('free their tree when they die for lack of housing, so a new woodcutter can fell it', () => {
     const tiles = new Uint8Array(32 * 32).fill(TileType.Grass);
     const economy = new Economy(resources(200, 80, 5));
     const world = new World(new GameMap(32, 32, 1, new Float32Array(33 * 33), tiles), economy);
@@ -162,7 +162,6 @@ describe('Woodcutters', () => {
     expect(world.population.count).toBe(0);
     economy.add(ResourceKind.Wood, 50);
     place(world, ObjectKind.Keep, 2, 2);
-    economy.add(ResourceKind.Food, 5);
     tickUntil(world, () => world.objectAt(24, 7)?.kind === ObjectKind.Stump, 8000);
   });
 
@@ -185,6 +184,20 @@ describe('Woodcutters', () => {
     }
     tickUntil(world, () => world.productionState(huts[0].id)?.status === 'workerCannotReach');
     expect(world.objectAt(25, 7)?.kind).toBe(ObjectKind.Tree);
+  });
+
+  it('keep the job of a woodcutter whose only tree is walled in, and fell it once the wall opens', () => {
+    const { world, huts } = camp([[25, 7]]);
+    for (let ty = 6; ty <= 8; ty++) {
+      for (let tx = 24; tx <= 26; tx++) if (tx !== 25 || ty !== 7) place(world, ObjectKind.Wall, tx, ty);
+    }
+    tickUntil(world, () => world.productionState(huts[0].id)?.status === 'workerCannotReach');
+    for (let i = 0; i < 300; i++) world.tick();
+    expect(peasants(world)).toHaveLength(1);
+    expect(peasants(world)[0]).toMatchObject({ id: 1, workplaceId: huts[0].id, state: 'toTree', treeId: null });
+    expect(world.apply({ type: 'demolish', objectId: world.objectAt(24, 7)!.id }).ok).toBe(true);
+    tickUntil(world, () => world.treeChopsTaken(world.objectAt(25, 7)!.id) > 0, 2000);
+    expect(peasants(world)[0].id).toBe(1);
   });
 
   it('do not stall the game when the only trees in reach stand on an island they cannot reach', () => {

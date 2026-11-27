@@ -11,7 +11,8 @@ const FNV_PRIME = 0x01000193;
  * 32-bit FNV-1a over the bytes of the map's `heights` and `tiles`, then (as little-endian int32) the tick count,
  * each resource's amount and capacity in `RESOURCE_KINDS` order, each object's id, kind, tx and ty in id order,
  * each producing building's cycle progress in id order, the id and remaining skip ticks of each building skipped by
- * job assignment in id order, the id and ticks left of each stump in id order, the id and rounds taken of each chopped tree in id order, the arrival timer, and each peasant in id order (see `feedPeasant`).
+ * worker spawning in id order, the id and ticks left of each stump in id order, the id and rounds taken of each
+ * chopped tree in id order, and each peasant in id order (see `feedPeasant`).
  * Use to compare worlds cheaply, e.g. between peers.
  */
 export function worldChecksum(world: World): number {
@@ -45,17 +46,14 @@ export function worldChecksum(world: World): number {
     const chops = world.treeChopsTaken(object.id);
     if (chops > 0) hash = feedInt32(feedInt32(hash, object.id), chops);
   }
-  hash = feedInt32(hash, world.arrivalTimer);
   for (const p of world.peasants()) hash = feedPeasant(hash, p);
   return hash >>> 0;
 }
 
 /**
  * Everything a later tick reads of peasant `p`: id, state index, tx, ty, nextTx, nextTy, step progress, step ticks,
- * load resource (-1 for none) and amount, workplace id (0 for none), delivery target id (0 for none), tree id (0 for none),
- * wait ticks,
- * path index, the tiles still ahead on its path (count, then each tx and ty), its walk mode and its stand's tx and ty (-1, -1 for
- * none).
+ * load resource (-1 for none) and amount, workplace id, delivery target id (0 for none), tree id (0 for none), wait
+ * ticks, path index, the tiles still ahead on its path (count, then each tx and ty) and its walk mode.
  */
 function feedPeasant(hash: number, p: PeasantView): number {
   hash = feedInt32(hash, p.id);
@@ -68,15 +66,13 @@ function feedPeasant(hash: number, p: PeasantView): number {
   hash = feedInt32(hash, p.stepTicks);
   hash = feedInt32(hash, p.load ? p.load.resource : -1);
   hash = feedInt32(hash, p.load ? p.load.amount : 0);
-  hash = feedInt32(hash, p.workplaceId ?? 0);
+  hash = feedInt32(hash, p.workplaceId);
   hash = feedInt32(hash, p.targetId ?? 0);
   hash = feedInt32(hash, p.treeId ?? 0);
   hash = feedInt32(hash, p.waitTicks);
   hash = feedInt32(hash, p.pathIndex);
   hash = feedTiles(hash, p.path, p.pathIndex);
-  hash = feedInt32(hash, p.walkMode);
-  hash = feedInt32(hash, p.stand ? p.stand.tx : -1);
-  return feedInt32(hash, p.stand ? p.stand.ty : -1);
+  return feedInt32(hash, p.walkMode);
 }
 
 /** Feeds the number of `tiles` from index `from` on, then each one's tx and ty. */

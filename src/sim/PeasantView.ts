@@ -4,11 +4,11 @@ import type { TileCoord } from './TileCoord';
 import type { WalkMode } from './walkRules';
 
 /** Every peasant state, in checksum order (a state's index is what the checksum covers). */
-export const PEASANT_STATES = Object.freeze(['idle', 'toWork', 'working', 'toStore', 'toWorkBack', 'toTree', 'chopping'] as const);
+export const PEASANT_STATES = Object.freeze(['toWork', 'working', 'toStore', 'toWorkBack', 'toTree', 'chopping'] as const);
 
 /**
- * What a peasant is doing: nothing, walking to work, working, carrying to storage, walking back to work, or (a
- * woodcutter) walking to its tree and chopping it.
+ * What a worker is doing: walking to work, working, carrying to storage, walking back to work, or (a woodcutter)
+ * walking to its tree and chopping it. There is no idle state: every peasant is a worker.
  */
 export type PeasantState = (typeof PEASANT_STATES)[number];
 
@@ -33,8 +33,8 @@ export interface PeasantView {
   /** Ticks the current step takes; 0 when not moving. */
   readonly stepTicks: number;
   readonly load: Load | null;
-  /** Id of the building it works at; null when it has no job. */
-  readonly workplaceId: number | null;
+  /** Id of the building it works at; it is born with it and dies with it. */
+  readonly workplaceId: number;
   /** The storage place it carries its load to; null when not delivering or no storage place is in reach. */
   readonly targetId: number | null;
   /** The tree a woodcutter walks to or chops; null otherwise. */
@@ -46,6 +46,4 @@ export interface PeasantView {
   readonly pathIndex: number;
   /** How its current walk may use the wall walk (see `WalkMode`). */
   readonly walkMode: WalkMode;
-  /** The tile near the Keep an idle peasant stands on or heads for; null when it has none. */
-  readonly stand: TileCoord | null;
 }

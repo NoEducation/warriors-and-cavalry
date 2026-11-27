@@ -26,7 +26,7 @@ export class StartMenu {
       this.start();
     });
     form.appendChild(document.createElement('h1')).textContent = 'Warriors and Cavalry';
-    form.appendChild(document.createElement('p')).textContent = 'Raise a keep, feed your peasants, hold the land.';
+    form.appendChild(document.createElement('p')).textContent = 'Raise a keep, put your people to work, hold the land.';
 
     const label = form.appendChild(document.createElement('label'));
     label.className = 'seed';

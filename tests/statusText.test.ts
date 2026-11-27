@@ -3,10 +3,10 @@ import type { ProductionStatus } from '../src/sim/Production';
 import { peasantCountText, productionStatusText } from '../src/ui/statusText';
 
 describe('peasantCountText', () => {
-  it('shows peasants over housing, and the idle ones when any', () => {
-    expect(peasantCountText({ count: 3, housing: 8, idle: 2 })).toBe('3/8 (2 idle)');
-    expect(peasantCountText({ count: 0, housing: 0, idle: 0 })).toBe('0/0');
-    expect(peasantCountText({ count: 4, housing: 4, idle: 0 })).toBe('4/4');
+  it('shows workers over the worker limit, with no idle count', () => {
+    expect(peasantCountText({ count: 3, housing: 8 })).toBe('3/8');
+    expect(peasantCountText({ count: 0, housing: 0 })).toBe('0/0');
+    expect(peasantCountText({ count: 4, housing: 4 })).toBe('4/4');
   });
 });
 

@@ -79,16 +79,15 @@ const peasantOf = (world: World): PeasantView | undefined => [...world.peasants(
 function remaining(p: PeasantView): Record<keyof PeasantView, unknown> {
   const { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, treeId, waitTicks } = p;
   const view = { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, treeId, waitTicks };
-  return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, walkMode: p.walkMode, stand: p.stand };
+  return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, walkMode: p.walkMode };
 }
 
 /**
- * Asserts that `a` and `b` have the same tick count, economy, objects, arrival timer and one peasant each, alike in
+ * Asserts that `a` and `b` have the same tick count, economy, objects and one peasant each, alike in
  * every field (its path compared by the tiles still ahead) except `field`.
  */
 function expectOnlyPeasantFieldDiffers(a: World, b: World, field: keyof PeasantView): void {
   expect(a.tickCount).toBe(b.tickCount);
-  expect(a.arrivalTimer).toBe(b.arrivalTimer);
   for (const kind of RESOURCE_KINDS) {
     expect(a.economy.amount(kind)).toBe(b.economy.amount(kind));
     expect(a.economy.capacity(kind)).toBe(b.economy.capacity(kind));
@@ -112,9 +111,9 @@ describe('worldChecksum', () => {
     // started covering resource amounts and capacities (was 541835208 before that), and again when it started
     // covering the arrival timer and the peasants (was 1606265378 before that), and again when map generation gained
     // ridged mountains (was 3863915074 before that), and again when it gained quarry ground (was 3247290596 before
-    // that).
+    // that), and again when the arrival timer left it (was 1557280754 before that).
     // Tree looks are render-only, so changing them must not change this value.
-    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(1557280754);
+    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(1121369298);
   });
 
   it('differs for different seeds', () => {
@@ -181,8 +180,8 @@ describe('worldChecksum', () => {
   });
 
   it('covers the ticks a building is skipped by job assignment', () => {
-    // A hut cut off by water; in A it stands before the only peasant arrives (tick 50), in B it is placed 5 ticks
-    // later. Each peasant gives the hut up at once, so only the remaining skip ticks differ.
+    // A hut cut off by water from the Keep; in A it is placed at tick 40, in B at tick 55. No worker is spawned for it
+    // in either, so only the remaining skip ticks differ.
     const size = 16;
     const tiles = new Uint8Array(size * size).fill(TileType.Grass);
     for (let i = 9; i < size; i++) tiles[9 * size + i] = tiles[i * size + 9] = TileType.Water;
@@ -200,7 +199,7 @@ describe('worldChecksum', () => {
     };
     const a = run(40);
     const b = run(55);
-    expect([a.jobSkipTicks(3), b.jobSkipTicks(3)]).toEqual([150, 156]);
+    expect([a.jobSkipTicks(3), b.jobSkipTicks(3)]).toEqual([141, 156]);
     expect([...a.peasants()]).toEqual([...b.peasants()]);
     expect(worldChecksum(a)).not.toBe(worldChecksum(b));
   });
@@ -209,27 +208,14 @@ describe('worldChecksum', () => {
     const run = (): World => {
       const world = new World(flatMap());
       world.apply({ type: 'placeBuilding', kind: ObjectKind.Keep, tx: 1, ty: 1 });
+      world.apply({ type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 6, ty: 6 });
+      world.apply({ type: 'placeBuilding', kind: ObjectKind.WoodcutterHut, tx: 6, ty: 1 });
       for (let i = 0; i < 300; i++) world.tick();
       return world;
     };
     const a = run();
-    expect(a.population.count).toBe(4);
+    expect(a.population.count).toBe(2);
     expect(worldChecksum(a)).toBe(worldChecksum(run()));
-  });
-
-  it('covers the arrival timer and the peasants', () => {
-    // Keep placed one tick later in B. After 120 ticks both have 2 peasants and the same food; only the timer differs.
-    const keep = { type: 'placeBuilding', kind: ObjectKind.Keep, tx: 1, ty: 1 } as const;
-    const a = new World(flatMap());
-    a.apply(keep);
-    for (let i = 0; i < 120; i++) a.tick();
-    const b = new World(flatMap());
-    b.tick();
-    b.apply(keep);
-    for (let i = 0; i < 119; i++) b.tick();
-    expect([a.arrivalTimer, b.arrivalTimer]).toEqual([20, 19]);
-    expect(a.population.count).toBe(b.population.count);
-    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
   });
 
   it('covers the ticks a carrier still waits before searching again', () => {
@@ -292,24 +278,6 @@ describe('worldChecksum', () => {
     const b = run(true);
     expect(a.tickCount).toBe(b.tickCount);
     expectOnlyPeasantFieldDiffers(a, b, 'path');
-    expect(worldChecksum(a)).not.toBe(worldChecksum(b));
-  });
-
-  it('covers the peasants, not only the food they cost', () => {
-    // Same objects, food, tick count and timer; A paid 5 of its 50 food for a peasant, B started too poor and is
-    // topped up to the same 45 afterwards.
-    const keep = { type: 'placeBuilding', kind: ObjectKind.Keep, tx: 1, ty: 1 } as const;
-    const a = new World(flatMap());
-    a.apply(keep);
-    for (let i = 0; i < 50; i++) a.tick();
-    const poor = new Economy(resources(100, 40, 4));
-    const b = new World(flatMap(), poor);
-    b.apply(keep);
-    for (let i = 0; i < 50; i++) b.tick();
-    poor.add(ResourceKind.Food, 41);
-    expect([a.population.count, b.population.count]).toEqual([1, 0]);
-    expect([a.economy.amount(ResourceKind.Food), b.economy.amount(ResourceKind.Food)]).toEqual([45, 45]);
-    expect([a.arrivalTimer, b.arrivalTimer]).toEqual([0, 0]);
     expect(worldChecksum(a)).not.toBe(worldChecksum(b));
   });
 });

@@ -12,9 +12,9 @@ import type { WoodcutterTrips } from './WoodcutterTrips';
 
 export class WorkerTrips {
   /**
-   * Trips in `world` to the storage places `stores`, delivering into `economy`; `jobs` is told when a worker
-   * gives its job up, and `woodcutters` takes the woodcutters' walks to their trees. A carrier whose target storage
-   * place is removed re-targets on its next tick.
+   * Trips in `world` to the storage places `stores`, delivering into `economy`; `jobs` is told when a worker is
+   * dismissed, and `woodcutters` takes the woodcutters' walks to their trees. A carrier whose target storage place
+   * is removed re-targets on its next tick.
    */
   public constructor(
     private readonly world: PopulationHost,
@@ -25,10 +25,9 @@ export class WorkerTrips {
     private readonly woodcutters: WoodcutterTrips,
   ) {}
 
-  /** Gives the idle `p` the vacant job at `buildingId` and sends it there; with no path it gives the job up. */
-  public startWork(p: Peasant, buildingId: number): void {
-    this.jobs.take(buildingId, p);
-    if (!this.planWorkWalk(p)) this.giveUpJob(p);
+  /** Sends the new worker `p` from where it stands to its workplace; false when there is no way there. */
+  public startWork(p: Peasant): boolean {
+    return this.planWorkWalk(p);
   }
 
   /**
@@ -43,33 +42,37 @@ export class WorkerTrips {
     return felled;
   }
 
-  /** Makes `p` idle where it stands, dropping its load and freeing its job; fine when its workplace is already gone. */
-  public stop(p: Peasant): void {
+  /**
+   * Frees the tree `p` has claimed and its job, for the caller to remove it (its load is lost). Fine when its
+   * workplace is already gone.
+   */
+  public dismiss(p: Peasant): void {
     this.woodcutters.release(p);
-    this.jobs.release(p, false);
-    p.goIdle();
+    this.jobs.release(p);
   }
 
   /**
-   * True when `p` carries a load, waits after a failed search and a storage place for its load stands: one exists,
-   * but it cannot reach it.
+   * True when `p` waits after a failed search for a way that exists but is blocked: to its workplace, to a storage
+   * place for its load (one stands), or (a woodcutter) to the free trees in reach of its hut.
    */
   public isStranded(p: Peasant): boolean {
-    return p.state === 'toStore' && p.waitTicks > 0 && p.load !== null && this.stores.anyFor(p.load.resource);
+    if (p.waitTicks === 0) return false;
+    if (p.state === 'toWork' || p.state === 'toWorkBack') return true;
+    if (p.state === 'toStore') return p.load !== null && this.stores.anyFor(p.load.resource);
+    return this.woodcutters.isCutOff(p);
   }
 
   /**
-   * Advances the worker `p` by one tick of what its state has it do (idle peasants are `IdleStands`' business).
-   * Call once per tick per peasant, in ascending id order.
+   * Advances the worker `p` by one tick of what its state has it do. Call once per tick per peasant, in ascending id
+   * order.
    */
   public tick(p: Peasant): void {
     switch (p.state) {
-      case 'idle': // see IdleStands
       case 'chopping': // production hands it the wood when the tree falls (see `carry`)
         break;
       case 'working': // stands at work (production hands it each batch), or a woodcutter waits for a free tree
       case 'toTree':
-        if (!this.woodcutters.tick(p)) this.giveUpJob(p);
+        this.woodcutters.tick(p);
         break;
       case 'toWork':
       case 'toWorkBack':
@@ -81,16 +84,21 @@ export class WorkerTrips {
     }
   }
 
-  /** Walking to work (first or after a delivery): re-routes when blocked, starts working on arrival. */
+  /**
+   * Walking to work (first or after a delivery): re-routes when blocked, starts working on arrival. With no way
+   * there it waits where it stands and searches again, keeping its job.
+   */
   private tickToWork(p: Peasant): void {
-    if (this.needsNewPath(p) && !this.planWorkWalk(p)) {
-      this.giveUpJob(p);
-      return;
+    if (p.waitTicks > 0) {
+      if (!p.countDownWait()) return;
+      if (!this.planWorkWalk(p)) return p.waitToRetry();
+    } else if (this.needsNewPath(p) && !this.planWorkWalk(p)) {
+      return p.waitToRetry();
     }
     this.walker.tick(p);
     if (!this.isWalkDone(p)) return;
-    const arrived = this.isAt(p, p.workplaceId);
-    if (!(arrived ? this.woodcutters.arriveAtWork(p) : this.planWorkWalk(p))) this.giveUpJob(p);
+    if (this.isAt(p, p.workplaceId)) this.woodcutters.arriveAtWork(p);
+    else if (!this.planWorkWalk(p)) p.waitToRetry();
   }
 
   /** Carrying a load: waits out a failed search, re-routes when needed, delivers on arrival. */
@@ -107,18 +115,11 @@ export class WorkerTrips {
     else this.planDelivery(p);
   }
 
-  /** Stores `p`'s load (what does not fit is lost) and sends it back to work. */
+  /** Stores `p`'s load (what does not fit is lost) and sends it back to work, or has it wait when it cannot. */
   private deliverLoad(p: Peasant): void {
     const load = p.deliver();
     if (load) this.economy.add(load.resource, load.amount);
-    if (!this.planWorkWalk(p)) this.giveUpJob(p);
-  }
-
-  /** Frees `p`'s job, skipping its building for a while, and makes it idle where it stands. */
-  private giveUpJob(p: Peasant): void {
-    this.woodcutters.release(p);
-    this.jobs.release(p, true);
-    p.goIdle();
+    if (!this.planWorkWalk(p)) p.waitToRetry();
   }
 
   /** True when `p`'s walk is no good any more: its delivery target is gone, or the next tile was built over. */
@@ -133,7 +134,7 @@ export class WorkerTrips {
 
   /** Searches from where `p` stands toward its workplace's access tiles; false when there is no way there. */
   private planWorkWalk(p: Peasant): boolean {
-    return p.workplaceId !== null && this.walker.walkTo(p, this.world.accessTiles(p.workplaceId));
+    return this.walker.walkTo(p, this.world.accessTiles(p.workplaceId));
   }
 
   /**
