@@ -218,6 +218,9 @@ export class World {
       case 'demolish': return this.lifecycle.demolish(command.objectId);
       case 'placeWallLine': return this.walls.build(command);
       case 'trainUnit': return this.army.train(command);
+      case 'orderMove':
+      case 'orderAttack':
+        return this.army.order(command);
       default: return { ok: false, reason: 'UnknownCommand' };
     }
   }

@@ -1,12 +1,17 @@
 // Every soldier and raider: training at the Barracks, their orders, and one tick of fighting.
 import { firstAccessTile } from './accessOrder';
 import type { ArmyHost } from './ArmyHost';
+import { ArmyOrders } from './ArmyOrders';
+import { Battlefield } from './Battlefield';
 import type { MapObject } from './MapObject';
+import { SoldierBrain } from './SoldierBrain';
+import { StepWalker } from './StepWalker';
 import { Training, type TrainingQueueView } from './Training';
 import { Unit } from './Unit';
 import { isUnitKind, Side, type UnitKind, UNIT_KINDS } from './UnitKind';
 import type { UnitView } from './UnitView';
-import type { CommandFailure, TrainUnitCommand, TrainUnitSuccess } from './WorldCommand';
+import { UnitWalks } from './UnitWalks';
+import type { CommandFailure, OrderCommand, OrderSuccess, TrainUnitCommand, TrainUnitSuccess } from './WorldCommand';
 
 /** Soldier totals for the UI: living player soldiers, and the room the Barracks give. */
 export interface SoldierSummary {
@@ -18,10 +23,18 @@ export class Army {
   /** Units by id; ids only increase, so insertion order is ascending id order. */
   private readonly byId = new Map<number, Unit>();
   private readonly training = new Training();
+  private readonly orders: ArmyOrders;
+  private readonly soldierBrain: SoldierBrain;
   private nextId = 1;
 
   /** The army of `world`. Create once per world. */
-  public constructor(private readonly world: ArmyHost) {}
+  public constructor(private readonly world: ArmyHost) {
+    const walker = new StepWalker(world.map.width, world.map.height, (tx, ty) => world.walkClass(tx, ty));
+    const field = new Battlefield(world, this.byId, () => {});
+    const walks = new UnitWalks(world, walker, field);
+    this.orders = new ArmyOrders(world, this.byId);
+    this.soldierBrain = new SoldierBrain(field, walks);
+  }
 
   /** Every unit in ascending id order (dead ones only until the end of the tick that killed them). */
   public units(): Iterable<UnitView> {
@@ -82,9 +95,19 @@ export class Army {
     return { ok: true, queued: this.training.enqueue(barracksId, unitKind) };
   }
 
+  /** Gives player soldiers a `move` or `attack` order; see `ArmyOrders.apply`. */
+  public order(command: OrderCommand): OrderSuccess | CommandFailure {
+    return this.orders.apply(command);
+  }
+
   /** Advances one tick: training, then every living unit in ascending id order, then the dead are removed. */
   public tick(): void {
     this.training.tick((barracks, kind) => this.stepOut(barracks, kind));
+    for (const unit of this.byId.values()) {
+      if (!unit.alive) continue;
+      unit.countDown();
+      if (unit.side === Side.Player) this.soldierBrain.tick(unit);
+    }
     this.removeDead();
   }
 
