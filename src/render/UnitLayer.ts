@@ -7,7 +7,7 @@ import { hash2 } from '../sim/rng';
 import { Side, UnitKind } from '../sim/UnitKind';
 import type { UnitView } from '../sim/UnitView';
 import type { World } from '../sim/World';
-import { PeasantMeshes } from './PeasantMeshes';
+import { PeasantMeshes, UNIT_PARTS } from './PeasantMeshes';
 import { PeasantPart } from './peasantParts';
 import { type Pose, peasantPose } from './peasantPose';
 import { PeasantRig } from './PeasantRig';
@@ -39,7 +39,7 @@ export function unitSpreadOffset(id: number, axis: 0 | 1): number {
 export class UnitLayer implements WorldLayer {
   /** Add this to the scene; holds one instanced mesh per body part (`unit-<part>`). */
   public readonly object = new THREE.Group();
-  private readonly meshes = new PeasantMeshes(this.object, UNIT_RENDER_CONFIG.initialCapacity, 'unit');
+  private readonly meshes = new PeasantMeshes(this.object, UNIT_RENDER_CONFIG.initialCapacity, 'unit', UNIT_PARTS);
   private readonly tracks = new PeasantTracks((world) => world.units());
   private readonly rig = new PeasantRig();
   private readonly parts = this.rig.createMatrices();
