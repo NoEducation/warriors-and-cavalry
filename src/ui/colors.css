@@ -30,7 +30,7 @@
   --blood: #5e100c;
 
   /* Grey-brown mist that hangs around the edges of the game view. */
-  --mist: #5a544c;
+  --mist: #6e675e;
 
   /* The start menu's night sky behind the panel. */
   --sky: #3a2a22;
@@ -48,7 +48,7 @@
   --shadow-80: color-mix(in srgb, var(--black) 80%, transparent);
   --shadow-85: color-mix(in srgb, var(--black) 85%, transparent);
   --select-fill: color-mix(in srgb, var(--select) 15%, transparent);
-  --mist-thin: color-mix(in srgb, var(--mist) 35%, transparent);
-  --mist-thick: color-mix(in srgb, var(--mist) 80%, transparent);
+  --mist-thin: color-mix(in srgb, var(--mist) 22%, transparent);
+  --mist-thick: color-mix(in srgb, var(--mist) 58%, transparent);
   --blood-veil: color-mix(in srgb, var(--blood) 85%, transparent);
 }
