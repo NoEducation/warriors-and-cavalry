@@ -11,9 +11,9 @@ import { beachGrassBlend, sandColor, seabedColor } from './shoreColor';
 /** Colour tuning for the terrain, in sRGB hex colours and world units. Tune by editing these values. */
 export const TERRAIN_LOOK_CONFIG = Object.freeze({
   /** Late-autumn grass: dark olive turf, faded ochre meadows, rust-brown dead patches, grey-green uplands. */
-  grassLush: 0x434f26,
-  grassMeadow: 0x625f30,
-  grassDry: 0x7a5a2c,
+  grassLush: 0x4b5a2a,
+  grassMeadow: 0x6c6936,
+  grassDry: 0x86633a,
   grassHighland: 0x51523a,
   rockMoss: 0x55574a,
   rockStone: 0x625e58,
