@@ -9,12 +9,12 @@ export const SCENE_LOOK_CONFIG = Object.freeze({
   fogNear: 90,
   fogFar: 340,
   /** Grey overcast sky light from above and a dark earth bounce from below. */
-  skyLight: 0x8c8f96,
+  skyLight: 0x9fa2a8,
   groundLight: 0x3a2c1e,
-  hemisphereIntensity: 1.0,
-  ambientIntensity: 0.1,
+  hemisphereIntensity: 1.35,
+  ambientIntensity: 0.16,
   /** A low, dim, copper sun: long shadows on slopes, warm rims on roofs. */
   sunColor: 0xd9a066,
-  sunIntensity: 1.95,
-  sunDirection: Object.freeze({ x: -0.8, y: 0.5, z: -0.35 }),
+  sunIntensity: 2.4,
+  sunDirection: Object.freeze({ x: -0.8, y: 0.62, z: -0.35 }),
 });
