@@ -66,6 +66,17 @@ describe('orders', () => {
     expect(unit(world, archer)).toMatchObject({ tx: 10, ty: 8, hitPoints: 35 });
   });
 
+  it('has a Spearman on a wall ordered to attack a raider below walk down and fight it', () => {
+    const world = combatWorld();
+    wallWithStairs(world);
+    const spearman = world.spawnUnit(Side.Player, UnitKind.Spearman, 10, 6).id;
+    const raider = world.spawnUnit(Side.Raider, UnitKind.Spearman, 11, 6).id; // at the foot of the wall
+    world.apply({ type: 'orderAttack', unitIds: [spearman], targetUnitId: raider });
+    run(world, 5);
+    expect(unit(world, spearman)?.order).toBe('attack');
+    runUntil(world, () => unit(world, raider) === undefined || unit(world, spearman) === undefined, 800);
+  });
+
   it('skips duplicate, dead and raider ids, and fails when no living player unit is left', () => {
     const world = combatWorld();
     const a = world.spawnUnit(Side.Player, UnitKind.Spearman, 2, 2).id;

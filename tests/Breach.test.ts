@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { PathFinder } from '../src/sim/PathFinder';
 import { ObjectKind } from '../src/sim/ObjectKind';
 import { Side, UnitKind } from '../src/sim/UnitKind';
 import type { World } from '../src/sim/World';
@@ -34,6 +35,29 @@ describe('gates and breaching', () => {
     expect(breached.size).toBe(1);
     const [piece] = breached;
     expect(world.objectById(piece)).toBeUndefined();
+  });
+
+  it('still breaks in when two or more workers stand in sight behind the wall', () => {
+    const world = combatWorld(32, () => false, 1);
+    const { keepId } = walledKeep(world);
+    world.spawn(ObjectKind.WoodcutterHut, 10, 10);
+    world.spawn(ObjectKind.WoodcutterHut, 16, 10);
+    runUntil(world, () => world.population.count === 2 && [...world.peasants()].every((p) => p.state === 'working'), 300);
+    for (const tx of [12, 13, 14]) world.spawnUnit(Side.Raider, UnitKind.Spearman, tx, 4);
+    runUntil(world, () => (world.buildingHitPoints(keepId)?.current ?? 0) < 600 || world.population.count < 2, 3000);
+  });
+
+  it('searches the way to a walled Keep once for a wave standing on one tile', () => {
+    const world = combatWorld(64, () => false, 1);
+    const corners: [number, number, number, number][] = [[9, 9, 18, 9], [18, 9, 18, 18], [18, 18, 9, 18], [9, 18, 9, 9]];
+    for (const [fromTx, fromTy, toTx, toTy] of corners) world.apply({ type: 'placeWallLine', fromTx, fromTy, toTx, toTy });
+    world.spawn(ObjectKind.Keep, 12, 12);
+    for (let i = 0; i < 6; i++) world.spawnUnit(Side.Raider, UnitKind.Spearman, 40, 40);
+    const searches = vi.spyOn(PathFinder.prototype, 'findWith');
+    world.tick();
+    // One failed search to the Keep, one breach search, then each raider's short walk to the hole.
+    expect(searches.mock.calls.length).toBeLessThanOrEqual(8);
+    searches.mockRestore();
   });
 
   it('has raiders cut off by water wait between searches instead of searching every tick', () => {

@@ -17,6 +17,9 @@ export interface RaidGround {
 }
 
 export class RaiderBrain {
+  /** The last place and tick a building was found out of reach, so raiders standing together search for it once. */
+  private readonly failed = { tick: -1, goalId: 0, tx: -1, ty: -1 };
+
   /** Raiders fighting on `field` over `ground`, walking with `walks` and breaking through with `breach`. */
   public constructor(
     private readonly field: Battlefield,
@@ -27,15 +30,20 @@ export class RaiderBrain {
 
   /** Advances the raider `unit` by one tick. Call once per tick per living raider, in ascending id order. */
   public tick(unit: Unit): void {
-    const target = this.choose(unit);
+    let target = this.choose(unit);
     unit.setTarget(target);
-    const place = target ? this.field.place(target) : null;
-    if (!target || !place) return this.walks.halt(unit);
-    if (this.walks.pursue(unit, target, place) === 'busy') return;
-    if (target.type !== 'building') {
-      unit.ignoreTarget();
-      return this.walks.halt(unit);
+    let place = target ? this.field.place(target) : null;
+    if (target && place && target.type !== 'building') {
+      if (this.walks.pursue(unit, target, place) === 'busy') return;
+      unit.ignoreTarget(); // out of every way: give up chasing for a while and march on this tick
+      const march = this.marchTarget(unit);
+      target = march ? { type: 'building', id: march.id } : null;
+      unit.setTarget(target);
+      place = target ? this.field.place(target) : null;
     }
+    if (!target || !place) return this.walks.halt(unit);
+    if (!this.failedHereThisTick(unit, target.id) && this.walks.pursue(unit, target, place) === 'busy') return;
+    this.noteFailure(unit, target.id);
     const hole = this.holeFor(unit, target.id, place);
     const holePlace = hole === null ? null : this.field.place({ type: 'building', id: hole });
     if (hole !== null && holePlace) {
@@ -47,15 +55,31 @@ export class RaiderBrain {
   }
 
   /**
+   * True when, this tick, a raider standing where `unit` stands has already found no way to building `goalId`, and
+   * `unit` has no walk there yet: a wave on one tile searches once, not once per raider.
+   */
+  private failedHereThisTick(unit: Unit, goalId: number): boolean {
+    const f = this.failed;
+    const fresh = unit.chaseTx < 0 && unit.waitTicks === 0;
+    return fresh && f.tick === this.field.tick && f.goalId === goalId && f.tx === unit.nextTx && f.ty === unit.nextTy;
+  }
+
+  /** Remembers that from where `unit` stands there is no way to building `goalId` this tick. */
+  private noteFailure(unit: Unit, goalId: number): void {
+    Object.assign(this.failed, { tick: this.field.tick, goalId, tx: unit.nextTx, ty: unit.nextTy });
+  }
+
+  /**
    * Its target this tick: the unit or worker it fights while it lives and stays in sight; else the nearest enemy in
-   * sight; else the building it already goes for; else the building it marches on.
+   * sight (only within reach while it has given up chasing); else the building it already goes for; else the
+   * building it marches on.
    */
   private choose(unit: Unit): UnitTarget | null {
-    const sight = UNIT_KINDS[unit.kind].sight;
+    const sight = unit.ignoreTicks > 0 ? this.field.reach(unit) : UNIT_KINDS[unit.kind].sight;
     const current = unit.target;
     const place = current ? this.field.place(current) : null;
     if (current && place && current.type !== 'building' && distanceTo(unit.tx, unit.ty, place) <= sight) return current;
-    const enemy = this.field.nearestEnemy(unit, true);
+    const enemy = this.field.nearestEnemy(unit, true, sight);
     if (enemy) return enemy;
     if (current?.type === 'building' && place) return current;
     const march = this.marchTarget(unit);

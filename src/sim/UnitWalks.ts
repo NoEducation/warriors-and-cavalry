@@ -7,7 +7,7 @@ import { PATH_CONFIG } from './pathConfig';
 import type { StepWalker } from './StepWalker';
 import type { TileCoord } from './TileCoord';
 import type { Unit } from './Unit';
-import { Side } from './UnitKind';
+import { Side, UnitKind } from './UnitKind';
 import type { UnitTarget } from './UnitView';
 import { WalkClass, type WalkClassOf, WalkMode } from './walkRules';
 
@@ -90,15 +90,20 @@ export class UnitWalks {
     return 'busy';
   }
 
-  /** The tiles from which `unit` could strike `place` (within its reach, not on it for a building), row by row. */
+  /**
+   * The tiles from which `unit` could strike `place` (within its reach, not on it for a building; for a Spearman only
+   * tiles on the target's own level, wall top or ground), row by row.
+   */
   public reachTiles(unit: Unit, place: TargetPlace): TileCoord[] {
     const reach = this.field.reach(unit);
+    const melee = unit.kind === UnitKind.Spearman;
     const { width, height } = this.world.map;
     const tiles: TileCoord[] = [];
     for (let ty = Math.max(0, place.ty - reach); ty <= Math.min(height - 1, place.ty + place.height - 1 + reach); ty++) {
       for (let tx = Math.max(0, place.tx - reach); tx <= Math.min(width - 1, place.tx + place.width - 1 + reach); tx++) {
         const d = distanceTo(tx, ty, place);
-        if (d <= reach && (d > 0 || place.width === 1)) tiles.push({ tx, ty });
+        if (d > reach || (d === 0 && place.width > 1) || (melee && this.field.isTop(tx, ty) !== place.onTop)) continue;
+        tiles.push({ tx, ty });
       }
     }
     return tiles;

@@ -34,6 +34,11 @@ export class Battlefield {
     private readonly damageBuilding: (objectId: number, amount: number) => void,
   ) {}
 
+  /** The tick being run. */
+  public get tick(): number {
+    return this.world.tickCount;
+  }
+
   /** True when tile (tx, ty) is a wall or tower top. */
   public isTop(tx: number, ty: number): boolean {
     return this.world.walkClass(tx, ty) === WalkClass.Top;

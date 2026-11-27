@@ -42,12 +42,13 @@ export class SoldierBrain {
   }
 
   /**
-   * Fights what comes near: a Spearman goes for the nearest raider in sight it may strike, an Archer only shoots the
-   * nearest in reach and never walks on its own (so archers stay on the walls). With none it stands.
+   * Fights what comes near: a Spearman goes for the nearest raider in sight it may strike (only within reach for a
+   * while after one was out of every way), an Archer only shoots the nearest in reach and never walks on its own (so
+   * archers stay on the walls). With none it stands.
    */
   private stand(unit: Unit): void {
-    const archer = unit.kind === UnitKind.Archer;
-    const range = archer ? this.field.reach(unit) : UNIT_KINDS[unit.kind].sight;
+    const chases = unit.kind !== UnitKind.Archer && unit.ignoreTicks === 0;
+    const range = chases ? UNIT_KINDS[unit.kind].sight : this.field.reach(unit);
     const kept = unit.target ? this.field.place(unit.target) : null;
     const keep = kept && unit.target && this.field.canStrike(unit, kept) && distanceOk(unit, kept, range);
     if (!keep) unit.setTarget(this.field.nearestEnemy(unit, false, range));
