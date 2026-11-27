@@ -19,14 +19,12 @@
         height: 100vh;
         image-rendering: pixelated;
       }
-      /* Mist rolling in from the edges of the view, over a faint darkening; clicks pass through. */
+      /* A faint darkening at the edges of the view; clicks pass through. (Mist lives in the world: MountainMist.) */
       #vignette {
         position: absolute;
         inset: 0;
         pointer-events: none;
-        background:
-          radial-gradient(ellipse at center, transparent 55%, var(--mist-thin) 76%, var(--mist-thick) 100%),
-          radial-gradient(ellipse at center, transparent 60%, var(--shadow-25) 100%);
+        background: radial-gradient(ellipse at center, transparent 60%, var(--shadow-25) 100%);
       }
       #error {
         position: absolute;
