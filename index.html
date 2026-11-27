@@ -19,12 +19,14 @@
         height: 100vh;
         image-rendering: pixelated;
       }
-      /* Darkened edges over the scene, for a gloomier mood; clicks pass through. */
+      /* Mist rolling in from the edges of the view, over a faint darkening; clicks pass through. */
       #vignette {
         position: absolute;
         inset: 0;
         pointer-events: none;
-        background: radial-gradient(ellipse at center, transparent 55%, var(--shadow-60) 100%);
+        background:
+          radial-gradient(ellipse at center, transparent 48%, var(--mist-thin) 72%, var(--mist-thick) 100%),
+          radial-gradient(ellipse at center, transparent 60%, var(--shadow-25) 100%);
       }
       #error {
         position: absolute;

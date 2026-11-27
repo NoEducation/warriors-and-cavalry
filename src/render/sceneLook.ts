@@ -5,9 +5,9 @@ export const SCENE_LOOK_CONFIG = Object.freeze({
   /** Smoky, ash-brown sky behind the map. */
   background: 0x15130f,
   /** Haze that swallows the far side of the map; distances from the camera where it starts and where it is solid. */
-  fogColor: 0x231f1a,
-  fogNear: 90,
-  fogFar: 340,
+  fogColor: 0x3a352f,
+  fogNear: 70,
+  fogFar: 280,
   /** Grey overcast sky light from above and a dark earth bounce from below. */
   skyLight: 0x9fa2a8,
   groundLight: 0x3a2c1e,
