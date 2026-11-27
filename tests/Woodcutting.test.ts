@@ -186,6 +186,20 @@ describe('Woodcutters', () => {
     expect(world.objectAt(25, 7)?.kind).toBe(ObjectKind.Tree);
   });
 
+  it('keep the job of a woodcutter whose only tree is walled in, and fell it once the wall opens', () => {
+    const { world, huts } = camp([[25, 7]]);
+    for (let ty = 6; ty <= 8; ty++) {
+      for (let tx = 24; tx <= 26; tx++) if (tx !== 25 || ty !== 7) place(world, ObjectKind.Wall, tx, ty);
+    }
+    tickUntil(world, () => world.productionState(huts[0].id)?.status === 'workerCannotReach');
+    for (let i = 0; i < 300; i++) world.tick();
+    expect(peasants(world)).toHaveLength(1);
+    expect(peasants(world)[0]).toMatchObject({ id: 1, workplaceId: huts[0].id, state: 'toTree', treeId: null });
+    expect(world.apply({ type: 'demolish', objectId: world.objectAt(24, 7)!.id }).ok).toBe(true);
+    tickUntil(world, () => world.treeChopsTaken(world.objectAt(25, 7)!.id) > 0, 2000);
+    expect(peasants(world)[0].id).toBe(1);
+  });
+
   it('do not stall the game when the only trees in reach stand on an island they cannot reach', () => {
     const size = 256;
     const tiles = new Uint8Array(size * size).fill(TileType.Grass);

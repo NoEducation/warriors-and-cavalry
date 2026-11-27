@@ -412,3 +412,45 @@ describe('Supply chain determinism and speed', () => {
     expect(ms, `supply chain: 3000 ticks with 40 workers took ${ms.toFixed(1)} ms`).toBeLessThan(500);
   });
 });
+
+describe('Workers cut off from their way', () => {
+  /** Walls on the ring of tiles x 19..22, y 3..6 around the hut of `camp`; returns the wall at (20, 6). */
+  function wallInHut(world: World): MapObject {
+    let door: MapObject | null = null;
+    for (let ty = 3; ty <= 6; ty++) {
+      for (let tx = 19; tx <= 22; tx++) {
+        if (tx !== 19 && tx !== 22 && ty !== 3 && ty !== 6) continue;
+        const wall = world.spawn(ObjectKind.Wall, tx, ty);
+        if (tx === 20 && ty === 6) door = wall;
+      }
+    }
+    return door!;
+  }
+
+  it('keeps the job of a worker walled off from its workplace, and it gets there once the wall opens', () => {
+    const { world, hut } = camp();
+    world.tick();
+    expect(peasant(world).state).toBe('toWork');
+    const door = wallInHut(world);
+    ticks(world, 300);
+    expect(world.population.count).toBe(1);
+    expect(peasant(world)).toMatchObject({ id: 1, state: 'toWork', workplaceId: hut.id });
+    expect(peasant(world).waitTicks).toBeGreaterThan(0);
+    expect(status(world, hut.id)).toBe('workerCannotReach');
+    world.apply({ type: 'demolish', objectId: door.id });
+    tickUntil(world, () => peasant(world).state === 'toTree' || peasant(world).state === 'chopping', 1000);
+    expect(peasant(world).id).toBe(1);
+  });
+
+  it('keeps the job of a carrier walled off on its way back to work', () => {
+    const { world, hut } = camp();
+    tickUntil(world, () => first(world)?.state === 'toStore', 2000);
+    const door = wallInHut(world);
+    tickUntil(world, () => peasant(world).state === 'toWorkBack' && peasant(world).waitTicks > 0, 2000);
+    expect(status(world, hut.id)).toBe('workerCannotReach');
+    ticks(world, 200);
+    expect(peasant(world)).toMatchObject({ id: 1, state: 'toWorkBack', workplaceId: hut.id });
+    world.apply({ type: 'demolish', objectId: door.id });
+    tickUntil(world, () => peasant(world).state === 'toTree' || peasant(world).state === 'chopping', 1000);
+  });
+});
