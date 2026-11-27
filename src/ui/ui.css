@@ -246,10 +246,90 @@
   }
 }
 
+/* The raid line in the HUD turns to the danger colour while raiders are on the map. */
+#hud .raid.active {
+  color: var(--danger);
+  font-weight: bold;
+}
+
+/* The box a left drag draws to select soldiers. */
+.select-box {
+  position: fixed;
+  pointer-events: none;
+  border: 1px solid var(--select);
+  background: var(--select-fill);
+}
+.select-box[hidden] {
+  display: none;
+}
+
+/* The panel of an opened Barracks, above the build bar on the right. */
+.barracks-panel {
+  position: absolute;
+  right: 12px;
+  bottom: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.barracks-panel[hidden] {
+  display: none;
+}
+.barracks-panel .title {
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  color: var(--gold);
+}
+.barracks-panel .close {
+  background: none;
+  border: none;
+  padding: 0 2px;
+}
+.barracks-panel .train {
+  padding: 4px 8px;
+  text-align: left;
+  background: linear-gradient(180deg, var(--plaque-top) 0%, var(--plaque-bottom) 100%);
+  border: 1px solid var(--bronze);
+  border-radius: 4px;
+}
+.barracks-panel .train:hover {
+  background: linear-gradient(180deg, var(--plaque-active-top) 0%, var(--plaque-active-bottom) 100%);
+}
+.barracks-panel .train.unaffordable {
+  opacity: 0.5;
+}
+
+/* "Your Keep has fallen": across the middle of the screen, letting clicks through to the map. */
+.defeat-banner {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 40px;
+  font-family: var(--serif);
+  font-size: 36px;
+  color: var(--parchment);
+  background: var(--blood-veil);
+  border: 2px solid var(--bronze);
+  border-radius: 6px;
+  text-shadow: 0 2px 0 var(--black);
+  pointer-events: none;
+}
+.defeat-banner[hidden] {
+  display: none;
+}
+
 /* While the start menu is up, the in-game panels stay hidden. */
 body.in-menu #resources,
 body.in-menu #buildbar,
-body.in-menu #hud {
+body.in-menu #hud,
+body.in-menu .barracks-panel,
+body.in-menu .defeat-banner {
   display: none;
 }
 

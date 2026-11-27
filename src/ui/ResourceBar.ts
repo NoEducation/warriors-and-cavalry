@@ -1,8 +1,11 @@
-// HTML bar showing the camp's resources and people as icon slots: [log] 100/250 [stone] 40/250 [sheaf] 50/100 [peasant] 3/8.
+// HTML bar showing the camp's resources and people as icon slots: [log] 100/250 [stone] 40/250 [sheaf] 50/100
+// [peasant] 3/8 [soldier] 2/8.
+import type { SoldierSummary } from '../sim/Army';
 import type { EconomyView } from '../sim/Economy';
 import type { PopulationSummary } from '../sim/Population';
 import { RESOURCE_KINDS, RESOURCE_NAMES, type ResourceKind } from '../sim/ResourceKind';
 import { type IconName, RESOURCE_ICONS, iconSvg } from './icons';
+import { soldierCountText } from './raidText';
 import { peasantCountText } from './statusText';
 
 /** One slot's elements and what it last showed. */
@@ -16,6 +19,7 @@ interface Slot {
 export class ResourceBar {
   private readonly resources = new Map<ResourceKind, Slot>();
   private readonly peasants: Slot;
+  private readonly soldiers: Slot;
 
   /** Builds one slot per resource and one for the workers inside `root`. Create once at setup. */
   public constructor(private readonly root: HTMLElement) {
@@ -24,19 +28,21 @@ export class ResourceBar {
       this.resources.set(kind, this.addSlot(RESOURCE_ICONS[kind], name.charAt(0).toUpperCase() + name.slice(1)));
     }
     this.peasants = this.addSlot('peasant', 'Workers / worker limit');
+    this.soldiers = this.addSlot('soldier', 'Soldiers / room in the barracks');
   }
 
   /**
-   * Shows each amount and capacity of `economy`, a resource at capacity with the class `full`, then the `population`.
-   * Cheap to call every frame: the DOM changes only when a value does.
+   * Shows each amount and capacity of `economy`, a resource at capacity with the class `full`, then the `population`
+   * and the `soldiers`. Cheap to call every frame: the DOM changes only when a value does.
    */
-  public update(economy: EconomyView, population: PopulationSummary): void {
+  public update(economy: EconomyView, population: PopulationSummary, soldiers: SoldierSummary): void {
     for (const [kind, slot] of this.resources) {
       const amount = economy.amount(kind);
       const capacity = economy.capacity(kind);
       this.show(slot, `${amount}/${capacity}`, amount >= capacity);
     }
     this.show(this.peasants, peasantCountText(population), false);
+    this.show(this.soldiers, soldierCountText(soldiers), false);
   }
 
   private addSlot(icon: IconName, title: string): Slot {

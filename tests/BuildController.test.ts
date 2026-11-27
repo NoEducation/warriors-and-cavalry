@@ -29,7 +29,7 @@ function setup(world: World = flatWorld()): { world: World; controller: BuildCon
 }
 
 describe('BUILD_TOOLS', () => {
-  it('lists ten buildings on the digit keys 1-9 and 0, Stairs on T, then Demolish on X', () => {
+  it('lists ten buildings on the digit keys 1-9 and 0, Stairs on T, Barracks on B, then Demolish on X', () => {
     expect(BUILD_TOOLS.map((e) => [e.label, e.key])).toEqual([
       ['Keep', 'Digit1'],
       ['Hovel', 'Digit2'],
@@ -42,9 +42,10 @@ describe('BUILD_TOOLS', () => {
       ['Gate', 'Digit9'],
       ['Tower', 'Digit0'],
       ['Stairs', 'KeyT'],
+      ['Barracks', 'KeyB'],
       ['Demolish', 'KeyX'],
     ]);
-    expect(BUILD_TOOLS.slice(0, 11).map((e) => e.tool)).toEqual(
+    expect(BUILD_TOOLS.slice(0, 12).map((e) => e.tool)).toEqual(
       [
         ObjectKind.Keep,
         ObjectKind.Hovel,
@@ -57,9 +58,10 @@ describe('BUILD_TOOLS', () => {
         ObjectKind.Gate,
         ObjectKind.Tower,
         ObjectKind.Stairs,
+        ObjectKind.Barracks,
       ].map((kind) => ({ type: 'build', kind })),
     );
-    expect(BUILD_TOOLS[11].tool).toEqual(DEMOLISH);
+    expect(BUILD_TOOLS[12].tool).toEqual(DEMOLISH);
   });
 });
 

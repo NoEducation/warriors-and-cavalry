@@ -4,10 +4,13 @@ import { CameraRig } from '../render/CameraRig';
 import { groundHeightAt } from '../render/groundHeightAt';
 import { PixelRenderer } from '../render/PixelRenderer';
 import { PlacementGhost } from '../render/PlacementGhost';
+import { SelectionRings } from '../render/SelectionRings';
 import { TileHighlight } from '../render/TileHighlight';
 import { WallLineGhost } from '../render/WallLineGhost';
 import { WorldView } from '../render/WorldView';
 import { TICKS_PER_SECOND } from '../sim/gameTime';
+import type * as THREE from 'three';
+import type { UnitView } from '../sim/UnitView';
 import type { World } from '../sim/World';
 import { Hud } from '../ui/Hud';
 import { ResourceBar } from '../ui/ResourceBar';
@@ -32,6 +35,7 @@ export class Game {
   private readonly ghostFactory = new BuildingMeshFactory();
   private readonly ghost = new PlacementGhost(this.ghostFactory);
   private readonly wallGhost = new WallLineGhost(this.ghostFactory);
+  private readonly rings = new SelectionRings();
   private readonly rig = new CameraRig(GAME_CONFIG.mapSize, GAME_CONFIG.mapSize);
   private readonly runner = new SimulationRunner(TICKS_PER_SECOND);
   private readonly pixelRenderer: PixelRenderer;
@@ -60,7 +64,7 @@ export class Game {
     this.input = this.createInput(canvas, buildBarRoot);
     this.widgets = this.createWidgets(resourceRoot);
     // The hover outline and the ghosts stay in the scene across maps.
-    this.worldView.scene.add(this.highlight.object, this.ghost.object, this.wallGhost.object);
+    this.worldView.scene.add(this.highlight.object, this.ghost.object, this.wallGhost.object, this.rings.object);
     this.showWorld(first);
   }
 
@@ -95,7 +99,12 @@ export class Game {
   private createInput(canvas: HTMLCanvasElement, buildBarRoot: HTMLElement): GameInput {
     const { hud, highlight, ghost, wallGhost, rig, runner } = this;
     const currentWorld = (): World => this.world;
-    return new GameInput(canvas, buildBarRoot, { hud, highlight, ghost, wallGhost, rig, runner, currentWorld });
+    const placeOf = (world: World, unit: UnitView, out: THREE.Vector3): boolean => {
+      const units = this.worldView.units;
+      if (units) units.placeOf(world, unit, this.runner.tickFraction, out);
+      return units !== null;
+    };
+    return new GameInput(canvas, buildBarRoot, { hud, highlight, ghost, wallGhost, rig, runner, currentWorld, placeOf });
   }
 
   /** Creates the FPS reading and the clock, resource bar and affordability display. Call after `createInput`. */
@@ -133,7 +142,8 @@ export class Game {
   }
 
   private readonly onFrame = (time: number): void => {
-    // Frame order: ticks → camera → hover → world view update (at the tick fraction) → status → FPS → render.
+    // Frame order: ticks → camera → hover → world view update (at the tick fraction) → selection rings and Barracks
+    // panel → status → FPS → render.
     const dt = this.lastFrameTime === null ? 0 : (time - this.lastFrameTime) / 1000;
     this.lastFrameTime = time;
     for (let ticks = this.runner.ticksFor(dt); ticks > 0; ticks--) this.world.tick();
@@ -141,6 +151,9 @@ export class Game {
     this.rig.followGround((x, z) => groundHeightAt(this.world.map, x, z), dt);
     this.input.tileHover.update(this.rig.camera, this.world);
     this.worldView.update(this.world, this.runner.tickFraction);
+    this.input.selection.prune(this.world);
+    this.rings.update(this.world, this.input.selection.selected, this.worldView.units, this.runner.tickFraction);
+    this.input.barracks.update(this.world);
     this.widgets.status.update(this.world);
     this.widgets.fpsDisplay.addFrame(dt, time);
     this.pixelRenderer.render(this.worldView.scene, this.rig.camera);

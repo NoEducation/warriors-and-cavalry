@@ -25,6 +25,10 @@
   --parchment-dim: #c9b68c;
   --danger: #ff7a5c;
 
+  /* Combat: the selection box and the defeat banner. */
+  --select: #f4e27a;
+  --blood: #6e1410;
+
   /* The start menu's night sky behind the panel. */
   --sky: #2a3b4a;
   --sky-dark: #0b1016;
@@ -40,4 +44,6 @@
   --shadow-60: color-mix(in srgb, var(--black) 60%, transparent);
   --shadow-80: color-mix(in srgb, var(--black) 80%, transparent);
   --shadow-85: color-mix(in srgb, var(--black) 85%, transparent);
+  --select-fill: color-mix(in srgb, var(--select) 15%, transparent);
+  --blood-veil: color-mix(in srgb, var(--blood) 85%, transparent);
 }
