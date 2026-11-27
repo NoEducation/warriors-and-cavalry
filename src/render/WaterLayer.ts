@@ -13,8 +13,13 @@ export const WATER_CONFIG = Object.freeze({
   /** Black, threatening sea: a thin band of murky green at the shore, then ink-dark depths and grey, dirty foam. */
   shallowColor: 0x32463e,
   midColor: 0x15232a,
-  deepColor: 0x05090c,
+  deepColor: 0x060d14,
   foamColor: 0x8c8a80,
+  /** The open ocean around the island: a cold, dark blue, reached through a wide, wobbling band around the map edge. */
+  openSeaColor: 0x0c2036,
+  /** Where that band starts inside the map edge and where it ends outside it, in world units, and how far noise moves it. */
+  openSeaBlend: Object.freeze([-45, 90]) as readonly [number, number],
+  openSeaWobble: 30,
   /** How far the open sea reaches past every map edge, in world units: beyond the camera's far plane, so it never ends. */
   openSeaMargin: 1500,
   /** Longest frame step the waves advance by, so a stalled tab does not jump them. */
@@ -66,6 +71,9 @@ export class WaterLayer implements WorldLayer {
         midColor: { value: new THREE.Color(c.midColor) },
         deepColor: { value: new THREE.Color(c.deepColor) },
         foamColor: { value: new THREE.Color(c.foamColor) },
+        openSeaColor: { value: new THREE.Color(c.openSeaColor) },
+        openSeaBlend: { value: new THREE.Vector2(c.openSeaBlend[0], c.openSeaBlend[1]) },
+        openSeaWobble: { value: c.openSeaWobble },
       },
     });
     this.mesh = new THREE.Mesh(geometry, material);
