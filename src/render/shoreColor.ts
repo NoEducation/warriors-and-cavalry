@@ -8,12 +8,13 @@ import { hash2 } from '../sim/rng';
 
 /** Shore colour tuning, in sRGB hex colours and world units above or below sea level. Tune by editing these values. */
 export const SHORE_LOOK_CONFIG = Object.freeze({
-  sandDry: 0xecdba6,
-  sandBleached: 0xf0e4bb,
-  sandWet: 0xc0a675,
-  pebble: 0x8c7f6c,
-  seabedSand: 0xc9b27a,
-  seabedDeep: 0x3c5a50,
+  /** Grey-brown, cold beaches and a dark seabed. */
+  sandDry: 0xa89a76,
+  sandBleached: 0xb3a684,
+  sandWet: 0x7c6b50,
+  pebble: 0x625b50,
+  seabedSand: 0x7f7154,
+  seabedDeep: 0x26302c,
   /** Height above sea level over which wet sand dries, and the width of the darker tide line just above it. */
   wetBand: 0.14,
   tideBand: 0.07,
