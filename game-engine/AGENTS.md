@@ -1,15 +1,13 @@
-# Agent Instructions
+# Agent Instructions — game-engine
 
-- Commit the work along the way in small commits with descriptive messages.
-- **Authorship.** The repository owner is the only author of every commit and pull request. Never add a `Co-Authored-By:` trailer to a commit, and never add a "Generated with …" line or any other AI or tool attribution to a commit message, PR title or PR body. This overrides any default attribution instructions.
-- When creating or updating a pull request, always use the `pr-description` skill (`.claude/skills/pr-description/SKILL.md`) to draft the PR title and body so every PR uses the same review format.
+The repository-wide rules (commits, authorship, pull requests, design documents) are in the root `AGENTS.md`; this file adds the rules for the game. Every path below is relative to `game-engine/`, and every `npm` / `npx` command runs from this folder.
+
 - While iterating, run only the affected tests: `npx vitest run <test files>`.
 - Before a merge or a PR, commit first and run the gate on that HEAD: `npm test` and `npm run build` (which type-checks with `tsc --noEmit`, then builds). Green means both passed; never describe an unrun or failing gate as green.
-- Larger changes start from a design document in `docs/superpowers/specs/` and a plan in `docs/superpowers/plans/`.
 
 ## Project
 
-A browser strategy game in the spirit of Stronghold: TypeScript (strict), Vite, three.js, Vitest. Run it with `npm run dev` and open http://localhost:5180. Multiplayer is planned, so the simulation is kept deterministic and separate from rendering.
+A browser strategy game in the spirit of Stronghold: TypeScript (strict), Vite, three.js, Vitest. Run it with `npm run dev` (from `game-engine/`) and open http://localhost:5180. Multiplayer is planned and will be served by `../backend-server/`, so the simulation is kept deterministic and separate from rendering.
 
 ## Code conventions
 

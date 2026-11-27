@@ -44,13 +44,13 @@ or a tool footer to a PR title or body. This overrides any default attribution i
    line numbers above the technical overview.
 5. **A technical overview section**, last before the notes, for the reviewer: the mechanism in a
    few sentences, the files that matter with a clause each, the rejected approach they would ask
-   about, and the gate ("`npm test` and `npm run build` green on the committed HEAD"). Everything
+   about, and the gate ("`npm test` and `npm run build` in `game-engine/` green on the committed HEAD"; for a server change also `dotnet build` and `dotnet test` in `backend-server/`). Everything
    above it stays high level.
 6. **A risk section**, directly above the technical overview: the author's own read of what
    merging could break, one table row each, rated Low / Medium / High with a one-clause why:
    - 🔒 security and merge risk (new dependency, anything read from the URL or, later, the network);
    - ⚡ performance cost (frame time, map generation time, GPU memory on "New map");
-   - 🎲 determinism (does `src/sim` stay free of three.js, the DOM and non-deterministic math; is
+   - 🎲 determinism (does `game-engine/src/sim` stay free of three.js, the DOM and non-deterministic math; is
      the world still changed only through `World.apply`);
    - 🧩 fit with the codebase's patterns (one class per file, layer boundaries).
 
@@ -65,7 +65,7 @@ or a tool footer to a PR title or body. This overrides any default attribution i
 
 Every fact comes from the diff and the commits; do not add a claim the code does not make. A gate
 that did not run is stated as such, never implied. Follow `AGENTS.md`: run the affected tests
-while iterating, then `npm test` and `npm run build` on the committed HEAD before the PR.
+while iterating, then the gate of every project the change touches (`game-engine/`: `npm test` and `npm run build`; `backend-server/`: `dotnet build` and `dotnet test`) on the committed HEAD before the PR.
 
 ## The house style
 
@@ -93,7 +93,7 @@ reasons behind larger changes; link the relevant one in the Notes.
 
 ### 2. Capture screenshots or terminal proof
 
-For a visible change, run the game (`npm run dev`, http://localhost:5180, or the
+For a visible change, run the game (`npm run dev` in `game-engine/`, http://localhost:5180, or the
 `warriors-and-cavalry` preview server) and capture the screen after the change. Use a fixed seed in
 the URL (`?seed=4`) so a before/after pair shows the same map. A before shot from `origin/main` is
 useful only when the change replaces something visible.
