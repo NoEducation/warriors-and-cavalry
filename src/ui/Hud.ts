@@ -1,4 +1,5 @@
-// HTML overlay: game clock, seed, hovered tile, FPS, a message line and a "New map" button.
+// HTML overlay: game clock, raid line, seed, hovered tile, FPS, a message line and a "New map" button; and the
+// defeat banner across the screen.
 import { formatGameTime, type GameTime } from '../sim/gameTime';
 import type { TileCoord } from '../sim/TileCoord';
 
@@ -14,6 +15,8 @@ export interface HudTileInfo extends TileCoord {
 
 export class Hud {
   private readonly clockLine: HTMLDivElement;
+  private readonly raidLine: HTMLDivElement;
+  private readonly banner: HTMLDivElement;
   private readonly seedLine: HTMLDivElement;
   private readonly tileLine: HTMLDivElement;
   private readonly fpsLine: HTMLDivElement;
@@ -28,6 +31,11 @@ export class Hud {
     onNewMap: () => void,
   ) {
     this.clockLine = this.addLine();
+    this.raidLine = this.addLine();
+    this.raidLine.className = 'raid';
+    this.banner = (root.parentElement ?? root).appendChild(document.createElement('div'));
+    this.banner.className = 'defeat-banner';
+    this.banner.hidden = true;
     this.seedLine = this.addLine();
     this.tileLine = this.addLine();
     this.fpsLine = this.addLine();
@@ -55,6 +63,17 @@ export class Hud {
     if (paused) text += ' · Paused';
     else if (speed !== 1) text += ` · ${speed}×`;
     if (this.clockLine.textContent !== text) this.clockLine.textContent = text;
+  }
+
+  /**
+   * Shows the raid line (`Raiders in 2:31`, `Raid! 3 raiders`; '' hides it) and, with `banner` text, the defeat banner
+   * (null hides it). Cheap to call every frame: the DOM changes only when the text does.
+   */
+  public setRaid(line: string, banner: string | null): void {
+    if (this.raidLine.textContent !== line) this.raidLine.textContent = line;
+    this.raidLine.classList.toggle('active', line.startsWith('Raid!'));
+    if (this.banner.textContent !== (banner ?? '')) this.banner.textContent = banner ?? '';
+    this.banner.hidden = banner === null;
   }
 
   /** Shows the seed of the current map. Call after each map load. */

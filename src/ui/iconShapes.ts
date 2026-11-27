@@ -16,6 +16,7 @@ export const C = Object.freeze({
   iron: '#b9bec6',
   green: '#5d8a38',
   red: '#d0392a',
+  blue: '#3d62b3',
   dark: '#2a1a0c',
 });
 

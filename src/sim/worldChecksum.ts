@@ -1,18 +1,18 @@
 // Cheap fingerprint of a whole world, for comparing worlds (e.g. between peers).
+import { feedArmy } from './armyChecksum';
+import { feedInt32, feedTiles } from './checksumFeed';
 import { PEASANT_STATES, type PeasantView } from './PeasantView';
 import { RESOURCE_KINDS } from './ResourceKind';
-import type { TileCoord } from './TileCoord';
 import type { World } from './World';
 
-const FNV_OFFSET_BASIS = 0x811c9dc5;
-const FNV_PRIME = 0x01000193;
+import { FNV_OFFSET_BASIS, feedBytes } from './checksumFeed';
 
 /**
  * 32-bit FNV-1a over the bytes of the map's `heights` and `tiles`, then (as little-endian int32) the tick count,
  * each resource's amount and capacity in `RESOURCE_KINDS` order, each object's id, kind, tx and ty in id order,
  * each producing building's cycle progress in id order, the id and remaining skip ticks of each building skipped by
  * worker spawning in id order, the id and ticks left of each stump in id order, the id and rounds taken of each
- * chopped tree in id order, and each peasant in id order (see `feedPeasant`).
+ * chopped tree in id order, each peasant in id order (see `feedPeasant`), then the army (see `feedArmy`).
  * Use to compare worlds cheaply, e.g. between peers.
  */
 export function worldChecksum(world: World): number {
@@ -47,13 +47,13 @@ export function worldChecksum(world: World): number {
     if (chops > 0) hash = feedInt32(feedInt32(hash, object.id), chops);
   }
   for (const p of world.peasants()) hash = feedPeasant(hash, p);
-  return hash >>> 0;
+  return feedArmy(hash, world) >>> 0;
 }
 
 /**
  * Everything a later tick reads of peasant `p`: id, state index, tx, ty, nextTx, nextTy, step progress, step ticks,
  * load resource (-1 for none) and amount, workplace id, delivery target id (0 for none), tree id (0 for none), wait
- * ticks, path index, the tiles still ahead on its path (count, then each tx and ty) and its walk mode.
+ * ticks, path index, the tiles still ahead on its path (count, then each tx and ty), its walk mode and hit points.
  */
 function feedPeasant(hash: number, p: PeasantView): number {
   hash = feedInt32(hash, p.id);
@@ -72,27 +72,5 @@ function feedPeasant(hash: number, p: PeasantView): number {
   hash = feedInt32(hash, p.waitTicks);
   hash = feedInt32(hash, p.pathIndex);
   hash = feedTiles(hash, p.path, p.pathIndex);
-  return feedInt32(hash, p.walkMode);
-}
-
-/** Feeds the number of `tiles` from index `from` on, then each one's tx and ty. */
-function feedTiles(hash: number, tiles: readonly TileCoord[], from: number): number {
-  hash = feedInt32(hash, tiles.length - from);
-  for (let i = from; i < tiles.length; i++) hash = feedInt32(feedInt32(hash, tiles[i].tx), tiles[i].ty);
-  return hash;
-}
-
-function feedBytes(hash: number, bytes: Uint8Array): number {
-  for (let i = 0; i < bytes.length; i++) hash = feedByte(hash, bytes[i]);
-  return hash;
-}
-
-/** Feeds the four bytes of `value` as a little-endian int32. */
-function feedInt32(hash: number, value: number): number {
-  for (let shift = 0; shift < 32; shift += 8) hash = feedByte(hash, (value >>> shift) & 0xff);
-  return hash;
-}
-
-function feedByte(hash: number, byte: number): number {
-  return Math.imul(hash ^ byte, FNV_PRIME);
+  return feedInt32(feedInt32(hash, p.walkMode), p.hitPoints);
 }

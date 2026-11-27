@@ -2,6 +2,7 @@
 import { gameTimeAt } from '../sim/gameTime';
 import type { World } from '../sim/World';
 import type { Hud } from '../ui/Hud';
+import { DEFEAT_TEXT, raidLineText } from '../ui/raidText';
 import type { ResourceBar } from '../ui/ResourceBar';
 import type { BuildInput } from './BuildInput';
 import type { SimulationRunner } from './SimulationRunner';
@@ -20,12 +21,17 @@ export class StatusDisplay {
     private readonly runner: SimulationRunner,
   ) {}
 
-  /** Shows the clock, resources, population and affordable buildings of `world`. Call once per frame, after ticking. */
+  /**
+   * Shows the clock, resources, population, soldiers, affordable buildings and the raids of `world`. Call once per
+   * frame, after ticking.
+   */
   public update(world: World): void {
     this.updateClock(world.tickCount);
     // Not skipped with the clock: placing or demolishing changes the economy and housing without a tick, even paused.
-    this.resourceBar.update(world.economy, world.population);
+    this.resourceBar.update(world.economy, world.population, world.soldiers);
     this.buildInput.showAffordable(world.economy);
+    const { raids } = world;
+    this.hud.setRaid(raidLineText(raids), raids.keepFallen ? DEFEAT_TEXT : null);
   }
 
   /** Returns early when the tick count, pause and speed are what the clock already shows. */

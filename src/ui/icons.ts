@@ -23,6 +23,8 @@ export type IconName =
   | 'gate'
   | 'tower'
   | 'stairs'
+  | 'barracks'
+  | 'soldier'
   | 'demolish';
 
 /** Each icon's inner SVG markup on a `0 0 16 16` view box. */
@@ -112,6 +114,19 @@ export const ICONS: Readonly<Record<IconName, string>> = Object.freeze({
     crenels(10, 1, 2, C.stone) +
     [0, 1, 2, 3].map((i) => rect(2 + i * 2, 13 - i * 3, 2, 2 + i * 3, i % 2 === 0 ? C.stoneLight : C.stone)).join('') +
     rect(1, 14.25, 14, 0.75, C.stoneDark),
+  barracks:
+    path('M1 7 L8 2 L15 7 Z', C.woodDark) +
+    rect(2, 7, 12, 8, C.stone) +
+    rect(7, 10, 3, 5, C.woodDark) +
+    [3.5, 11.5].map((x) => rect(x, 9, 1, 3, C.dark)).join('') +
+    line(13, 15, 15, 1, 1, C.wood) +
+    path('M14.4 0 L16 2 L15 3 Z', C.iron),
+  soldier:
+    path('M5 5 Q8 0 11 5 Z', C.iron) +
+    `<circle cx="8" cy="6" r="2.2" fill="${C.skin}"/>` +
+    path('M4 15 L5 9 L11 9 L12 15 Z', C.blue) +
+    line(13, 15, 13, 2, 1, C.wood) +
+    path('M12 3 L13 0 L14 3 Z', C.iron),
   demolish: HAMMER + line(2, 2, 7, 7, 2, C.red) + line(7, 2, 2, 7, 2, C.red),
 });
 

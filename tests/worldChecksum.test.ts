@@ -79,7 +79,7 @@ const peasantOf = (world: World): PeasantView | undefined => [...world.peasants(
 function remaining(p: PeasantView): Record<keyof PeasantView, unknown> {
   const { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, treeId, waitTicks } = p;
   const view = { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, treeId, waitTicks };
-  return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, walkMode: p.walkMode };
+  return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, walkMode: p.walkMode, hitPoints: p.hitPoints };
 }
 
 /**
@@ -111,9 +111,10 @@ describe('worldChecksum', () => {
     // started covering resource amounts and capacities (was 541835208 before that), and again when it started
     // covering the arrival timer and the peasants (was 1606265378 before that), and again when map generation gained
     // ridged mountains (was 3863915074 before that), and again when it gained quarry ground (was 3247290596 before
-    // that), and again when the arrival timer left it (was 1557280754 before that).
+    // that), and again when the arrival timer left it (was 1557280754 before that), and again when it started
+    // covering peasant hit points and the army (was 1121369298 before that).
     // Tree looks are render-only, so changing them must not change this value.
-    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(1121369298);
+    expect(worldChecksum(generator.generate({ seed: 1, width: 512, height: 512 }))).toBe(97324671);
   });
 
   it('differs for different seeds', () => {

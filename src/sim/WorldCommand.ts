@@ -1,6 +1,7 @@
 // Commands that change a World, and what they report back. All plain serialisable data.
 import type { MapObject } from './MapObject';
 import type { ObjectKind } from './ObjectKind';
+import type { UnitKind } from './UnitKind';
 
 /** Why an object cannot be placed at a position. */
 export type PlacementFailure = 'NotBuildable' | 'OutOfBounds' | 'BadTerrain' | 'Occupied' | 'TooSteep' | 'NeedsQuarryGround' | 'NeedsWall';
@@ -16,7 +17,28 @@ export type WorldCommand =
       readonly fromTy: number;
       readonly toTx: number;
       readonly toTy: number;
-    };
+    }
+  | { readonly type: 'trainUnit'; readonly barracksId: number; readonly unitKind: UnitKind }
+  | { readonly type: 'orderMove'; readonly unitIds: readonly number[]; readonly tx: number; readonly ty: number }
+  | { readonly type: 'orderAttack'; readonly unitIds: readonly number[]; readonly targetUnitId: number };
+
+/** The command that pays for a soldier and queues it at a Barracks. */
+export type TrainUnitCommand = Extract<WorldCommand, { type: 'trainUnit' }>;
+
+/** The commands that give player soldiers an order. */
+export type OrderCommand = Extract<WorldCommand, { type: 'orderMove' | 'orderAttack' }>;
+
+/** A successful `trainUnit`: the Barracks' queue is now `queued` long. */
+export interface TrainUnitSuccess {
+  readonly ok: true;
+  readonly queued: number;
+}
+
+/** A successful `orderMove` or `orderAttack`: `ordered` units got the order. */
+export interface OrderSuccess {
+  readonly ok: true;
+  readonly ordered: number;
+}
 
 /** The command that builds a line of wall pieces. */
 export type PlaceWallLineCommand = Extract<WorldCommand, { type: 'placeWallLine' }>;
@@ -45,7 +67,18 @@ export interface WallLineSuccess {
 /** Why a command failed. */
 export interface CommandFailure {
   readonly ok: false;
-  readonly reason: PlacementFailure | 'NotEnoughResources' | 'UnknownObject' | 'NotDemolishable' | 'UnknownCommand';
+  readonly reason:
+    | PlacementFailure
+    | 'NotEnoughResources'
+    | 'UnknownObject'
+    | 'NotDemolishable'
+    | 'UnknownCommand'
+    | 'NotABarracks'
+    | 'UnknownUnitKind'
+    | 'QueueFull'
+    | 'NoSoldierRoom'
+    | 'NoUnits'
+    | 'UnknownUnit';
 }
 
 /** What `placeBuilding` and `demolish` report. */
@@ -56,7 +89,7 @@ export type ObjectCommandResult = ObjectCommandSuccess | CommandFailure;
  * `UnknownCommand` means the command's `type` is not recognised or its fields are malformed (a wall line whose
  * coordinates are not safe integers).
  */
-export type CommandResult = ObjectCommandSuccess | WallLineSuccess | CommandFailure;
+export type CommandResult = ObjectCommandSuccess | WallLineSuccess | TrainUnitSuccess | OrderSuccess | CommandFailure;
 
 /** Delivered to World listeners for every object added or removed. */
 export interface WorldChange {

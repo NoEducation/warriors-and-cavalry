@@ -4,10 +4,21 @@ import { PeasantGeometryFactory } from './PeasantGeometryFactory';
 import { PeasantPart } from './peasantParts';
 
 /** Parts whose white vertices take a colour per instance. */
-const TINTED: readonly PeasantPart[] = [PeasantPart.Torso, PeasantPart.Hat, PeasantPart.Hood];
+const TINTED: readonly PeasantPart[] = [PeasantPart.Torso, PeasantPart.Hat, PeasantPart.Hood, PeasantPart.Helmet];
 /** Parts every peasant has two of. */
 const PAIRED: readonly PeasantPart[] = [PeasantPart.Leg, PeasantPart.Arm];
-const ALL_PARTS: readonly PeasantPart[] = Object.values(PeasantPart);
+/** A soldier's gear, which peasants never carry. */
+const SOLDIER_GEAR: readonly PeasantPart[] = [PeasantPart.Spear, PeasantPart.Bow, PeasantPart.Helmet];
+/** The parts peasants are drawn from. */
+export const PEASANT_PARTS: readonly PeasantPart[] = Object.values(PeasantPart).filter((p) => !SOLDIER_GEAR.includes(p));
+/** The parts soldiers and raiders are drawn from. */
+export const UNIT_PARTS: readonly PeasantPart[] = [
+  PeasantPart.Leg,
+  PeasantPart.Arm,
+  PeasantPart.Torso,
+  PeasantPart.Head,
+  ...SOLDIER_GEAR,
+];
 const PART_NAMES = new Map<PeasantPart, string>(Object.entries(PeasantPart).map(([name, part]) => [part, name]));
 
 export class PeasantMeshes {
@@ -16,10 +27,15 @@ export class PeasantMeshes {
   private readonly counts = new Map<PeasantPart, number>();
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 
-  /** Creates the part meshes, with room for `capacity` peasants, inside `group`. */
-  public constructor(private readonly group: THREE.Group, private capacity: number) {
+  /** Creates one mesh per part of `parts`, with room for `capacity` figures, inside `group`, named `<prefix>-<part>`. */
+  public constructor(
+    private readonly group: THREE.Group,
+    private capacity: number,
+    private readonly prefix = 'peasant',
+    private readonly parts: readonly PeasantPart[] = PEASANT_PARTS,
+  ) {
     const factory = new PeasantGeometryFactory();
-    for (const part of ALL_PARTS) this.geometries.set(part, factory.create(part));
+    for (const part of parts) this.geometries.set(part, factory.create(part));
     this.createMeshes();
   }
 
@@ -33,7 +49,7 @@ export class PeasantMeshes {
 
   /** Starts a frame: every part is empty again. */
   public begin(): void {
-    for (const part of ALL_PARTS) this.counts.set(part, 0);
+    for (const part of this.parts) this.counts.set(part, 0);
   }
 
   /** Adds one instance of `part` at `matrix`, coloured `color` (sRGB) for tinted parts. Call between begin and end. */
@@ -64,10 +80,10 @@ export class PeasantMeshes {
   }
 
   private createMeshes(): void {
-    for (const part of ALL_PARTS) {
+    for (const part of this.parts) {
       const room = PAIRED.includes(part) ? 2 * this.capacity : this.capacity;
       const mesh = new THREE.InstancedMesh(this.geometries.get(part)!, this.material, room);
-      mesh.name = `peasant-${PART_NAMES.get(part)!.toLowerCase()}`;
+      mesh.name = `${this.prefix}-${PART_NAMES.get(part)!.toLowerCase()}`;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       // Created up front, so the shader does not change while playing.
       if (TINTED.includes(part)) mesh.setColorAt(0, new THREE.Color(0xffffff));

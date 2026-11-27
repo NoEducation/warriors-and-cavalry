@@ -24,6 +24,12 @@ const REASON_TEXT: Record<FailureReason, string> = {
   UnknownObject: 'nothing here',
   NotDemolishable: 'trees cannot be removed',
   UnknownCommand: 'unknown command',
+  NotABarracks: 'not a barracks',
+  UnknownUnitKind: 'unknown soldier',
+  QueueFull: 'the queue is full',
+  NoSoldierRoom: 'no room for more soldiers: build a barracks',
+  NoUnits: 'no soldiers selected',
+  UnknownUnit: 'no enemy there',
 };
 
 export class BuildController {

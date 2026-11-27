@@ -1,16 +1,20 @@
-// The 3D scene for a world: background, lights, terrain, water, trees, buildings, stockpile stacks, crops and peasants.
+// The 3D scene for a world: background, lights, terrain, water, trees, buildings, stockpile stacks, crops, peasants,
+// soldiers and raiders, arrows and health bars.
 import * as THREE from 'three';
 import type { World } from '../sim/World';
+import { ArrowFlights } from './ArrowFlights';
 import { BuildingLayer } from './BuildingLayer';
 import { BuildingMeshFactory } from './BuildingMeshFactory';
 import { disposeObject } from './disposeObject';
 import { FarmCrops } from './FarmCrops';
+import { HealthBars } from './HealthBars';
 import { PeasantLayer } from './PeasantLayer';
 import { StockpileStacks } from './StockpileStacks';
 import { type TerrainChunkData, TerrainMeshBuilder } from './TerrainMeshBuilder';
 import { StumpLayer } from './StumpLayer';
 import { TreeLayer } from './TreeLayer';
 import { TreeShadowLayer } from './TreeShadowLayer';
+import { UnitLayer } from './UnitLayer';
 import { WaterLayer } from './WaterLayer';
 import type { WorldLayer } from './WorldLayer';
 
@@ -21,6 +25,7 @@ export class WorldView {
   private terrainChunks: THREE.Group | null = null;
   /** Water, tree shadows, trees, buildings, stockpile stacks, crops and peasants of the shown world, in drawing order; empty at first. */
   private readonly layers: WorldLayer[] = [];
+  private unitLayer: UnitLayer | null = null;
 
   /** Creates the scene with background and lights; no world is shown until `showWorld`. */
   public constructor() {
@@ -53,6 +58,8 @@ export class WorldView {
       new FarmCrops(world),
       new PeasantLayer(),
     );
+    this.unitLayer = new UnitLayer();
+    this.layers.push(this.unitLayer, new ArrowFlights(), new HealthBars(this.unitLayer));
     for (const layer of this.layers) this.scene.add(layer.object);
   }
 
@@ -62,6 +69,11 @@ export class WorldView {
    */
   public update(world: World, tickFraction: number): void {
     for (const layer of this.layers) layer.update(world, tickFraction);
+  }
+
+  /** The soldiers' and raiders' layer of the shown world, which knows where each unit is drawn; null before `showWorld`. */
+  public get units(): UnitLayer | null {
+    return this.unitLayer;
   }
 
   /** Removes and frees everything shown. Call when the view is no longer needed. */
@@ -80,5 +92,6 @@ export class WorldView {
     }
     this.terrainChunks = null;
     this.layers.length = 0;
+    this.unitLayer = null;
   }
 }

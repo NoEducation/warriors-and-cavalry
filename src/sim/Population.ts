@@ -6,7 +6,7 @@ import { Jobs } from './Jobs';
 import type { MapObject } from './MapObject';
 import { Peasant } from './Peasant';
 import type { PeasantView } from './PeasantView';
-import { PeasantWalker } from './PeasantWalker';
+import { StepWalker } from './StepWalker';
 import type { PopulationHost } from './PopulationHost';
 import type { ProductionOutput, ProductionState } from './Production';
 import { StoragePlaces } from './StoragePlaces';
@@ -33,7 +33,7 @@ export class Population {
   /** Workers living in `world`, delivering their work into `economy`. */
   public constructor(world: PopulationHost, economy: Economy) {
     const walkClass = (tx: number, ty: number): WalkClass => world.walkClass(tx, ty);
-    const walker = new PeasantWalker(world.map.width, world.map.height, walkClass);
+    const walker = new StepWalker(world.map.width, world.map.height, walkClass);
     this.housingOf = new Housing(world);
     this.stores = new StoragePlaces(world);
     this.woodcutters = new WoodcutterTrips(world, walker);
@@ -53,6 +53,21 @@ export class Population {
   /** All workers in ascending id order. */
   public peasants(): Iterable<PeasantView> {
     return this.byId.values();
+  }
+
+  /** The worker `id`, or undefined. */
+  public peasantById(id: number): PeasantView | undefined {
+    return this.byId.get(id);
+  }
+
+  /** Takes `amount` hit points from worker `id` (a raider's strike); unknown ids change nothing. */
+  public damage(id: number, amount: number): void {
+    this.byId.get(id)?.takeDamage(amount);
+  }
+
+  /** Removes the workers killed this tick, in ascending id order; their buildings get new workers when there is room. */
+  public removeDead(): void {
+    for (const p of [...this.byId.values()]) if (p.hitPoints <= 0) this.remove(p);
   }
 
   /** Call for every object added to the world: counts its housing, opens its job, remembers a storage place. */

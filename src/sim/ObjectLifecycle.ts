@@ -1,5 +1,6 @@
 // Adding and removing objects: the building rules and cost, then every part of the world that follows the objects,
 // updated in one fixed order.
+import type { Army } from './Army';
 import type { Economy } from './Economy';
 import { Footprint } from './Footprint';
 import type { GameMap } from './GameMap';
@@ -10,6 +11,7 @@ import type { ObjectIndex } from './ObjectIndex';
 import { checkPlacement } from './placementRules';
 import type { Population } from './Population';
 import type { Production } from './Production';
+import type { Structures } from './Structures';
 import type { Stumps } from './Stumps';
 import type { WallSite } from './WallBuilder';
 import type { ObjectCommandResult, PlacementCheck, WorldChange } from './WorldCommand';
@@ -18,8 +20,10 @@ import type { ObjectCommandResult, PlacementCheck, WorldChange } from './WorldCo
 export interface ObjectFollowers {
   readonly index: ObjectIndex;
   readonly economy: Economy;
+  readonly structures: Structures;
   readonly production: Production;
   readonly population: Population;
+  readonly army: Army;
   readonly stumps: Stumps;
   readonly listeners: Listeners<WorldChange>;
 }
@@ -56,7 +60,7 @@ export class ObjectLifecycle implements WallSite {
     return { ok: true, object };
   }
 
-  /** Removes `object` without any rule or refund: a felled tree, a cleared stump. Call from `World.tick` only. */
+  /** Removes `object` without any rule or refund: a felled tree, a cleared stump, a wrecked building. Call from `World.tick` only. */
   public remove(object: MapObject): void {
     this.detach(object, false);
   }
@@ -74,30 +78,35 @@ export class ObjectLifecycle implements WallSite {
    * and pays nothing: the callers have done both, or (the map generator) skip them on purpose.
    */
   public add(kind: ObjectKind, tx: number, ty: number): MapObject {
-    const { index, economy, production, population, stumps, listeners } = this.parts;
+    const { index, economy, structures, production, population, army, stumps, listeners } = this.parts;
     const object: MapObject = Object.freeze({ id: this.nextId++, kind, tx, ty });
-    // Fixed order: occupancy -> capacity -> production -> population -> stumps -> listeners (who see the end state).
+    // Fixed order: occupancy -> capacity -> hit points -> production -> population -> army -> stumps -> listeners
+    // (who see the end state).
     index.insert(object);
     economy.addCapacity(OBJECT_KINDS[kind].storage);
+    structures.added(object);
     production.added(object);
     population.buildingAdded(object);
+    army.buildingAdded(object);
     stumps.added(object);
     listeners.notify({ type: 'added', object });
     return object;
   }
 
   /**
-   * Fixed order: occupancy -> capacity (and, with `refund`, half the cost back) -> production -> population ->
-   * stumps -> listeners (who see the end state).
+   * Fixed order: occupancy -> capacity (and, with `refund`, half the cost back) -> hit points -> production ->
+   * population -> army -> stumps -> listeners (who see the end state).
    */
   private detach(object: MapObject, refund: boolean): void {
-    const { index, economy, production, population, stumps, listeners } = this.parts;
+    const { index, economy, structures, production, population, army, stumps, listeners } = this.parts;
     const info = OBJECT_KINDS[object.kind];
     index.remove(object);
     economy.removeCapacity(info.storage);
     if (refund) economy.refund(info.cost);
+    structures.removed(object);
     production.removed(object);
     population.buildingRemoved(object);
+    army.buildingRemoved(object);
     stumps.removed(object);
     listeners.notify({ type: 'removed', object });
   }

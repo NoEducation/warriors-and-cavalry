@@ -50,6 +50,7 @@ describe('OBJECT_KINDS', () => {
       ['Tower', 2, 2, true],
       ['Stump', 1, 1, false],
       ['Stairs', 1, 1, true],
+      ['Barracks', 3, 3, true],
     ]);
   });
 
@@ -74,6 +75,7 @@ describe('OBJECT_KINDS', () => {
       [[0, 20, 0], [0, 0, 0], false, false, true, 0, null],
       [[0, 0, 0], [0, 0, 0], false, false, false, 0, null],
       [[0, 3, 0], [0, 0, 0], false, false, true, 0, null],
+      [[40, 10, 0], [0, 0, 0], false, false, false, 0, null],
     ]);
   });
 });
