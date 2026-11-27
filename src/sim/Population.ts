@@ -123,16 +123,17 @@ export class Population {
 
   /**
    * While the housing has room, each vacant building that is not skipped, in ascending id order, gets a new worker on
-   * the Keep's spawn tile, walking to it. A building with no way there from the Keep is skipped instead.
+   * the Keep's spawn tile, walking to it. A building with no way there from the Keep, or with every tile around the
+   * Keep built over, is skipped instead (`workerCannotReach`).
    */
   private spawnWorkers(): void {
     this.jobs.tick();
     for (const buildingId of this.jobs.vacancies()) {
       if (this.byId.size >= this.housingOf.housing) return;
       const tile = this.housingOf.spawnTile();
-      if (!tile) return;
-      const worker = new Peasant(this.nextId, tile.tx, tile.ty, buildingId);
-      if (!this.trips.startWork(worker)) {
+      if (!tile && !this.housingOf.keep) return; // no Keep: buildings wait as `noWorker`
+      const worker = tile ? new Peasant(this.nextId, tile.tx, tile.ty, buildingId) : null;
+      if (!worker || !this.trips.startWork(worker)) {
         this.jobs.skip(buildingId);
         continue;
       }

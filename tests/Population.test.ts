@@ -157,6 +157,21 @@ describe('World population: workers', () => {
   });
 });
 
+describe('World population: a Keep built in', () => {
+  it('shows workerCannotReach and skips the buildings when every tile around the Keep is built over', () => {
+    const world = new World(flatMap(32));
+    world.spawn(ObjectKind.Keep, 4, 4); // 4..7 x 4..7; its ring is x 3..8, y 3..8
+    for (let i = 3; i <= 8; i++) {
+      for (const [tx, ty] of [[i, 3], [i, 8], [3, i], [8, i]]) if (!world.objectAt(tx, ty)) world.spawn(ObjectKind.Wall, tx, ty);
+    }
+    const hut = world.spawn(ObjectKind.WoodcutterHut, 20, 20);
+    world.tick();
+    expect(world.population.count).toBe(0);
+    expect(status(world, hut.id)).toBe('workerCannotReach');
+    expect(world.jobSkipTicks(hut.id)).toBe(200);
+  });
+});
+
 describe('World population: deaths', () => {
   it('removes the worker of a demolished workplace at once', () => {
     const { world, huts } = hutCamp(2);
