@@ -2,6 +2,7 @@
 import { POPULATION_CONFIG } from './populationConfig';
 import type { TileCoord } from './TileCoord';
 import type { Load, PeasantState, PeasantView } from './PeasantView';
+import type { Walker } from './Walker';
 import { WalkMode } from './walkRules';
 
 const NO_TILES: readonly TileCoord[] = Object.freeze([]);
@@ -10,7 +11,7 @@ const NO_TILES: readonly TileCoord[] = Object.freeze([]);
  * The mutable peasant record. Its fields change only through the transitions below, which `Population` and its
  * helpers call; everyone else sees it as a `PeasantView`.
  */
-export class Peasant implements PeasantView {
+export class Peasant implements PeasantView, Walker {
   private _state: PeasantState = 'toWork';
   private _tx: number;
   private _ty: number;

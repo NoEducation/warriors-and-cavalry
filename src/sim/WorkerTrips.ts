@@ -3,7 +3,7 @@
 import type { Economy } from './Economy';
 import type { Jobs } from './Jobs';
 import type { Peasant } from './Peasant';
-import type { PeasantWalker } from './PeasantWalker';
+import type { StepWalker } from './StepWalker';
 import type { Load } from './PeasantView';
 import type { PopulationHost } from './PopulationHost';
 import { targetAtWalkEnd, targetTiles } from './pathTargets';
@@ -21,7 +21,7 @@ export class WorkerTrips {
     private readonly stores: StoragePlaces,
     private readonly economy: Economy,
     private readonly jobs: Jobs,
-    private readonly walker: PeasantWalker,
+    private readonly walker: StepWalker,
     private readonly woodcutters: WoodcutterTrips,
   ) {}
 

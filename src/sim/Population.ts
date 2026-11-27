@@ -6,7 +6,7 @@ import { Jobs } from './Jobs';
 import type { MapObject } from './MapObject';
 import { Peasant } from './Peasant';
 import type { PeasantView } from './PeasantView';
-import { PeasantWalker } from './PeasantWalker';
+import { StepWalker } from './StepWalker';
 import type { PopulationHost } from './PopulationHost';
 import type { ProductionOutput, ProductionState } from './Production';
 import { StoragePlaces } from './StoragePlaces';
@@ -33,7 +33,7 @@ export class Population {
   /** Workers living in `world`, delivering their work into `economy`. */
   public constructor(world: PopulationHost, economy: Economy) {
     const walkClass = (tx: number, ty: number): WalkClass => world.walkClass(tx, ty);
-    const walker = new PeasantWalker(world.map.width, world.map.height, walkClass);
+    const walker = new StepWalker(world.map.width, world.map.height, walkClass);
     this.housingOf = new Housing(world);
     this.stores = new StoragePlaces(world);
     this.woodcutters = new WoodcutterTrips(world, walker);

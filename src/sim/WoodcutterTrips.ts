@@ -4,7 +4,7 @@ import type { MapObject } from './MapObject';
 import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import { PATH_CONFIG } from './pathConfig';
 import type { Peasant } from './Peasant';
-import type { PeasantWalker } from './PeasantWalker';
+import type { StepWalker } from './StepWalker';
 import { type PathTarget, targetAtWalkEnd, targetTiles } from './pathTargets';
 import type { PopulationHost } from './PopulationHost';
 import { TreeClaims } from './TreeClaims';
@@ -18,7 +18,7 @@ export class WoodcutterTrips {
   /** Woodcutters of `world`, walked by `walker`. */
   public constructor(
     private readonly world: PopulationHost,
-    private readonly walker: PeasantWalker,
+    private readonly walker: StepWalker,
   ) {}
 
   /** True when `p` works at a building that needs trees (a woodcutter's hut). */

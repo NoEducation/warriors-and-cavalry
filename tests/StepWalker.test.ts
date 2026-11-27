@@ -1,25 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { Peasant } from '../src/sim/Peasant';
-import { PeasantWalker } from '../src/sim/PeasantWalker';
+import { StepWalker } from '../src/sim/StepWalker';
 import type { TileCoord } from '../src/sim/TileCoord';
 import { WalkClass } from '../src/sim/walkRules';
 
 const SIZE = 16;
 
 /** A walker on an open 16 x 16 map whose `blocked` tiles are not walkable, and a peasant standing on (0, 4). */
-function setup(): { walker: PeasantWalker; blocked: Set<number>; peasant: Peasant } {
+function setup(): { walker: StepWalker; blocked: Set<number>; peasant: Peasant } {
   const blocked = new Set<number>();
   const walkClass = (tx: number, ty: number): WalkClass =>
     tx >= 0 && ty >= 0 && tx < SIZE && ty < SIZE && !blocked.has(ty * SIZE + tx) ? WalkClass.Ground : WalkClass.Blocked;
-  return { walker: new PeasantWalker(SIZE, SIZE, walkClass), blocked, peasant: new Peasant(1, 0, 4, 0) };
+  return { walker: new StepWalker(SIZE, SIZE, walkClass), blocked, peasant: new Peasant(1, 0, 4, 0) };
 }
 
-function ticks(walker: PeasantWalker, peasant: Peasant, n: number): void {
+function ticks(walker: StepWalker, peasant: Peasant, n: number): void {
   for (let i = 0; i < n; i++) walker.tick(peasant);
 }
 
 /** Ticks until the peasant stands on `goal` (at most 200 ticks); returns the ticks taken and every tile entered. */
-function walk(walker: PeasantWalker, p: Peasant, goal: TileCoord): { ticksTaken: number; entered: TileCoord[] } {
+function walk(walker: StepWalker, p: Peasant, goal: TileCoord): { ticksTaken: number; entered: TileCoord[] } {
   const entered: TileCoord[] = [];
   for (let n = 1; n <= 200; n++) {
     const from = { tx: p.tx, ty: p.ty };
@@ -33,7 +33,7 @@ function walk(walker: PeasantWalker, p: Peasant, goal: TileCoord): { ticksTaken:
   throw new Error('walk did not end');
 }
 
-describe('PeasantWalker', () => {
+describe('StepWalker', () => {
   it('takes 4 ticks per straight step, counting stepProgress up within a step', () => {
     const { walker, peasant } = setup();
     expect(walker.walkTo(peasant, [{ tx: 3, ty: 4 }])).toBe(true);

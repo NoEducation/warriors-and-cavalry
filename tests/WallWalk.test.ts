@@ -4,7 +4,7 @@ import { GameMap } from '../src/sim/GameMap';
 import { ObjectKind } from '../src/sim/ObjectKind';
 import { PathFinder } from '../src/sim/PathFinder';
 import { Peasant } from '../src/sim/Peasant';
-import { PeasantWalker } from '../src/sim/PeasantWalker';
+import { StepWalker } from '../src/sim/StepWalker';
 import { ResourceKind, resources } from '../src/sim/ResourceKind';
 import { TileType } from '../src/sim/tiles';
 import { WalkClass, WalkMode } from '../src/sim/walkRules';
@@ -54,7 +54,7 @@ describe('the wall walk', () => {
     const world = flatWorld();
     for (const tx of [5, 6, 7]) world.spawn(ObjectKind.Wall, tx, 5);
     world.spawn(ObjectKind.Stairs, 8, 5);
-    const walker = new PeasantWalker(32, 32, world.walkClass.bind(world));
+    const walker = new StepWalker(32, 32, world.walkClass.bind(world));
     const p = new Peasant(1, 5, 5, 0);
     expect(walker.walkTo(p, [{ tx: 10, ty: 5 }])).toBe(true);
     expect(p.walkMode).toBe(WalkMode.Ground);
@@ -66,7 +66,7 @@ describe('the wall walk', () => {
   it('is climbed down from on the spot when no stair is left', () => {
     const world = flatWorld();
     world.spawn(ObjectKind.Wall, 5, 5);
-    const walker = new PeasantWalker(32, 32, world.walkClass.bind(world));
+    const walker = new StepWalker(32, 32, world.walkClass.bind(world));
     const p = new Peasant(1, 5, 5, 0);
     expect(walker.walkTo(p, [{ tx: 10, ty: 5 }])).toBe(true);
     expect(p.walkMode).toBe(WalkMode.Down);
