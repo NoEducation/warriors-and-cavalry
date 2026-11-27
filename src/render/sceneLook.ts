@@ -2,8 +2,8 @@
 
 /** Sky, fog and light tuning, in sRGB hex colours, intensities and world units. Tune by editing these values. */
 export const SCENE_LOOK_CONFIG = Object.freeze({
-  /** Smoky, ash-brown sky behind the map. */
-  background: 0x15130f,
+  /** Sky behind the map: the fog's own colour, so the endless sea melts into it at the horizon. */
+  background: 0x3a352f,
   /** Haze that swallows the far side of the map; distances from the camera where it starts and where it is solid. */
   fogColor: 0x3a352f,
   fogNear: 70,

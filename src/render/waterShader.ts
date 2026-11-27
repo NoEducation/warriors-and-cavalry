@@ -21,6 +21,7 @@ void main() {
 /** Colours the sea from the depth texture; time drives the ripples, the foam pulse and the sparkle. */
 export const WATER_FRAGMENT_SHADER = /* glsl */ `
 uniform sampler2D depthMap;
+uniform vec2 mapSize;
 uniform float time;
 uniform float landDepth;
 uniform float maxDepth;
@@ -37,8 +38,10 @@ float hash(vec2 p) {
 }
 
 void main() {
-  float depth = mix(landDepth, maxDepth, texture2D(depthMap, vDepthUv).r);
   vec2 p = vWorld.xz;
+  // Past the map edges lies open, deep sea (the map's own border is already forced deep, so there is no seam).
+  bool onMap = p.x >= 0.0 && p.y >= 0.0 && p.x <= mapSize.x && p.y <= mapSize.y;
+  float depth = onMap ? mix(landDepth, maxDepth, texture2D(depthMap, vDepthUv).r) : maxDepth;
 
   vec3 color = mix(shallowColor, midColor, smoothstep(0.0, 1.6, depth));
   color = mix(color, deepColor, smoothstep(1.6, 5.0, depth));
@@ -57,7 +60,7 @@ void main() {
   float foam = max(1.0 - smoothstep(0.0, 0.035, depth), rollers * nearShore * 0.7);
   color = mix(color, foamColor, foam);
 
-  float alpha = mix(0.6, 0.97, smoothstep(0.0, 2.5, depth));
+  float alpha = onMap ? mix(0.6, 0.97, smoothstep(0.0, 2.5, depth)) : 1.0;
   gl_FragColor = vec4(color, max(alpha, foam * 0.95));
   #include <colorspace_fragment>
   #include <fog_fragment>

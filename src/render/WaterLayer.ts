@@ -1,4 +1,4 @@
-// The sea: one plane over the map at sea level, coloured by a shader from a texture of the water depth at each corner.
+// The sea: one plane at sea level over the map and an open sea far past its edges, coloured by a shader from a texture of the water depth at each corner.
 import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
 import { MAPGEN_CONFIG } from '../sim/MapGenerator';
@@ -15,6 +15,8 @@ export const WATER_CONFIG = Object.freeze({
   midColor: 0x15232a,
   deepColor: 0x05090c,
   foamColor: 0x8c8a80,
+  /** How far the open sea reaches past every map edge, in world units: beyond the camera's far plane, so it never ends. */
+  openSeaMargin: 1500,
   /** Longest frame step the waves advance by, so a stalled tab does not jump them. */
   maxStep: 0.1,
 });
@@ -44,7 +46,7 @@ export class WaterLayer implements WorldLayer {
     this.depthTexture.magFilter = THREE.LinearFilter;
     this.depthTexture.minFilter = THREE.LinearFilter;
     this.depthTexture.needsUpdate = true;
-    const geometry = new THREE.PlaneGeometry(map.width, map.height)
+    const geometry = new THREE.PlaneGeometry(map.width + 2 * c.openSeaMargin, map.height + 2 * c.openSeaMargin)
       .rotateX(-Math.PI / 2) // plane normal +z -> +y
       .translate(map.width / 2, MAPGEN_CONFIG.seaLevel, map.height / 2);
     const material = new THREE.ShaderMaterial({
