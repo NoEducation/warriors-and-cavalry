@@ -3,7 +3,10 @@ import { firstAccessTile } from './accessOrder';
 import type { ArmyHost } from './ArmyHost';
 import { ArmyOrders } from './ArmyOrders';
 import { Battlefield } from './Battlefield';
+import { Breach } from './Breach';
 import type { MapObject } from './MapObject';
+import { OBJECT_KINDS } from './ObjectKind';
+import { RaiderBrain } from './RaiderBrain';
 import { SoldierBrain } from './SoldierBrain';
 import { StepWalker } from './StepWalker';
 import { Training, type TrainingQueueView } from './Training';
@@ -25,6 +28,9 @@ export class Army {
   private readonly training = new Training();
   private readonly orders: ArmyOrders;
   private readonly soldierBrain: SoldierBrain;
+  private readonly raiderBrain: RaiderBrain;
+  /** Standing buildings raiders may attack, by id (ascending). */
+  private readonly buildings = new Map<number, MapObject>();
   private nextId = 1;
 
   /** The army of `world`. Create once per world. */
@@ -34,6 +40,8 @@ export class Army {
     const walks = new UnitWalks(world, walker, field);
     this.orders = new ArmyOrders(world, this.byId);
     this.soldierBrain = new SoldierBrain(field, walks);
+    const ground = { units: this.byId, buildings: this.buildings };
+    this.raiderBrain = new RaiderBrain(field, walks, new Breach(world, walker), ground);
   }
 
   /** Every unit in ascending id order (dead ones only until the end of the tick that killed them). */
@@ -68,11 +76,13 @@ export class Army {
 
   /** Call for every object added to the world. */
   public buildingAdded(object: MapObject): void {
+    if (OBJECT_KINDS[object.kind].hitPoints > 0) this.buildings.set(object.id, object);
     this.training.buildingAdded(object);
   }
 
   /** Call for every object removed from the world. */
   public buildingRemoved(object: MapObject): void {
+    this.buildings.delete(object.id);
     this.training.buildingRemoved(object);
   }
 
@@ -107,6 +117,7 @@ export class Army {
       if (!unit.alive) continue;
       unit.countDown();
       if (unit.side === Side.Player) this.soldierBrain.tick(unit);
+      else this.raiderBrain.tick(unit);
     }
     this.removeDead();
   }
