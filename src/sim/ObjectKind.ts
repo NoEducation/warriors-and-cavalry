@@ -1,4 +1,5 @@
-// Kinds of objects that stand on map tiles: footprints, costs, storage, housing, placement rules and production.
+// Kinds of objects that stand on map tiles: footprints, costs, storage, housing, hit points, placement rules and
+// production.
 import { NO_RESOURCES, type ResourceAmounts, ResourceKind, resources } from './ResourceKind';
 
 export const ObjectKind = {
@@ -15,6 +16,7 @@ export const ObjectKind = {
   Tower: 11,
   Stump: 12,
   Stairs: 13,
+  Barracks: 14,
 } as const;
 export type ObjectKind = (typeof ObjectKind)[keyof typeof ObjectKind];
 
@@ -48,6 +50,10 @@ export interface ObjectKindInfo {
   readonly needsWall: boolean;
   /** Peasants this building houses while it stands. */
   readonly housing: number;
+  /** Soldiers the player may have (trained or queued) while it stands; see `World.soldiers`. */
+  readonly soldierRoom: number;
+  /** Damage it takes before it falls; 0 when it cannot be attacked (trees, stumps). */
+  readonly hitPoints: number;
   readonly production: ProductionInfo | null;
 }
 
@@ -59,6 +65,7 @@ const PLAIN = {
   rockAllowed: false,
   needsWall: false,
   housing: 0,
+  soldierRoom: 0,
   production: null,
 } as const;
 
@@ -75,9 +82,10 @@ function deepFreeze<T extends object>(value: T): T {
 
 /** Frozen all the way down (entries and their cost, storage and production); tune by editing the source. */
 export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
-  [ObjectKind.Tree]: { ...PLAIN, name: 'Tree', width: 1, height: 1, buildable: false, cost: NO_RESOURCES },
+  [ObjectKind.Tree]: { ...PLAIN, hitPoints: 0, name: 'Tree', width: 1, height: 1, buildable: false, cost: NO_RESOURCES },
   [ObjectKind.Keep]: {
     ...PLAIN,
+    hitPoints: 600,
     name: 'Keep',
     width: 4,
     height: 4,
@@ -87,6 +95,7 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   },
   [ObjectKind.Hovel]: {
     ...PLAIN,
+    hitPoints: 80,
     name: 'Hovel',
     width: 2,
     height: 2,
@@ -96,6 +105,7 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   },
   [ObjectKind.WoodcutterHut]: {
     ...PLAIN,
+    hitPoints: 80,
     name: "Woodcutter's hut",
     width: 2,
     height: 2,
@@ -105,6 +115,7 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   },
   [ObjectKind.Stockpile]: {
     ...PLAIN,
+    hitPoints: 80,
     name: 'Stockpile',
     width: 3,
     height: 3,
@@ -114,6 +125,7 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   },
   [ObjectKind.Granary]: {
     ...PLAIN,
+    hitPoints: 120,
     name: 'Granary',
     width: 3,
     height: 3,
@@ -123,6 +135,7 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   },
   [ObjectKind.Quarry]: {
     ...PLAIN,
+    hitPoints: 120,
     name: 'Quarry',
     width: 3,
     height: 3,
@@ -133,6 +146,7 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
   },
   [ObjectKind.WheatFarm]: {
     ...PLAIN,
+    hitPoints: 80,
     name: 'Wheat farm',
     width: 4,
     height: 4,
@@ -141,9 +155,19 @@ export const OBJECT_KINDS: Record<ObjectKind, ObjectKindInfo> = deepFreeze({
     grassOnly: true,
     production: { resource: ResourceKind.Food, cycleTicks: 200, yield: 3, treeRadius: null },
   },
-  [ObjectKind.Wall]: { ...CASTLE, name: 'Wall', width: 1, height: 1, cost: resources(0, 2, 0) },
-  [ObjectKind.Gate]: { ...CASTLE, name: 'Gate', width: 1, height: 1, cost: resources(0, 6, 0) },
-  [ObjectKind.Tower]: { ...CASTLE, name: 'Tower', width: 2, height: 2, cost: resources(0, 20, 0) },
-  [ObjectKind.Stump]: { ...PLAIN, name: 'Stump', width: 1, height: 1, buildable: false, cost: NO_RESOURCES },
-  [ObjectKind.Stairs]: { ...CASTLE, name: 'Stairs', width: 1, height: 1, cost: resources(0, 3, 0), needsWall: true },
+  [ObjectKind.Wall]: { ...CASTLE, hitPoints: 150, name: 'Wall', width: 1, height: 1, cost: resources(0, 2, 0) },
+  [ObjectKind.Gate]: { ...CASTLE, hitPoints: 200, name: 'Gate', width: 1, height: 1, cost: resources(0, 6, 0) },
+  [ObjectKind.Tower]: { ...CASTLE, hitPoints: 400, name: 'Tower', width: 2, height: 2, cost: resources(0, 20, 0) },
+  [ObjectKind.Stump]: { ...PLAIN, hitPoints: 0, name: 'Stump', width: 1, height: 1, buildable: false, cost: NO_RESOURCES },
+  [ObjectKind.Barracks]: {
+    ...PLAIN,
+    hitPoints: 200,
+    name: 'Barracks',
+    width: 3,
+    height: 3,
+    buildable: true,
+    cost: resources(40, 10, 0),
+    soldierRoom: 8,
+  },
+  [ObjectKind.Stairs]: { ...CASTLE, hitPoints: 60, name: 'Stairs', width: 1, height: 1, cost: resources(0, 3, 0), needsWall: true },
 });

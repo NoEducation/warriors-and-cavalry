@@ -9,6 +9,7 @@ import { ObjectLifecycle } from './ObjectLifecycle';
 import type { PeasantView } from './PeasantView';
 import { Population, type PopulationSummary } from './Population';
 import { Production, type ProductionState } from './Production';
+import { type HitPoints, Structures } from './Structures';
 import { Stumps } from './Stumps';
 import { TreeFelling } from './TreeFelling';
 import type { TileCoord } from './TileCoord';
@@ -31,6 +32,7 @@ export class World {
   private readonly lifecycle: ObjectLifecycle;
   private readonly walls: WallBuilder;
   private readonly stumps = new Stumps();
+  private readonly structures = new Structures();
   private readonly felling: TreeFelling;
   private ticks = 0;
 
@@ -39,8 +41,8 @@ export class World {
     this.index = new ObjectIndex(map);
     this.production = new Production(map, economyState, (tx, ty) => this.objectAt(tx, ty)?.kind === ObjectKind.Tree);
     this.populace = new Population(this, economyState);
-    const { index, production, populace: population, stumps, listeners } = this;
-    const followers = { index, economy: economyState, production, population, stumps, listeners };
+    const { index, structures, production, populace: population, stumps, listeners } = this;
+    const followers = { index, economy: economyState, structures, production, population, stumps, listeners };
     this.lifecycle = new ObjectLifecycle(map, followers);
     this.walls = new WallBuilder(this.lifecycle, economyState);
     this.felling = new TreeFelling(index, this.lifecycle, stumps, listeners);
@@ -71,6 +73,11 @@ export class World {
   /** Ticks before the stump `objectId` is cleared away; 0 when it is not a stump. */
   public stumpTicksLeft(objectId: number): number {
     return this.stumps.ticksLeft(objectId);
+  }
+
+  /** The hit points of the standing building `objectId`; null for trees, stumps and unknown ids. */
+  public buildingHitPoints(objectId: number): HitPoints | null {
+    return this.structures.hitPoints(objectId);
   }
 
   /** Rounds of wood already taken from the standing tree `objectId`; 0 for an untouched tree or any other id. */

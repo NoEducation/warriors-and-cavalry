@@ -1,6 +1,7 @@
 // Low-poly meshes for each buildable object kind, each built by its own shape class.
 import type * as THREE from 'three';
 import { OBJECT_KINDS, ObjectKind } from '../sim/ObjectKind';
+import { BarracksShape } from './buildings/BarracksShape';
 import type { BuildingShape } from './buildings/BuildingShape';
 import { type GatePassage, GateShape } from './buildings/GateShape';
 import { GranaryShape } from './buildings/GranaryShape';
@@ -31,6 +32,7 @@ export class BuildingMeshFactory {
     [ObjectKind.WheatFarm, new WheatFarmShape()],
     [ObjectKind.Wall, new WallShape()],
     [ObjectKind.Tower, new TowerShape()],
+    [ObjectKind.Barracks, new BarracksShape()],
   ]);
 
   /**

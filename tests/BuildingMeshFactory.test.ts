@@ -47,8 +47,8 @@ function hits(mesh: THREE.Mesh, origin: THREE.Vector3, direction: THREE.Vector3)
 describe('BuildingMeshFactory', () => {
   const factory = new BuildingMeshFactory();
 
-  it('has eleven buildable kinds', () => {
-    expect(BUILDABLE_KINDS).toHaveLength(11);
+  it('has twelve buildable kinds', () => {
+    expect(BUILDABLE_KINDS).toHaveLength(12);
   });
 
   it('creates a non-empty group within its triangle budget and within the footprint for every buildable kind', () => {
