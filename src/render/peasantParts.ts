@@ -1,4 +1,4 @@
-// The parts a peasant is drawn from, where their joints sit on the figure, and the boxes each part is built of.
+// The parts a peasant (or soldier) is drawn from, where their joints sit on the figure, and the boxes each part is built of.
 
 /** Each part is one instanced mesh for all peasants; the number is only an id. */
 export const PeasantPart = {
@@ -14,6 +14,9 @@ export const PeasantPart = {
   Axe: 9,
   Pick: 10,
   Hoe: 11,
+  Spear: 12,
+  Bow: 13,
+  Helmet: 14,
 } as const;
 export type PeasantPart = (typeof PeasantPart)[keyof typeof PeasantPart];
 
@@ -61,6 +64,8 @@ const COLORS = Object.freeze({
   handle: 0x7a5530,
   iron: 0x6d7378,
   blade: 0xa7acb0,
+  bowWood: 0x5a3a1e,
+  string: 0xd8d0b8,
 });
 
 function piece(cx: number, cz: number, w: number, d: number, y0: number, y1: number, color: number, taper = 1): PartPiece {
@@ -105,4 +110,15 @@ export const PEASANT_PART_PIECES: Readonly<Record<PeasantPart, readonly PartPiec
     piece(0, 0.15, 0.03, 0.46, HAND - 0.015, HAND + 0.015, COLORS.handle),
     piece(0, 0.37, 0.12, 0.03, HAND - 0.07, HAND, COLORS.iron),
   ],
+  [PeasantPart.Spear]: [
+    piece(0, 0.2, 0.025, 0.9, HAND - 0.012, HAND + 0.012, COLORS.handle),
+    piece(0, 0.69, 0.035, 0.1, HAND - 0.02, HAND + 0.02, COLORS.blade),
+  ],
+  [PeasantPart.Bow]: [
+    piece(0, 0.05, 0.03, 0.03, HAND - 0.26, HAND + 0.26, COLORS.bowWood),
+    piece(0, 0.1, 0.03, 0.04, HAND + 0.2, HAND + 0.26, COLORS.bowWood),
+    piece(0, 0.1, 0.03, 0.04, HAND - 0.26, HAND - 0.2, COLORS.bowWood),
+    piece(0, 0.12, 0.006, 0.006, HAND - 0.24, HAND + 0.24, COLORS.string),
+  ],
+  [PeasantPart.Helmet]: [piece(0, 0, 0.18, 0.18, 0.11, 0.21, WHITE, 0.75), piece(0, 0.085, 0.03, 0.01, 0.05, 0.14, WHITE)],
 });

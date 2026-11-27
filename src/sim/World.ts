@@ -139,6 +139,11 @@ export class World {
     return this.felling.chopsTaken(objectId);
   }
 
+  /** The peasant `id`, or undefined when there is none. */
+  public peasantById(id: number): PeasantView | undefined {
+    return this.populace.peasantById(id);
+  }
+
   /** All peasants in ascending id order. */
   public peasants(): Iterable<PeasantView> {
     return this.populace.peasants();
