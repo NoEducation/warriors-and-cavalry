@@ -1,4 +1,5 @@
 // The simulation state: a map, the objects standing on it and the camp's economy, changed only through commands.
+import { Army, type SoldierSummary } from './Army';
 import { Economy, type EconomyView } from './Economy';
 import type { GameMap } from './GameMap';
 import type { MapObject } from './MapObject';
@@ -13,8 +14,12 @@ import { type HitPoints, Structures } from './Structures';
 import { Stumps } from './Stumps';
 import { TreeFelling } from './TreeFelling';
 import type { TileCoord } from './TileCoord';
+import type { TrainingQueueView } from './Training';
+import type { Side, UnitKind } from './UnitKind';
+import type { UnitView } from './UnitView';
 import type { WalkClass } from './walkRules';
 import { WallBuilder, type WallLinePreview } from './WallBuilder';
+import { WorldArmyHost } from './WorldArmyHost';
 import {
   type CommandResult,
   type ObjectCommand,
@@ -34,6 +39,7 @@ export class World {
   private readonly stumps = new Stumps();
   private readonly structures = new Structures();
   private readonly felling: TreeFelling;
+  private readonly army: Army;
   private ticks = 0;
 
   /** Creates a world with no objects on `map`, holding `economyState` (by default the usual start amounts). */
@@ -42,7 +48,10 @@ export class World {
     this.production = new Production(map, economyState, (tx, ty) => this.objectAt(tx, ty)?.kind === ObjectKind.Tree);
     this.populace = new Population(this, economyState);
     const { index, structures, production, populace: population, stumps, listeners } = this;
-    const followers = { index, economy: economyState, structures, production, population, stumps, listeners };
+    const economy = economyState;
+    const destroy = (object: MapObject): void => this.lifecycle.remove(object);
+    this.army = new Army(new WorldArmyHost(this, { economy, structures, population, destroy }));
+    const followers = { index, economy, structures, production, population, army: this.army, stumps, listeners };
     this.lifecycle = new ObjectLifecycle(map, followers);
     this.walls = new WallBuilder(this.lifecycle, economyState);
     this.felling = new TreeFelling(index, this.lifecycle, stumps, listeners);
@@ -61,13 +70,52 @@ export class World {
   /**
    * Advances the world by one simulation tick: peasants, then production, whose batches the workers pick up (the
    * trees woodcutters finished a round on give it up, the last round fells them into stumps), then stumps whose time
-   * is up are cleared away.
+   * is up are cleared away, then the army: training, raids and every unit's fighting.
    */
   public tick(): void {
     this.ticks++;
     this.populace.tick();
     this.felling.chop(this.populace.collect(this.production.tick((id) => this.populace.isWorking(id))));
     this.felling.tick();
+    this.army.tick();
+  }
+
+  /** All soldiers and raiders in ascending id order. */
+  public units(): Iterable<UnitView> {
+    return this.army.units();
+  }
+
+  /** The unit `id`, or undefined when there is none. */
+  public unitById(id: number): UnitView | undefined {
+    return this.army.unitById(id);
+  }
+
+  /** Living player soldiers, and the room the Barracks give (trained plus queued soldiers may not exceed it). */
+  public get soldiers(): SoldierSummary {
+    return this.army.soldiers;
+  }
+
+  /** What Barracks `objectId` is training; null when it is not a standing Barracks. */
+  public trainingQueue(objectId: number): TrainingQueueView | null {
+    return this.army.trainingQueue(objectId);
+  }
+
+  /** Every Barracks' queue in ascending id order, as [id, queue]; for the checksum. */
+  public trainingQueues(): Iterable<readonly [number, TrainingQueueView]> {
+    return this.army.trainingQueues();
+  }
+
+  /** The id the next unit will get; for the checksum. */
+  public get nextUnitId(): number {
+    return this.army.nextUnitId;
+  }
+
+  /**
+   * Adds a unit of `kind` for `side` on tile (tx, ty) without any rule or cost. For setting worlds up (tests,
+   * scenarios) only, like `spawn`.
+   */
+  public spawnUnit(side: Side, kind: UnitKind, tx: number, ty: number): UnitView {
+    return this.army.spawn(side, kind, tx, ty);
   }
 
   /** Ticks before the stump `objectId` is cleared away; 0 when it is not a stump. */
@@ -169,6 +217,7 @@ export class World {
       case 'placeBuilding': return this.lifecycle.placeBuilding(command.kind, command.tx, command.ty);
       case 'demolish': return this.lifecycle.demolish(command.objectId);
       case 'placeWallLine': return this.walls.build(command);
+      case 'trainUnit': return this.army.train(command);
       default: return { ok: false, reason: 'UnknownCommand' };
     }
   }

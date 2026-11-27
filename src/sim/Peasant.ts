@@ -1,4 +1,5 @@
 // One peasant: its state and every change to it, each a named transition.
+import { COMBAT_CONFIG } from './combatConfig';
 import { POPULATION_CONFIG } from './populationConfig';
 import type { TileCoord } from './TileCoord';
 import type { Load, PeasantState, PeasantView } from './PeasantView';
@@ -26,6 +27,7 @@ export class Peasant implements PeasantView, Walker {
   private _path = NO_TILES;
   private _pathIndex = 0;
   private _walkMode: WalkMode = WalkMode.Ground;
+  private _hitPoints: number = COMBAT_CONFIG.peasantHitPoints;
 
   /** A new worker standing on tile (tx, ty), heading for its workplace, building `workplaceId`. */
   public constructor(
@@ -53,6 +55,12 @@ export class Peasant implements PeasantView, Walker {
   public get path(): readonly TileCoord[] { return this._path; }
   public get pathIndex(): number { return this._pathIndex; }
   public get walkMode(): WalkMode { return this._walkMode; }
+  public get hitPoints(): number { return this._hitPoints; }
+
+  /** Takes `amount` hit points (a raider's strike); at 0 or below it is dead. */
+  public takeDamage(amount: number): void {
+    this._hitPoints -= amount;
+  }
 
   /** toWork or toWorkBack -> working: stands at its workplace, so the building's production advances. */
   public startWorking(): void {

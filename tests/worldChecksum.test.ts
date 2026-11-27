@@ -79,7 +79,7 @@ const peasantOf = (world: World): PeasantView | undefined => [...world.peasants(
 function remaining(p: PeasantView): Record<keyof PeasantView, unknown> {
   const { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, treeId, waitTicks } = p;
   const view = { id, state, tx, ty, nextTx, nextTy, stepProgress, stepTicks, load, workplaceId, targetId, treeId, waitTicks };
-  return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, walkMode: p.walkMode };
+  return { ...view, path: p.path.slice(p.pathIndex), pathIndex: p.pathIndex, walkMode: p.walkMode, hitPoints: p.hitPoints };
 }
 
 /**

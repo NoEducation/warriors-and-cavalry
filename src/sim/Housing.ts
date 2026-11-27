@@ -1,5 +1,6 @@
 // Housing: how many workers the homes allow (the worker limit), and where at the Keep a new worker appears.
 import type { MapObject } from './MapObject';
+import { firstAccessTile } from './accessOrder';
 import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
 import type { PopulationHost } from './PopulationHost';
 import type { TileCoord } from './TileCoord';
@@ -42,19 +43,6 @@ export class Housing {
    */
   public spawnTile(): TileCoord | null {
     const keep = this.keep;
-    if (!keep) return null;
-    const { width, height } = OBJECT_KINDS[keep.kind];
-    const span = this.world.map.width + this.world.map.height;
-    let best: TileCoord | null = null;
-    let bestKey = Infinity;
-    for (const tile of this.world.accessTiles(keep.id)) {
-      let key: number;
-      if (tile.ty === keep.ty + height) key = tile.tx;
-      else if (tile.tx === keep.tx + width) key = span + tile.ty;
-      else if (tile.ty === keep.ty - 1) key = 2 * span + tile.tx;
-      else key = 3 * span + tile.ty;
-      if (key < bestKey) [best, bestKey] = [tile, key];
-    }
-    return best;
+    return keep ? firstAccessTile(this.world, keep) : null;
   }
 }

@@ -29,4 +29,6 @@ export interface PeasantView extends WalkerView {
   readonly treeId: number | null;
   /** Ticks left before it searches again after a failed search; 0 when not waiting. */
   readonly waitTicks: number;
+  /** Raiders take these; at 0 or below it is dead (removed at the end of the tick). */
+  readonly hitPoints: number;
 }

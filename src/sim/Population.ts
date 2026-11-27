@@ -55,6 +55,21 @@ export class Population {
     return this.byId.values();
   }
 
+  /** The worker `id`, or undefined. */
+  public peasantById(id: number): PeasantView | undefined {
+    return this.byId.get(id);
+  }
+
+  /** Takes `amount` hit points from worker `id` (a raider's strike); unknown ids change nothing. */
+  public damage(id: number, amount: number): void {
+    this.byId.get(id)?.takeDamage(amount);
+  }
+
+  /** Removes the workers killed this tick, in ascending id order; their buildings get new workers when there is room. */
+  public removeDead(): void {
+    for (const p of [...this.byId.values()]) if (p.hitPoints <= 0) this.remove(p);
+  }
+
   /** Call for every object added to the world: counts its housing, opens its job, remembers a storage place. */
   public buildingAdded(object: MapObject): void {
     this.housingOf.buildingAdded(object);
