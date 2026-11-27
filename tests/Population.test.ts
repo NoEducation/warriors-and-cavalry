@@ -156,3 +156,66 @@ describe('World population: workers', () => {
     expect(world.jobSkipTicks(hut.id)).toBe(200);
   });
 });
+
+describe('World population: deaths', () => {
+  it('removes the worker of a demolished workplace at once', () => {
+    const { world, huts } = hutCamp(2);
+    world.tick();
+    world.apply({ type: 'demolish', objectId: huts[0].id });
+    expect(world.population.count).toBe(1);
+    expect(workplaces(world)).toEqual([huts[1].id]);
+  });
+
+  it('gives the freed place to the next waiting building on the next tick', () => {
+    const { world, huts } = hutCamp(6);
+    world.tick();
+    expect(workplaces(world)).toEqual(huts.slice(0, 4).map((h) => h.id));
+    world.apply({ type: 'demolish', objectId: huts[1].id });
+    expect(world.population.count).toBe(3);
+    world.tick();
+    expect(world.population.count).toBe(4);
+    expect(workplaces(world)).toEqual([huts[0].id, huts[2].id, huts[3].id, huts[4].id]);
+    expect(status(world, huts[5].id)).toBe('noWorker');
+  });
+
+  it('kills the newest workers when a Hovel goes, and their buildings wait for room', () => {
+    const { world, huts } = hutCamp(8);
+    const hovel = world.spawn(ObjectKind.Hovel, 20, 2);
+    world.tick();
+    expect(world.population).toEqual({ count: 8, housing: 8 });
+    world.apply({ type: 'demolish', objectId: hovel.id });
+    expect(world.population).toEqual({ count: 4, housing: 4 });
+    expect([...world.peasants()].map((p) => p.id)).toEqual([1, 2, 3, 4]);
+    ticks(world, 10);
+    for (const hut of huts.slice(4)) expect(status(world, hut.id)).toBe('noWorker');
+    place(world, ObjectKind.Hovel, 20, 2);
+    world.tick();
+    expect(world.population.count).toBe(8);
+  });
+
+  it('kills nobody when the workers still fit after a Hovel goes', () => {
+    const { world } = hutCamp(4);
+    const hovel = world.spawn(ObjectKind.Hovel, 20, 2);
+    world.tick();
+    world.apply({ type: 'demolish', objectId: hovel.id });
+    expect(world.population).toEqual({ count: 4, housing: 4 });
+  });
+
+  it('kills every worker when the only Keep goes, and spawns nobody after', () => {
+    const { world, keep } = hutCamp(2);
+    world.tick();
+    world.apply({ type: 'demolish', objectId: keep.id });
+    expect(world.population).toEqual({ count: 0, housing: 0 });
+    ticks(world, 300);
+    expect(world.population.count).toBe(0);
+  });
+
+  it('spawns at the next Keep when the first one goes', () => {
+    const { world, keep } = hutCamp(1);
+    const second = world.spawn(ObjectKind.Keep, 20, 2);
+    world.apply({ type: 'demolish', objectId: keep.id });
+    world.tick();
+    const [p] = [...world.peasants()];
+    expect([p.tx, p.ty]).toEqual([second.tx, second.ty + 4]);
+  });
+});
