@@ -10,10 +10,11 @@ export const WATER_CONFIG = Object.freeze({
   /** Depth range stored in the depth texture: from this far above the sea (negative) to this far below it. */
   landDepth: -1.5,
   maxDepth: 6,
-  shallowColor: 0x3cc4c0,
-  midColor: 0x2a80b8,
-  deepColor: 0x143f70,
-  foamColor: 0xf4f8f6,
+  /** Murky, cold water: grey-green shallows sinking to near-black depths, with dirty foam. */
+  shallowColor: 0x4f6a5c,
+  midColor: 0x2c4548,
+  deepColor: 0x141f24,
+  foamColor: 0xb9b6a8,
   /** Longest frame step the waves advance by, so a stalled tab does not jump them. */
   maxStep: 0.1,
 });
@@ -51,7 +52,9 @@ export class WaterLayer implements WorldLayer {
       fragmentShader: WATER_FRAGMENT_SHADER,
       transparent: true,
       depthWrite: false,
+      fog: true,
       uniforms: {
+        ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
         depthMap: { value: this.depthTexture },
         mapSize: { value: new THREE.Vector2(map.width, map.height) },
         time: { value: 0 },

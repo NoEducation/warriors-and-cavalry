@@ -1,4 +1,4 @@
-// The 3D scene for a world: background, lights, terrain, water, trees, buildings, stockpile stacks, crops, peasants,
+// The 3D scene for a world: background, fog, lights, terrain, water, trees, buildings, stockpile stacks, crops, peasants,
 // soldiers and raiders, arrows and health bars.
 import * as THREE from 'three';
 import type { World } from '../sim/World';
@@ -9,6 +9,7 @@ import { disposeObject } from './disposeObject';
 import { FarmCrops } from './FarmCrops';
 import { HealthBars } from './HealthBars';
 import { PeasantLayer } from './PeasantLayer';
+import { SCENE_LOOK_CONFIG } from './sceneLook';
 import { StockpileStacks } from './StockpileStacks';
 import { type TerrainChunkData, TerrainMeshBuilder } from './TerrainMeshBuilder';
 import { StumpLayer } from './StumpLayer';
@@ -27,14 +28,16 @@ export class WorldView {
   private readonly layers: WorldLayer[] = [];
   private unitLayer: UnitLayer | null = null;
 
-  /** Creates the scene with background and lights; no world is shown until `showWorld`. */
+  /** Creates the scene with background, fog and lights; no world is shown until `showWorld`. */
   public constructor() {
-    this.scene.background = new THREE.Color(0x1b2a38);
-    // Sky light from above and bounce light from the ground keep shadowed slopes readable; a warm, low sun gives relief.
-    this.scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x5a4a30, 1.1));
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.15));
-    const sun = new THREE.DirectionalLight(0xfff1d8, 2.1);
-    sun.position.set(-0.8, 0.85, -0.35); // shines towards the origin (default target)
+    const look = SCENE_LOOK_CONFIG;
+    this.scene.background = new THREE.Color(look.background);
+    this.scene.fog = new THREE.Fog(look.fogColor, look.fogNear, look.fogFar);
+    // Overcast sky light and a dark earth bounce keep shadowed slopes readable; a low copper sun gives relief.
+    this.scene.add(new THREE.HemisphereLight(look.skyLight, look.groundLight, look.hemisphereIntensity));
+    this.scene.add(new THREE.AmbientLight(0xffffff, look.ambientIntensity));
+    const sun = new THREE.DirectionalLight(look.sunColor, look.sunIntensity);
+    sun.position.set(look.sunDirection.x, look.sunDirection.y, look.sunDirection.z); // shines towards the origin (default target)
     this.scene.add(sun);
   }
 

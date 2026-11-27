@@ -1,17 +1,20 @@
-// GLSL for the sea surface: colour by depth, shore foam, ripples and sparkle. Used by WaterLayer.
+// GLSL for the sea surface: colour by depth, shore foam, ripples, sparkle and the scene's fog. Used by WaterLayer.
 
 /** Passes the world position and the depth-texture coordinate to the fragment shader. */
 export const WATER_VERTEX_SHADER = /* glsl */ `
 uniform vec2 mapSize;
 varying vec3 vWorld;
 varying vec2 vDepthUv;
+#include <fog_pars_vertex>
 
 void main() {
   vec4 world = modelMatrix * vec4(position, 1.0);
   vWorld = world.xyz;
   // Corner (cx, cy) is texel (cx, cy) of a (width + 1) x (height + 1) texture: sample texel centres.
   vDepthUv = (world.xz + 0.5) / (mapSize + 1.0);
-  gl_Position = projectionMatrix * viewMatrix * world;
+  vec4 mvPosition = viewMatrix * world;
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
 }
 `;
 
@@ -27,6 +30,7 @@ uniform vec3 deepColor;
 uniform vec3 foamColor;
 varying vec3 vWorld;
 varying vec2 vDepthUv;
+#include <fog_pars_fragment>
 
 float hash(vec2 p) {
   return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
@@ -43,9 +47,9 @@ void main() {
   float ripple = sin(p.x * 0.9 + time * 0.8) * sin(p.y * 0.7 - time * 0.6) + 0.6 * sin((p.x + p.y) * 0.31 + time * 0.45);
   color *= 1.0 + 0.07 * ripple;
 
-  // Sparkle: a few cells per second catch the sun, more out at sea.
+  // Sparkle: a few cells per second catch the dim sun, more out at sea.
   float glint = step(0.9985, hash(floor(p * 5.0) + floor(time * 1.7)));
-  color += vec3(0.45) * glint * smoothstep(0.8, 2.5, depth);
+  color += vec3(0.18) * glint * smoothstep(0.8, 2.5, depth);
 
   // Foam: a solid line where water meets the beach, and bands that roll towards it.
   float nearShore = 1.0 - smoothstep(0.0, 0.22, depth);
@@ -56,5 +60,6 @@ void main() {
   float alpha = mix(0.5, 0.9, smoothstep(0.0, 3.0, depth));
   gl_FragColor = vec4(color, max(alpha, foam * 0.95));
   #include <colorspace_fragment>
+  #include <fog_fragment>
 }
 `;
