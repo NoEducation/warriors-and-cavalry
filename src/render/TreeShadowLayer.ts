@@ -21,7 +21,7 @@ export const TREE_SHADOW_CONFIG = Object.freeze({
   /** Height of the disc above the ground, against z-fighting. */
   lift: 0.03,
   opacity: 0.3,
-  color: 0x0b1606,
+  color: 0x0c0a06,
   segments: 9,
 });
 
