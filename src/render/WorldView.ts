@@ -1,5 +1,5 @@
 // The 3D scene for a world: background, fog, lights, terrain, water, trees, buildings, stockpile stacks, crops, peasants,
-// soldiers and raiders, arrows and health bars.
+// soldiers and raiders, mountain mist, arrows and health bars.
 import * as THREE from 'three';
 import type { World } from '../sim/World';
 import { ArrowFlights } from './ArrowFlights';
@@ -8,6 +8,7 @@ import { BuildingMeshFactory } from './BuildingMeshFactory';
 import { disposeObject } from './disposeObject';
 import { FarmCrops } from './FarmCrops';
 import { HealthBars } from './HealthBars';
+import { MountainMist } from './MountainMist';
 import { PeasantLayer } from './PeasantLayer';
 import { SCENE_LOOK_CONFIG } from './sceneLook';
 import { StockpileStacks } from './StockpileStacks';
@@ -60,6 +61,7 @@ export class WorldView {
       new StockpileStacks(world),
       new FarmCrops(world),
       new PeasantLayer(),
+      new MountainMist(map),
     );
     this.unitLayer = new UnitLayer();
     this.layers.push(this.unitLayer, new ArrowFlights(), new HealthBars(this.unitLayer));
