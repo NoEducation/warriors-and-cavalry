@@ -57,12 +57,12 @@ const onAccess = (world: World, objectId: number, p: PeasantView): boolean =>
 const wood = (world: World): number => world.economy.amount(WOOD);
 const status = (world: World, id: number): string | undefined => world.productionState(id)?.status;
 
-/** Food for exactly one arrival, so one peasant does all the work. */
-const onePeasant = (): Economy => new Economy(resources(100, 40, 5));
+/** The starting wood and stone, and no food. */
+const onePeasant = (): Economy => new Economy(resources(100, 40, 0));
 
 /**
- * A flat world with a tree at (25, 8), a Keep at (2, 20) (peasants arrive at (2, 24)) and a Woodcutter's hut at
- * (20, 4) (covering 20..21 x 4..5).
+ * A flat world with a tree at (25, 8), a Keep at (2, 20) (workers appear at (2, 24)) and a Woodcutter's hut at
+ * (20, 4) (covering 20..21 x 4..5): one worker.
  */
 function camp(economy = onePeasant()): { world: World; keep: MapObject; hut: MapObject } {
   const world = new World(flatMap(), economy);
@@ -136,13 +136,11 @@ describe('Jobs and the supply chain', () => {
   });
 
   it('takes a wheat farm\'s food to a Granary rather than to a nearer Stockpile', () => {
-    const world = new World(flatMap(), new Economy(resources(100, 0, 5)));
+    const world = new World(flatMap(), new Economy(resources(100, 0, 0)));
     world.spawn(ObjectKind.Keep, 2, 20);
     place(world, ObjectKind.WheatFarm, 20, 4); // 20..23 x 4..7
     const stockpile = place(world, ObjectKind.Stockpile, 20, 9); // its top edge (row 8) is the farm's bottom edge
     const granary = place(world, ObjectKind.Granary, 27, 4);
-    ticks(world, 50);
-    expect(world.economy.amount(ResourceKind.Food)).toBe(0);
     const p = untilDelivered(world);
     expect(onAccess(world, granary.id, p)).toBe(true);
     expect(onAccess(world, stockpile.id, p)).toBe(false);
@@ -185,17 +183,18 @@ describe('Jobs and the supply chain', () => {
     expect(wood(world)).toBe(before + 2);
   });
 
-  it('makes the worker of a demolished workplace idle, and it takes another vacant job on the next tick', () => {
+  it('removes the worker of a demolished workplace at once, leaving the other workers be', () => {
     const { world, hut } = camp();
     world.spawn(ObjectKind.Tree, 15, 8);
     const other = place(world, ObjectKind.WoodcutterHut, 12, 4);
     tickUntil(world, () => first(world)?.state === 'working', 4000);
     expect(peasant(world).workplaceId).toBe(hut.id);
-    expect(status(world, other.id)).toBe('noWorker');
+    expect(peasant(world, 2).workplaceId).toBe(other.id);
     world.apply({ type: 'demolish', objectId: hut.id });
-    expect(peasant(world)).toMatchObject({ state: 'idle', workplaceId: null, load: null });
+    expect(world.population.count).toBe(1);
+    expect(first(world)).toBeUndefined();
     world.tick();
-    expect(peasant(world)).toMatchObject({ state: 'toWork', workplaceId: other.id });
+    expect([...world.peasants()].map((p) => [p.id, p.workplaceId])).toEqual([[2, other.id]]);
   });
 
   it('drops the load of a worker whose workplace is demolished while it carries', () => {
@@ -203,47 +202,45 @@ describe('Jobs and the supply chain', () => {
     tickUntil(world, () => first(world)?.state === 'toStore', 2000);
     const before = wood(world);
     world.apply({ type: 'demolish', objectId: hut.id });
-    expect(peasant(world)).toMatchObject({ state: 'idle', workplaceId: null, load: null });
+    expect(world.population.count).toBe(0);
     const refunded = wood(world);
     expect(refunded).toBe(before + 10);
     ticks(world, 300);
     expect(wood(world)).toBe(refunded);
-    expect(peasant(world).state).toBe('idle');
+    expect(world.population.count).toBe(0);
   });
 
-  it('gives up a job it cannot reach and skips that building for 200 ticks', () => {
+  it('spawns no worker for a building it cannot reach and skips it for 200 ticks', () => {
     const ring = (tx: number, ty: number): boolean =>
       tx >= 18 && tx <= 27 && ty >= 18 && ty <= 27 && (tx === 18 || tx === 27 || ty === 18 || ty === 27);
     const world = new World(flatMap(ring), onePeasant());
     world.spawn(ObjectKind.Tree, 24, 24);
     place(world, ObjectKind.Keep, 2, 2);
     const hut = place(world, ObjectKind.WoodcutterHut, 21, 21);
-    ticks(world, 49);
     expect(status(world, hut.id)).toBe('noWorker');
     world.tick();
-    expect(peasant(world)).toMatchObject({ state: 'idle', workplaceId: null });
+    expect(world.population.count).toBe(0);
     expect(status(world, hut.id)).toBe('workerCannotReach');
     expect(world.jobSkipTicks(hut.id)).toBe(200);
     ticks(world, 199);
     expect(status(world, hut.id)).toBe('workerCannotReach');
     expect(world.jobSkipTicks(hut.id)).toBe(1);
-    expect(peasant(world).state).toBe('idle');
-    world.tick(); // offered again, and given up again
+    world.tick(); // offered again, and skipped again
     expect(world.jobSkipTicks(hut.id)).toBe(200);
-    expect(peasant(world).state).toBe('idle');
+    expect(world.population.count).toBe(0);
   });
 
-  it('gives the worker to the lower-id hut, even when another is nearer', () => {
+  it('gives the first worker to the lower-id hut, even when another is nearer', () => {
     const world = new World(flatMap(), onePeasant());
     world.spawn(ObjectKind.Tree, 25, 8);
     world.spawn(ObjectKind.Tree, 10, 10);
     place(world, ObjectKind.Keep, 2, 20);
     const far = place(world, ObjectKind.WoodcutterHut, 20, 4);
     const near = place(world, ObjectKind.WoodcutterHut, 8, 14);
-    ticks(world, 50);
+    world.tick();
     expect(peasant(world).workplaceId).toBe(far.id);
+    expect(peasant(world, 2).workplaceId).toBe(near.id);
     expect(status(world, far.id)).toBe('workerOnTheWay');
-    expect(status(world, near.id)).toBe('noWorker');
   });
 
   it('searches again when the next tile of its path is built over, and still reaches work', () => {
@@ -312,8 +309,8 @@ describe('Supply chain determinism and speed', () => {
   /** A rich economy, so the commands below can all be paid for. */
   function richEconomy(): Economy {
     const economy = new Economy();
-    economy.addCapacity(resources(900, 900, 900));
-    for (const kind of RESOURCE_KINDS) economy.add(kind, 900);
+    economy.addCapacity(resources(1900, 900, 900));
+    for (const kind of RESOURCE_KINDS) economy.add(kind, 1900);
     return economy;
   }
 
@@ -325,15 +322,18 @@ describe('Supply chain determinism and speed', () => {
     return world;
   }
 
-  /** Commands for a Keep near the map's middle, `hovels` Hovels and one of each producer and store near it. */
-  function campCommands(hovels: number): WorldCommand[] {
+  /**
+   * Commands for a Keep near the map's middle, `hovels` Hovels, one of each producer and store near it, and
+   * `extraFarms` more Wheat farms at least 16 tiles out, so they do not wall the Keep in.
+   */
+  function campCommands(hovels: number, extraFarms = 0): WorldCommand[] {
     const probe = seedOneWorld(richEconomy());
     const kinds: ObjectKind[] = [ObjectKind.Keep, ...Array<ObjectKind>(hovels).fill(ObjectKind.Hovel)];
     kinds.push(ObjectKind.WoodcutterHut, ObjectKind.Quarry, ObjectKind.WheatFarm, ObjectKind.Stockpile);
-    kinds.push(ObjectKind.Granary);
+    kinds.push(ObjectKind.Granary, ...Array<ObjectKind>(extraFarms).fill(ObjectKind.WheatFarm));
     const commands: WorldCommand[] = [];
-    for (const kind of kinds) {
-      const spot = nearestSpot(probe, kind);
+    for (const [i, kind] of kinds.entries()) {
+      const spot = nearestSpot(probe, kind, i >= kinds.length - extraFarms ? 16 : 0);
       const command: WorldCommand = { type: 'placeBuilding', kind, tx: spot[0], ty: spot[1] };
       const result = probe.apply(command);
       expect(result.ok, `placing kind ${kind}`).toBe(true);
@@ -342,9 +342,12 @@ describe('Supply chain determinism and speed', () => {
     return commands;
   }
 
-  /** The placeable spot nearest the map's middle (ring by ring); a hut's spot must also have trees nearby. */
-  function nearestSpot(world: World, kind: ObjectKind): [number, number] {
-    for (let r = 0; r < 200; r++) {
+  /**
+   * The placeable spot nearest the map's middle (ring by ring, from ring `minRing`); a hut's spot must also have
+   * trees nearby.
+   */
+  function nearestSpot(world: World, kind: ObjectKind, minRing = 0): [number, number] {
+    for (let r = minRing; r < 200; r++) {
       for (let ty = 256 - r; ty <= 256 + r; ty++) {
         for (let tx = 256 - r; tx <= 256 + r; tx++) {
           if (Math.max(Math.abs(tx - 256), Math.abs(ty - 256)) !== r) continue;
@@ -379,10 +382,8 @@ describe('Supply chain determinism and speed', () => {
     const commands = campCommands(2);
     const a = run(commands).world;
     const b = run(commands).world;
-    expect(a.population.count).toBe(12);
+    expect(a.population.count).toBe(3); // one worker per producer
     expect(worldChecksum(a)).toBe(worldChecksum(b));
-    const workers = [...a.peasants()].filter((p) => p.workplaceId !== null);
-    expect(workers).toHaveLength(3);
   });
 
   it('stays in step over 5000 ticks of woodcutting: equal checksums every 500 ticks, trees felled into stumps', () => {
@@ -405,9 +406,9 @@ describe('Supply chain determinism and speed', () => {
     expect(trees(a)).toBeLessThan(treesAtStart);
   }, 20000);
 
-  it('runs 3000 ticks with 40 peasants quickly', () => {
-    const { world, ms } = run(campCommands(9));
+  it('runs 3000 ticks with 40 workers quickly', () => {
+    const { world, ms } = run(campCommands(9, 37));
     expect(world.population.count).toBe(40);
-    expect(ms, `supply chain: 3000 ticks with 40 peasants took ${ms.toFixed(1)} ms`).toBeLessThan(500);
+    expect(ms, `supply chain: 3000 ticks with 40 workers took ${ms.toFixed(1)} ms`).toBeLessThan(500);
   });
 });

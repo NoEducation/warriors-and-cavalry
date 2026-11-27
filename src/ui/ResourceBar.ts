@@ -17,13 +17,13 @@ export class ResourceBar {
   private readonly resources = new Map<ResourceKind, Slot>();
   private readonly peasants: Slot;
 
-  /** Builds one slot per resource and one for the peasants inside `root`. Create once at setup. */
+  /** Builds one slot per resource and one for the workers inside `root`. Create once at setup. */
   public constructor(private readonly root: HTMLElement) {
     for (const kind of RESOURCE_KINDS) {
       const name = RESOURCE_NAMES[kind];
       this.resources.set(kind, this.addSlot(RESOURCE_ICONS[kind], name.charAt(0).toUpperCase() + name.slice(1)));
     }
-    this.peasants = this.addSlot('peasant', 'Peasants');
+    this.peasants = this.addSlot('peasant', 'Workers / worker limit');
   }
 
   /**

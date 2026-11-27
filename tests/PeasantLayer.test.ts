@@ -27,8 +27,8 @@ function tickUntil(world: World, done: () => boolean, max = 3000): void {
 }
 
 /**
- * A flat 32×32 camp: a Keep at (2, 2) (peasants arrive at (2, 6)), a Woodcutter's hut at (20, 6) with trees east of
- * it, and a Stockpile at (10, 12). Food for two arrivals.
+ * A flat 32×32 camp: a Keep at (2, 2) (workers appear at (2, 6)), a Woodcutter's hut at (20, 6) with trees east
+ * of it, a Stockpile at (10, 12) and a Wheat farm at (2, 20): two workers.
  */
 function camp(): World {
   const world = new World(flatMap(32), new Economy(resources(100, 40, 10)));
@@ -37,6 +37,7 @@ function camp(): World {
     [ObjectKind.Keep, 2, 2],
     [ObjectKind.WoodcutterHut, 20, 6],
     [ObjectKind.Stockpile, 10, 12],
+    [ObjectKind.WheatFarm, 2, 20],
   ] as const) {
     const result = world.apply({ type: 'placeBuilding', kind, tx, ty });
     if (!result.ok) throw new Error(`placement failed: ${result.reason}`);
@@ -206,20 +207,14 @@ describe('PeasantLayer', () => {
 
   it(`grows past ${PEASANT_RENDER_CONFIG.initialCapacity} peasants without throwing`, () => {
     expect(Object.isFrozen(PEASANT_RENDER_CONFIG)).toBe(true);
-    const economy = new Economy(resources(100, 40, 50));
-    const world = new World(flatMap(64), economy);
+    const world = new World(flatMap(128));
     world.spawn(ObjectKind.Keep, 2, 2);
-    // 64 Hovels: housing for 4 + 256 peasants.
+    // 64 Hovels: housing for 4 + 256 workers, and a hut for each of them.
     for (let i = 0; i < 64; i++) world.spawn(ObjectKind.Hovel, 10 + (i % 16) * 3, 10 + Math.floor(i / 16) * 3);
+    for (let i = 0; i < 260; i++) world.spawn(ObjectKind.WoodcutterHut, 2 + (i % 40) * 3, 30 + Math.floor(i / 40) * 3);
     const layer = new PeasantLayer();
-    tickUntil(
-      world,
-      () => {
-        economy.add(ResourceKind.Food, 1);
-        return world.population.count > PEASANT_RENDER_CONFIG.initialCapacity;
-      },
-      20000,
-    );
+    world.tick();
+    expect(world.population.count).toBeGreaterThan(PEASANT_RENDER_CONFIG.initialCapacity);
     expect(() => layer.update(world, 0)).not.toThrow();
     expect(bodies(layer).count).toBe(world.population.count);
     expect(bodies(layer).instanceMatrix.count).toBeGreaterThanOrEqual(world.population.count);
@@ -229,7 +224,7 @@ describe('PeasantLayer', () => {
   it('empties its group on dispose', () => {
     const world = camp();
     const layer = new PeasantLayer();
-    tickUntil(world, () => world.population.count === 1);
+    tickUntil(world, () => world.population.count > 0);
     layer.update(world, 0);
     layer.dispose();
     expect(layer.object.children).toHaveLength(0);

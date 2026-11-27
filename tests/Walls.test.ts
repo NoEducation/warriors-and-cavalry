@@ -227,7 +227,7 @@ describe('walls and peasants', () => {
   it('reports workerCannotReach when the ring has no gate', () => {
     const { world, hut } = walledCamp(false);
     tickUntil(world, () => world.productionState(hut.id)?.status === 'workerCannotReach', 200);
-    expect(first(world)?.state).toBe('idle');
+    expect(first(world)).toBeUndefined(); // no worker is spawned for a hut it cannot reach
   });
 
   it('never crosses a diagonal wall run, going around its end instead', () => {

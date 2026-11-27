@@ -23,64 +23,63 @@ export class WoodcutterTrips {
 
   /** True when `p` works at a building that needs trees (a woodcutter's hut). */
   public isWoodcutter(p: Peasant): boolean {
-    const workplace = p.workplaceId === null ? undefined : this.world.objectById(p.workplaceId);
+    const workplace = this.world.objectById(p.workplaceId);
     return workplace !== undefined && OBJECT_KINDS[workplace.kind].production?.treeRadius != null;
   }
 
-  /**
-   * `p` has reached its workplace: starts working there, or (a woodcutter) heads for the nearest free tree in reach.
-   * False when it is a woodcutter whose free trees are all out of reach (the caller gives the job up).
-   */
-  public arriveAtWork(p: Peasant): boolean {
-    if (this.isWoodcutter(p)) return this.atHut(p);
-    p.startWorking();
-    return true;
+  /** `p` has reached its workplace: starts working there, or (a woodcutter) heads for the nearest free tree in reach. */
+  public arriveAtWork(p: Peasant): void {
+    if (this.isWoodcutter(p)) this.lookForTree(p);
+    else p.startWorking();
   }
 
   /**
-   * One tick of a woodcutter's own part of its trip: walking to its tree, or waiting at the hut for a free one. Other
-   * workers and states are left alone. False when it can no longer pick a tree (the caller gives the job up).
+   * One tick of a woodcutter's own part of its trip: walking to its tree, or waiting for a free or reachable one.
+   * Other workers and states are left alone.
    */
-  public tick(p: Peasant): boolean {
-    if (p.state === 'toTree') return this.tickToTree(p);
-    if (p.state === 'working' && p.waitTicks > 0) return this.tickWaiting(p);
-    return true;
+  public tick(p: Peasant): void {
+    if (p.waitTicks > 0 && (p.state === 'toTree' || p.state === 'working')) {
+      if (p.countDownWait()) this.lookForTree(p);
+    } else if (p.state === 'toTree') {
+      this.tickToTree(p);
+    }
   }
 
   /**
-   * `p` stands at its hut: heads for the nearest free tree in reach, or waits there when there is none. False when
-   * free trees exist but none can be reached.
+   * True when `p` is a woodcutter waiting for a way to the free trees in reach of its hut, all of which it cannot
+   * reach now.
    */
-  private atHut(p: Peasant): boolean {
+  public isCutOff(p: Peasant): boolean {
+    return p.state === 'toTree' && p.waitTicks > 0;
+  }
+
+  /**
+   * Heads `p` for the nearest free tree in reach of its hut. With none free it waits where it is (`noTrees`); with
+   * free ones it cannot reach it waits too (`isCutOff`); either way it looks again after the wait.
+   */
+  private lookForTree(p: Peasant): void {
     const result = this.pickTree(p);
     if (result === 'none') p.waitAtWork();
-    return result !== 'unreachable';
-  }
-
-  /** One tick of a wait at the hut; when it ends, looks for a tree again. False as for `atHut`. */
-  private tickWaiting(p: Peasant): boolean {
-    return !p.countDownWait() || this.atHut(p);
+    else if (result === 'unreachable') p.waitForTree();
   }
 
   /**
    * One tick of walking to its tree: picks again when the tree is gone or the way is blocked, starts chopping on
-   * arrival. False when no tree can be picked any more.
+   * arrival.
    */
-  private tickToTree(p: Peasant): boolean {
+  private tickToTree(p: Peasant): void {
     const tree = p.treeId === null ? undefined : this.world.objectById(p.treeId);
-    if ((tree?.kind !== ObjectKind.Tree || this.walker.isNextStepBlocked(p)) && this.pickTree(p) !== 'heading') {
-      return false;
+    if (tree?.kind !== ObjectKind.Tree || this.walker.isNextStepBlocked(p)) {
+      this.lookForTree(p);
+      if (p.state !== 'toTree' || p.waitTicks > 0) return;
     }
     this.walker.tick(p);
-    if (p.stepTicks > 0 || p.pathIndex < p.path.length) return true;
-    if (this.isNextTo(p, p.treeId)) {
-      p.startChopping();
-      return true;
-    }
-    return this.pickTree(p) === 'heading';
+    if (p.stepTicks > 0 || p.pathIndex < p.path.length) return;
+    if (this.isNextTo(p, p.treeId)) p.startChopping();
+    else this.lookForTree(p);
   }
 
-  /** Frees the tree `p` has claimed, if any. Call before it goes idle or picks up its wood. */
+  /** Frees the tree `p` has claimed, if any. Call before it is removed or picks up its wood. */
   public release(p: Peasant): void {
     if (p.treeId === null) return;
     this.claims.release(p.treeId);
@@ -111,8 +110,8 @@ export class WoodcutterTrips {
   }
 
   /** The unclaimed trees within the tree radius of hut `hutId` (Chebyshev from its footprint), row by row. */
-  private candidates(hutId: number | null): PathTarget[] {
-    const hut = hutId === null ? undefined : this.world.objectById(hutId);
+  private candidates(hutId: number): PathTarget[] {
+    const hut = this.world.objectById(hutId);
     const info = hut ? OBJECT_KINDS[hut.kind] : undefined;
     const r = info?.production?.treeRadius;
     if (!hut || !info || r == null) return [];

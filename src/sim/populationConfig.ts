@@ -1,16 +1,12 @@
-// Tunable population numbers: arrivals, job retries and walking speed, all in whole ticks.
+// Tunable population numbers: job retries and walking speed, all in whole ticks.
 
 /** Frozen so worlds stay reproducible; tune by editing these values here. */
 export const POPULATION_CONFIG = Object.freeze({
-  /** Ticks between two arrivals while there is housing and food. */
-  arrivalTicks: 50,
-  /** Food paid for each arriving peasant. */
-  arrivalFoodCost: 5,
-  /** Ticks a peasant whose search failed (a carrier with no storage place in reach) waits before searching again. */
+  /** Ticks a worker whose search failed (its way to work, to storage or to a tree is blocked) waits before searching again. */
   retryTicks: 50,
   /** Peasant `id` waits `id % retrySpread` ticks more, so peasants stranded together do not all search on one tick. */
   retrySpread: 8,
-  /** Ticks a workplace without a path is skipped by job assignment. */
+  /** Ticks a workplace with no path from the Keep is skipped before a worker is tried for it again. */
   unreachableSkipTicks: 200,
   /** Ticks for one step to a straight neighbour. */
   straightStepTicks: 4,

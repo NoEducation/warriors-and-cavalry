@@ -83,14 +83,9 @@ export class World {
     return this.populace.peasants();
   }
 
-  /** How many peasants there are, how many the buildings house and how many are idle. */
+  /** How many workers there are and the worker limit the homes give. */
   public get population(): PopulationSummary {
-    return { count: this.populace.count, housing: this.populace.housing, idle: this.populace.idleCount };
-  }
-
-  /** Ticks counted toward the next peasant's arrival; 0 while nobody can arrive. */
-  public get arrivalTimer(): number {
-    return this.populace.arrivalTimer;
+    return { count: this.populace.count, housing: this.populace.housing };
   }
 
   /** What the production building `objectId` and its worker are doing; null for non-producers and unknown ids. */

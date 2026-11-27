@@ -11,7 +11,7 @@ const NO_TILES: readonly TileCoord[] = Object.freeze([]);
  * helpers call; everyone else sees it as a `PeasantView`.
  */
 export class Peasant implements PeasantView {
-  private _state: PeasantState = 'idle';
+  private _state: PeasantState = 'toWork';
   private _tx: number;
   private _ty: number;
   private _nextTx: number;
@@ -19,17 +19,20 @@ export class Peasant implements PeasantView {
   private _stepProgress = 0;
   private _stepTicks = 0;
   private _load: Load | null = null;
-  private _workplaceId: number | null = null;
   private _targetId: number | null = null;
   private _treeId: number | null = null;
   private _waitTicks = 0;
   private _path = NO_TILES;
   private _pathIndex = 0;
   private _walkMode: WalkMode = WalkMode.Ground;
-  private _stand: TileCoord | null = null;
 
-  /** A new, idle peasant standing on tile (tx, ty). */
-  public constructor(public readonly id: number, tx: number, ty: number) {
+  /** A new worker standing on tile (tx, ty), heading for its workplace, building `workplaceId`. */
+  public constructor(
+    public readonly id: number,
+    tx: number,
+    ty: number,
+    private readonly _workplaceId: number,
+  ) {
     this._tx = this._nextTx = tx;
     this._ty = this._nextTy = ty;
   }
@@ -42,27 +45,13 @@ export class Peasant implements PeasantView {
   public get stepProgress(): number { return this._stepProgress; }
   public get stepTicks(): number { return this._stepTicks; }
   public get load(): Load | null { return this._load; }
-  public get workplaceId(): number | null { return this._workplaceId; }
+  public get workplaceId(): number { return this._workplaceId; }
   public get targetId(): number | null { return this._targetId; }
   public get treeId(): number | null { return this._treeId; }
   public get waitTicks(): number { return this._waitTicks; }
   public get path(): readonly TileCoord[] { return this._path; }
   public get pathIndex(): number { return this._pathIndex; }
   public get walkMode(): WalkMode { return this._walkMode; }
-  public get stand(): TileCoord | null { return this._stand; }
-
-  /** idle -> toWork: takes the job at building `buildingId` and heads there, giving up its stand and any wait. */
-  public takeJob(buildingId: number): void {
-    this._workplaceId = buildingId;
-    this._state = 'toWork';
-    this._stand = null;
-    this._waitTicks = 0;
-  }
-
-  /** While idle: makes `tile` the tile it stands on or heads for; null to give its stand up. */
-  public standOn(tile: TileCoord | null): void {
-    this._stand = tile;
-  }
 
   /** toWork or toWorkBack -> working: stands at its workplace, so the building's production advances. */
   public startWorking(): void {
@@ -91,6 +80,13 @@ export class Peasant implements PeasantView {
     this.waitToRetry();
   }
 
+  /** -> toTree: a woodcutter whose free trees are all out of reach waits where it is, then looks again. */
+  public waitForTree(): void {
+    this._treeId = null;
+    this._state = 'toTree';
+    this.waitToRetry();
+  }
+
   /** working or chopping -> toStore: takes its building's finished batch to carry to storage, forgetting its tree. */
   public pickUp(load: Load): void {
     this._load = load;
@@ -110,21 +106,6 @@ export class Peasant implements PeasantView {
     this._targetId = null;
     this._state = 'toWorkBack';
     return load;
-  }
-
-  /**
-   * Any state -> idle: drops its job, load, target, tree, stand, wait and walk where it stands; a step under way is
-   * finished.
-   */
-  public goIdle(): void {
-    this._state = 'idle';
-    this._workplaceId = null;
-    this._load = null;
-    this._targetId = null;
-    this._treeId = null;
-    this._stand = null;
-    this._waitTicks = 0;
-    this.startWalk(NO_TILES);
   }
 
   /** After a failed search: waits `retryTicks` plus `id % retrySpread` ticks before searching again. */

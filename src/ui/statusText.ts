@@ -13,10 +13,9 @@ const PRODUCTION_STATUS_TEXT: Record<ProductionStatus, string> = Object.freeze({
   workerCannotReach: 'worker cannot reach',
 });
 
-/** `3/8 (2 idle)`: peasants over housing and, when any, the idle ones; the resource bar's peasant slot. */
+/** `3/8`: workers over the worker limit the homes give; the resource bar's peasant slot. */
 export function peasantCountText(population: PopulationSummary): string {
-  const idle = population.idle > 0 ? ` (${population.idle} idle)` : '';
-  return `${population.count}/${population.housing}${idle}`;
+  return `${population.count}/${population.housing}`;
 }
 
 /** `worker on the way`: what the HUD shows for a production building in `status`. */
