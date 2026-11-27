@@ -10,11 +10,11 @@ export const WATER_CONFIG = Object.freeze({
   /** Depth range stored in the depth texture: from this far above the sea (negative) to this far below it. */
   landDepth: -1.5,
   maxDepth: 6,
-  /** Murky, cold water: grey-green shallows sinking to near-black depths, with dirty foam. */
-  shallowColor: 0x4f6a5c,
-  midColor: 0x2c4548,
-  deepColor: 0x141f24,
-  foamColor: 0xb9b6a8,
+  /** Black, threatening sea: a thin band of murky green at the shore, then ink-dark depths and grey, dirty foam. */
+  shallowColor: 0x32463e,
+  midColor: 0x15232a,
+  deepColor: 0x05090c,
+  foamColor: 0x8c8a80,
   /** Longest frame step the waves advance by, so a stalled tab does not jump them. */
   maxStep: 0.1,
 });

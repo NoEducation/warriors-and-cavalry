@@ -14,7 +14,7 @@ export const SHORE_LOOK_CONFIG = Object.freeze({
   sandWet: 0x7c6b50,
   pebble: 0x625b50,
   seabedSand: 0x7f7154,
-  seabedDeep: 0x26302c,
+  seabedDeep: 0x111816,
   /** Height above sea level over which wet sand dries, and the width of the darker tide line just above it. */
   wetBand: 0.14,
   tideBand: 0.07,

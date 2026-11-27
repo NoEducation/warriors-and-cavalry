@@ -57,7 +57,7 @@ void main() {
   float foam = max(1.0 - smoothstep(0.0, 0.035, depth), rollers * nearShore * 0.7);
   color = mix(color, foamColor, foam);
 
-  float alpha = mix(0.5, 0.9, smoothstep(0.0, 3.0, depth));
+  float alpha = mix(0.6, 0.97, smoothstep(0.0, 2.5, depth));
   gl_FragColor = vec4(color, max(alpha, foam * 0.95));
   #include <colorspace_fragment>
   #include <fog_fragment>
