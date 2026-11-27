@@ -4,9 +4,9 @@ import { hash2 } from '../sim/rng';
 import { PeasantPart } from './peasantParts';
 
 /** Muted tunic colours (sRGB). */
-export const TUNIC_COLORS: readonly number[] = Object.freeze([0xeadfc0, 0x8a6f4e, 0x6f7f55, 0x8c5a4a, 0x5f6f86]);
+export const TUNIC_COLORS: readonly number[] = Object.freeze([0xa89c80, 0x6a553c, 0x525b3c, 0x6c443a, 0x48505e]);
 /** Straw, undyed wool and brown headwear (sRGB). */
-export const HEADWEAR_COLORS: readonly number[] = Object.freeze([0xc89b3c, 0xb9ad94, 0x6a4d33]);
+export const HEADWEAR_COLORS: readonly number[] = Object.freeze([0x8f7034, 0x8a8170, 0x52402b]);
 
 const LOOK_SEED = 0x5eed;
 

@@ -22,8 +22,8 @@ export const UNIT_RENDER_CONFIG = Object.freeze({
   /** Most a unit is drawn off its tile's centre, so units sharing a tile stand apart. */
   spread: 0.22,
   /** Tunic and helmet colours (sRGB) of each side. */
-  tunic: Object.freeze({ [Side.Player]: 0x3d62b3, [Side.Raider]: 0xa8352f }),
-  helmet: Object.freeze({ [Side.Player]: 0xa9b0b8, [Side.Raider]: 0x5a3b2a }),
+  tunic: Object.freeze({ [Side.Player]: 0x34508e, [Side.Raider]: 0x9c2a22 }),
+  helmet: Object.freeze({ [Side.Player]: 0x8e949a, [Side.Raider]: 0x3e2a1e }),
 });
 
 const PHASE_SEED = 0x50d1;

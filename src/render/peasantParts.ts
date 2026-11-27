@@ -48,11 +48,11 @@ export interface PartPiece {
 
 /** White parts take their colour from the instance (tunic, headwear). */
 const WHITE = 0xffffff;
-const SKIN = 0xe0b48c;
+const SKIN = 0xc89c7a;
 const COLORS = Object.freeze({
   hose: 0x5a4632,
   shoe: 0x2e2218,
-  sleeve: 0xcbb994,
+  sleeve: 0x9c8c70,
   belt: 0x4a3420,
   eyes: 0x2a1c14,
   hair: 0x5b3a1e,
@@ -60,7 +60,7 @@ const COLORS = Object.freeze({
   logEnd: 0xc9a46a,
   stone: 0x9a9a94,
   strap: 0x6e5236,
-  sack: 0xc8ad78,
+  sack: 0x9e8a62,
   handle: 0x7a5530,
   iron: 0x6d7378,
   blade: 0xa7acb0,

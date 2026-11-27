@@ -19,6 +19,13 @@
         height: 100vh;
         image-rendering: pixelated;
       }
+      /* Darkened edges over the scene, for a gloomier mood; clicks pass through. */
+      #vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 55%, var(--shadow-60) 100%);
+      }
       #error {
         position: absolute;
         inset: 0;
@@ -35,6 +42,7 @@
   </head>
   <body>
     <canvas id="game"></canvas>
+    <div id="vignette"></div>
     <div id="hud"></div>
     <div id="resources" class="panel"></div>
     <div id="buildbar" class="panel"></div>
