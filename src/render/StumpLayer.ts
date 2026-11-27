@@ -15,8 +15,8 @@ export const STUMP_CONFIG = Object.freeze({
   height: 0.14,
   /** Sunk into the ground, so stumps do not float on slopes. */
   sink: 0.03,
-  bark: 0x5e4128,
-  cut: 0xc9a46a,
+  bark: 0x4a3420,
+  cut: 0xa8885a,
   sides: 7,
 });
 

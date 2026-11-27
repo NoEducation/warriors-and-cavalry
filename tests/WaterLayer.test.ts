@@ -31,14 +31,17 @@ describe('encodeWaterDepth', () => {
 });
 
 describe('WaterLayer', () => {
-  it('covers the map at sea level with one mesh', () => {
+  it('covers the map and an open sea out to the horizon around it, at sea level, with one mesh', () => {
     const layer = new WaterLayer(slopeMap());
     const meshes = layer.object.children.filter((c): c is THREE.Mesh => c instanceof THREE.Mesh);
     expect(meshes).toHaveLength(1);
     const box = new THREE.Box3().setFromObject(layer.object);
-    expect(box.min.x).toBeCloseTo(0);
-    expect(box.max.x).toBeCloseTo(4);
-    expect(box.max.z).toBeCloseTo(4);
+    const m = WATER_CONFIG.openSeaMargin;
+    expect(m).toBeGreaterThan(500);
+    expect(box.min.x).toBeCloseTo(-m);
+    expect(box.min.z).toBeCloseTo(-m);
+    expect(box.max.x).toBeCloseTo(4 + m);
+    expect(box.max.z).toBeCloseTo(4 + m);
     expect(box.max.y).toBeCloseTo(0);
     layer.dispose();
   });

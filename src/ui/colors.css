@@ -6,38 +6,38 @@
   --white: #fff;
 
   /* Wood of the panels, darkest to lightest. */
-  --oak-darkest: #1e1209;
-  --oak-dark: #2b1a0e;
-  --oak: #4a2e17;
-  --oak-light: #6b4423;
+  --oak-darkest: #140c07;
+  --oak-dark: #1f140c;
+  --oak: #382417;
+  --oak-light: #523621;
 
   /* Plaques (tool and menu buttons): the top and bottom of their gradient, plain and active. */
-  --plaque-top: #5a3a1d;
-  --plaque-bottom: #3a2410;
-  --plaque-active-top: #7a5326;
-  --plaque-active-bottom: #4e3014;
-  --plaque-sheen: rgba(255, 220, 160, 0.2);
+  --plaque-top: #45301c;
+  --plaque-bottom: #2a1b0e;
+  --plaque-active-top: #6a3e22;
+  --plaque-active-bottom: #3e2213;
+  --plaque-sheen: rgba(255, 210, 160, 0.12);
 
   /* Trim and text. */
-  --bronze: #8a6a32;
-  --gold: #e0b450;
-  --parchment: #f1e2bd;
-  --parchment-dim: #c9b68c;
-  --danger: #ff7a5c;
+  --bronze: #6e5530;
+  --gold: #b88c42;
+  --parchment: #d8c9a4;
+  --parchment-dim: #a8977a;
+  --danger: #e0563c;
 
   /* Combat: the selection box and the defeat banner. */
   --select: #f4e27a;
-  --blood: #6e1410;
+  --blood: #5e100c;
 
   /* The start menu's night sky behind the panel. */
-  --sky: #2a3b4a;
-  --sky-dark: #0b1016;
+  --sky: #3a2a22;
+  --sky-dark: #0a0807;
 
   /* Translucent shades. */
   --gold-sheen: color-mix(in srgb, var(--gold) 35%, transparent);
   --gold-glow: color-mix(in srgb, var(--gold) 60%, transparent);
   --bronze-faint: color-mix(in srgb, var(--bronze) 50%, transparent);
-  --sky-haze: rgba(27, 42, 56, 0.55);
+  --sky-haze: rgba(40, 26, 20, 0.55);
   --shadow-25: color-mix(in srgb, var(--black) 25%, transparent);
   --shadow-45: color-mix(in srgb, var(--black) 45%, transparent);
   --shadow-50: color-mix(in srgb, var(--black) 50%, transparent);

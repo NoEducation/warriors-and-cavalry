@@ -1,4 +1,4 @@
-// The sea: one plane over the map at sea level, coloured by a shader from a texture of the water depth at each corner.
+// The sea: one plane at sea level over the map and an open sea far past its edges, coloured by a shader from a texture of the water depth at each corner.
 import * as THREE from 'three';
 import type { GameMap } from '../sim/GameMap';
 import { MAPGEN_CONFIG } from '../sim/MapGenerator';
@@ -10,10 +10,18 @@ export const WATER_CONFIG = Object.freeze({
   /** Depth range stored in the depth texture: from this far above the sea (negative) to this far below it. */
   landDepth: -1.5,
   maxDepth: 6,
-  shallowColor: 0x3cc4c0,
-  midColor: 0x2a80b8,
-  deepColor: 0x143f70,
-  foamColor: 0xf4f8f6,
+  /** Black, threatening sea: a thin band of murky green at the shore, then ink-dark depths and grey, dirty foam. */
+  shallowColor: 0x32463e,
+  midColor: 0x15232a,
+  deepColor: 0x060d14,
+  foamColor: 0x8c8a80,
+  /** The open ocean around the island: a cold, dark blue, reached through a wide, wobbling band around the map edge. */
+  openSeaColor: 0x0c2036,
+  /** Where that band starts inside the map edge and where it ends outside it, in world units, and how far noise moves it. */
+  openSeaBlend: Object.freeze([-45, 90]) as readonly [number, number],
+  openSeaWobble: 30,
+  /** How far the open sea reaches past every map edge, in world units: beyond the camera's far plane, so it never ends. */
+  openSeaMargin: 1500,
   /** Longest frame step the waves advance by, so a stalled tab does not jump them. */
   maxStep: 0.1,
 });
@@ -43,7 +51,7 @@ export class WaterLayer implements WorldLayer {
     this.depthTexture.magFilter = THREE.LinearFilter;
     this.depthTexture.minFilter = THREE.LinearFilter;
     this.depthTexture.needsUpdate = true;
-    const geometry = new THREE.PlaneGeometry(map.width, map.height)
+    const geometry = new THREE.PlaneGeometry(map.width + 2 * c.openSeaMargin, map.height + 2 * c.openSeaMargin)
       .rotateX(-Math.PI / 2) // plane normal +z -> +y
       .translate(map.width / 2, MAPGEN_CONFIG.seaLevel, map.height / 2);
     const material = new THREE.ShaderMaterial({
@@ -51,7 +59,9 @@ export class WaterLayer implements WorldLayer {
       fragmentShader: WATER_FRAGMENT_SHADER,
       transparent: true,
       depthWrite: false,
+      fog: true,
       uniforms: {
+        ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
         depthMap: { value: this.depthTexture },
         mapSize: { value: new THREE.Vector2(map.width, map.height) },
         time: { value: 0 },
@@ -61,6 +71,9 @@ export class WaterLayer implements WorldLayer {
         midColor: { value: new THREE.Color(c.midColor) },
         deepColor: { value: new THREE.Color(c.deepColor) },
         foamColor: { value: new THREE.Color(c.foamColor) },
+        openSeaColor: { value: new THREE.Color(c.openSeaColor) },
+        openSeaBlend: { value: new THREE.Vector2(c.openSeaBlend[0], c.openSeaBlend[1]) },
+        openSeaWobble: { value: c.openSeaWobble },
       },
     });
     this.mesh = new THREE.Mesh(geometry, material);

@@ -10,17 +10,19 @@ import { beachGrassBlend, sandColor, seabedColor } from './shoreColor';
 
 /** Colour tuning for the terrain, in sRGB hex colours and world units. Tune by editing these values. */
 export const TERRAIN_LOOK_CONFIG = Object.freeze({
-  grassLush: 0x3c7a2c,
-  grassMeadow: 0x5e9c3a,
-  grassDry: 0x93a24c,
-  grassHighland: 0x6f8a4e,
-  rockMoss: 0x737d5e,
-  rockStone: 0x7f7a72,
-  rockCliff: 0x4e4339,
-  snow: 0xd8dee6,
+  /** Late-autumn grass: dark olive turf, faded ochre meadows, rust-brown dead patches, grey-green uplands. */
+  grassLush: 0x4b5a2a,
+  grassMeadow: 0x6c6936,
+  grassDry: 0x86633a,
+  grassHighland: 0x51523a,
+  rockMoss: 0x55574a,
+  rockStone: 0x625e58,
+  rockCliff: 0x332c26,
+  /** Early, dirty snow on the peaks. */
+  snow: 0xaeb1b4,
   /** Quarry ground: pale cut limestone, warming to ochre in patches. */
-  quarryPale: 0xdccfab,
-  quarryOchre: 0xc9a66e,
+  quarryPale: 0xaea283,
+  quarryOchre: 0x9c7f52,
   /** Noise frequency per tile of the large grass patches, of the dry spots, and of the fine mottling. */
   patchScale: 1 / 28,
   dryScale: 1 / 17,

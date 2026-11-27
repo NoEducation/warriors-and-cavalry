@@ -9,27 +9,28 @@ export const FOUNDATION_DEPTH = 1.5;
 export const FOUNDATION_LIFT = 0.1;
 
 export const SHAPE_COLORS = {
-  foundation: 0x6e6a60,
-  timber: 0x8a6a45,
-  darkTimber: 0x7a5a3a,
-  straw: 0xc9b458,
-  stone: 0x9a9a94,
-  darkStone: 0x6f6f6a,
-  /** Freshly cut quarry stone: warmer and lighter than the grey Rock terrain (0x8c8c88) it is dug from. */
-  cutStone: 0xd2c09c,
-  darkCutStone: 0xb09d7a,
-  bareEarth: 0x7b5b3a,
-  hutRoof: 0x4a3a2a,
-  logs: 0x6b4a2b,
-  cropGreen: 0x6aa84f,
-  cropGold: 0xd9b93a,
-  door: 0x4f3622,
-  shutter: 0x5d7a4a,
-  windowDark: 0x2a241e,
-  ridge: 0x8f7a3a,
-  banner: 0xa3302a,
-  rope: 0xb59a6a,
-  plaster: 0xd9cfb4,
+  // Weathered, sooty materials: grey-brown timber, rotting thatch, cold stone, dirty plaster.
+  foundation: 0x57534b,
+  timber: 0x6b5236,
+  darkTimber: 0x57422e,
+  straw: 0x8f7c48,
+  stone: 0x7b7973,
+  darkStone: 0x56554f,
+  /** Freshly cut quarry stone: warmer and lighter than the grey Rock terrain it is dug from. */
+  cutStone: 0xaa9c7e,
+  darkCutStone: 0x8c7d62,
+  bareEarth: 0x5a432d,
+  hutRoof: 0x372b20,
+  logs: 0x553b23,
+  cropGreen: 0x5f6c34,
+  cropGold: 0xa8842c,
+  door: 0x3a281a,
+  shutter: 0x46533a,
+  windowDark: 0x1a1612,
+  ridge: 0x695a2e,
+  banner: 0x7e1f1b,
+  rope: 0x8e7a55,
+  plaster: 0xaea58c,
 } as const;
 
 /** An axis-aligned box in a building's local coordinates. */
