@@ -5,13 +5,15 @@ import { ArmyOrders } from './ArmyOrders';
 import { Battlefield } from './Battlefield';
 import { Breach } from './Breach';
 import type { MapObject } from './MapObject';
-import { OBJECT_KINDS } from './ObjectKind';
+import { OBJECT_KINDS, ObjectKind } from './ObjectKind';
+import { RaidSchedule, type RaidView, waveArchers, waveSize } from './RaidSchedule';
+import { RaidSpawner } from './RaidSpawner';
 import { RaiderBrain } from './RaiderBrain';
 import { SoldierBrain } from './SoldierBrain';
 import { StepWalker } from './StepWalker';
 import { Training, type TrainingQueueView } from './Training';
 import { Unit } from './Unit';
-import { isUnitKind, Side, type UnitKind, UNIT_KINDS } from './UnitKind';
+import { isUnitKind, Side, UnitKind, UNIT_KINDS } from './UnitKind';
 import type { UnitView } from './UnitView';
 import { UnitWalks } from './UnitWalks';
 import type { CommandFailure, OrderCommand, OrderSuccess, TrainUnitCommand, TrainUnitSuccess } from './WorldCommand';
@@ -31,17 +33,23 @@ export class Army {
   private readonly raiderBrain: RaiderBrain;
   /** Standing buildings raiders may attack, by id (ascending). */
   private readonly buildings = new Map<number, MapObject>();
+  private readonly raids = new RaidSchedule();
+  private readonly spawner: RaidSpawner;
+  /** True while a raider's strike is wrecking a building, so the loss of the last Keep counts as a defeat. */
+  private wrecking = false;
   private nextId = 1;
 
   /** The army of `world`. Create once per world. */
   public constructor(private readonly world: ArmyHost) {
     const walker = new StepWalker(world.map.width, world.map.height, (tx, ty) => world.walkClass(tx, ty));
-    const field = new Battlefield(world, this.byId, () => {});
+    const field = new Battlefield(world, this.byId, (id, amount) => this.wreck(id, amount));
     const walks = new UnitWalks(world, walker, field);
     this.orders = new ArmyOrders(world, this.byId);
     this.soldierBrain = new SoldierBrain(field, walks);
     const ground = { units: this.byId, buildings: this.buildings };
-    this.raiderBrain = new RaiderBrain(field, walks, new Breach(world, walker), ground);
+    const breach = new Breach(world, walker);
+    this.raiderBrain = new RaiderBrain(field, walks, breach, ground);
+    this.spawner = new RaidSpawner(world, walks.raiderWalkClass, breach);
   }
 
   /** Every unit in ascending id order (dead ones only until the end of the tick that killed them). */
@@ -77,12 +85,14 @@ export class Army {
   /** Call for every object added to the world. */
   public buildingAdded(object: MapObject): void {
     if (OBJECT_KINDS[object.kind].hitPoints > 0) this.buildings.set(object.id, object);
+    if (object.kind === ObjectKind.Keep) this.raids.keepBuilt();
     this.training.buildingAdded(object);
   }
 
   /** Call for every object removed from the world. */
   public buildingRemoved(object: MapObject): void {
     this.buildings.delete(object.id);
+    if (object.kind === ObjectKind.Keep && !this.keep()) this.raids.keepLost(this.wrecking);
     this.training.buildingRemoved(object);
   }
 
@@ -110,9 +120,22 @@ export class Army {
     return this.orders.apply(command);
   }
 
-  /** Advances one tick: training, then every living unit in ascending id order, then the dead are removed. */
+  /** The raid timer, the Keep's fall and the raiders alive. */
+  public get raidView(): RaidView {
+    let raidersAlive = 0;
+    for (const unit of this.byId.values()) if (unit.side === Side.Raider && unit.alive) raidersAlive++;
+    const { wave, ticksToNextWave, keepFallen } = this.raids;
+    return { wave, ticksToNextWave, keepFallen, raidersAlive };
+  }
+
+  /**
+   * Advances one tick: training, the raid timer (a due wave appears), then every living unit in ascending id order,
+   * then the dead are removed.
+   */
   public tick(): void {
     this.training.tick((barracks, kind) => this.stepOut(barracks, kind));
+    const wave = this.raids.tick();
+    if (wave > 0) this.sendWave(wave);
     for (const unit of this.byId.values()) {
       if (!unit.alive) continue;
       unit.countDown();
@@ -120,6 +143,32 @@ export class Army {
       else this.raiderBrain.tick(unit);
     }
     this.removeDead();
+  }
+
+  /** Wave `wave` appears on its spawn tile, Spearmen first, then Archers; skipped when the Keep has none. */
+  private sendWave(wave: number): void {
+    const keep = this.keep();
+    const tile = keep ? this.spawner.tileFor(keep, wave) : null;
+    if (!tile) return;
+    const archers = waveArchers(wave);
+    const size = waveSize(wave);
+    for (let i = 0; i < size; i++) this.spawn(Side.Raider, i < size - archers ? UnitKind.Spearman : UnitKind.Archer, tile.tx, tile.ty);
+  }
+
+  /** The lowest-id standing Keep, or null. */
+  private keep(): MapObject | null {
+    for (const building of this.buildings.values()) if (building.kind === ObjectKind.Keep) return building;
+    return null;
+  }
+
+  /** A raider's strike on building `id`: a Keep it wrecks this way counts as fallen. */
+  private wreck(id: number, amount: number): void {
+    this.wrecking = true;
+    try {
+      this.world.damageBuilding(id, amount);
+    } finally {
+      this.wrecking = false;
+    }
   }
 
   /** A finished soldier steps out on the Barracks' first free access tile; false when there is none. */

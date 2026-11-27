@@ -30,7 +30,8 @@ export class Battlefield {
   public constructor(
     private readonly world: ArmyHost,
     private readonly units: ReadonlyMap<number, Unit>,
-    private readonly onBuildingFallen: (objectId: number) => void,
+    /** Takes hit points from a building; one at 0 falls (see `ArmyHost.damageBuilding`). */
+    private readonly damageBuilding: (objectId: number, amount: number) => void,
   ) {}
 
   /** True when tile (tx, ty) is a wall or tower top. */
@@ -97,8 +98,8 @@ export class Battlefield {
       if (other) other.hitPoints -= damage;
     } else if (target.type === 'peasant') {
       this.world.damagePeasant(target.id, damage);
-    } else if (this.world.damageBuilding(target.id, damage)) {
-      this.onBuildingFallen(target.id);
+    } else {
+      this.damageBuilding(target.id, damage);
     }
   }
 

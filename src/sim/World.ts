@@ -10,6 +10,7 @@ import { ObjectLifecycle } from './ObjectLifecycle';
 import type { PeasantView } from './PeasantView';
 import { Population, type PopulationSummary } from './Population';
 import { Production, type ProductionState } from './Production';
+import type { RaidView } from './RaidSchedule';
 import { type HitPoints, Structures } from './Structures';
 import { Stumps } from './Stumps';
 import { TreeFelling } from './TreeFelling';
@@ -103,6 +104,11 @@ export class World {
   /** Every Barracks' queue in ascending id order, as [id, queue]; for the checksum. */
   public trainingQueues(): Iterable<readonly [number, TrainingQueueView]> {
     return this.army.trainingQueues();
+  }
+
+  /** The raid timer, whether the Keep has fallen, and the raiders alive. */
+  public get raids(): RaidView {
+    return this.army.raidView;
   }
 
   /** The id the next unit will get; for the checksum. */
